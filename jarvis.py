@@ -404,7 +404,11 @@ def execute_tool(name, inp):
                         uri = tracks[0]["uri"]
                         title = tracks[0]["name"]
                         artist = tracks[0]["artists"][0]["name"]
-                        os.startfile(uri)
+                        spotify_exe = os.path.expandvars(r"%APPDATA%\Spotify\Spotify.exe")
+                        if os.path.exists(spotify_exe):
+                            subprocess.Popen([spotify_exe, "--uri", uri])
+                        else:
+                            os.startfile(uri)
                         return f"Playing {title} by {artist}"
                     return "No track found"
                 except Exception as e:
