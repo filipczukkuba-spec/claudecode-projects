@@ -54,8 +54,8 @@ def save_api_key(key):
 API_KEY = load_api_key()
 
 # ─── Spotify API (Client Credentials — no redirect URI, no login) ─────────────
-SPOTIFY_CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID", "")
-SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+SPOTIFY_CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID", "3772f28ca5c541e0a970a60274c84a68")
+SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "d91e6f1761f940bb84ac6ce628bdd127")
 
 def make_spotify():
     if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
