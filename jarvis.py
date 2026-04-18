@@ -376,27 +376,29 @@ def execute_tool(name, inp):
 
         elif name == "play_spotify":
             query = inp["query"]
-            # Open Spotify and search
             subprocess.Popen(f'start "" "spotify:search:{query}"', shell=True)
             time.sleep(5)
-            # Focus Spotify window
+            # Find Spotify window and get its bounds
+            spotify_win = None
             try:
                 wins = [w for w in gw.getAllWindows() if "spotify" in w.title.lower()]
                 if wins:
-                    wins[0].restore()
+                    spotify_win = wins[0]
+                    spotify_win.restore()
                     time.sleep(0.3)
-                    wins[0].activate()
-                    time.sleep(1.0)
+                    spotify_win.activate()
+                    time.sleep(1.2)
             except Exception:
                 pass
-            # Tab out of search box → Down to first song → Enter to select → Enter to play
-            pyautogui.press("tab")
-            time.sleep(0.3)
-            pyautogui.press("down")
-            time.sleep(0.3)
-            pyautogui.press("enter")
-            time.sleep(0.3)
-            pyautogui.press("enter")
+            if spotify_win:
+                # First song row in Spotify search is ~200px from window top,
+                # and sits in the right-side Songs panel (~45% across the window width)
+                song_x = spotify_win.left + int(spotify_win.width * 0.45)
+                song_y = spotify_win.top + 200
+                # Hover to reveal the play button then double-click to play
+                pyautogui.moveTo(song_x, song_y, duration=0.4)
+                time.sleep(0.4)
+                pyautogui.doubleClick(song_x, song_y)
             return f"Playing {query} on Spotify"
 
         elif name == "spotify_control":
