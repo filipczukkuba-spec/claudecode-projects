@@ -560,7 +560,7 @@ def listen_loop():
     recognizer = sr.Recognizer()
     recognizer.energy_threshold = 300
     recognizer.dynamic_energy_threshold = True
-    recognizer.pause_threshold = 2.5      # wait 2.5s of silence before stopping
+    recognizer.pause_threshold = 1.0      # wait 1s of silence before stopping
     recognizer.phrase_threshold = 0.3
     mic = sr.Microphone()
     timeouts = 0
