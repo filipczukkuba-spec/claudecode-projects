@@ -378,22 +378,24 @@ def execute_tool(name, inp):
             query = inp["query"]
             # Open Spotify and search
             subprocess.Popen(f'start "" "spotify:search:{query}"', shell=True)
-            time.sleep(4)
-            # Force Spotify to foreground
+            time.sleep(5)
+            # Focus Spotify window
             try:
-                subprocess.run(
-                    ["powershell", "-Command",
-                     "(New-Object -ComObject WScript.Shell).AppActivate('Spotify')"],
-                    capture_output=True, timeout=5
-                )
-                time.sleep(0.8)
+                wins = [w for w in gw.getAllWindows() if "spotify" in w.title.lower()]
+                if wins:
+                    wins[0].restore()
+                    time.sleep(0.3)
+                    wins[0].activate()
+                    time.sleep(1.0)
             except Exception:
                 pass
-            # From search box: Tab to results, Down to first track, Enter to play
+            # Tab out of search box → Down to first song → Enter to select → Enter to play
             pyautogui.press("tab")
-            time.sleep(0.2)
+            time.sleep(0.3)
             pyautogui.press("down")
-            time.sleep(0.2)
+            time.sleep(0.3)
+            pyautogui.press("enter")
+            time.sleep(0.3)
             pyautogui.press("enter")
             return f"Playing {query} on Spotify"
 
@@ -551,7 +553,7 @@ def wake_up():
             pygame.mixer.init()
             pygame.mixer.music.load(song)
             pygame.mixer.music.play(start=3.0)
-            time.sleep(7)
+            time.sleep(10)
             pygame.mixer.music.stop()
             pygame.mixer.quit()
         except Exception as e:
