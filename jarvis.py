@@ -27,8 +27,27 @@ except ImportError as e:
     sys.exit(1)
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-SOUNDS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_PATH = os.path.join(BASE_DIR, "jarvis_config.json")
+SOUNDS_DIR = os.path.join(BASE_DIR, "sounds")
+
+
+def load_api_key():
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if key:
+        return key
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH) as f:
+            return json.load(f).get("api_key", "")
+    return ""
+
+
+def save_api_key(key):
+    with open(CONFIG_PATH, "w") as f:
+        json.dump({"api_key": key}, f)
+
+
+API_KEY = load_api_key()
 
 # Find any mp3 in the sounds folder, not just iron_man.mp3
 def find_song():
@@ -476,10 +495,19 @@ def listen_loop():
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():
+    global API_KEY, client
     if not API_KEY:
-        print("ERROR: ANTHROPIC_API_KEY not set.")
-        print("Run:  set ANTHROPIC_API_KEY=your-key-here")
-        sys.exit(1)
+        print("=" * 40)
+        print("  First-time setup: enter your Anthropic API key")
+        print("  (Find it at console.anthropic.com → API Keys)")
+        print("=" * 40)
+        API_KEY = input("Paste API key: ").strip()
+        if not API_KEY:
+            print("No key entered. Exiting.")
+            sys.exit(1)
+        save_api_key(API_KEY)
+        client = anthropic.Anthropic(api_key=API_KEY)
+        print("Key saved. You won't be asked again.\n")
 
     pyautogui.FAILSAFE = False
 
