@@ -405,12 +405,11 @@ def execute_tool(name, inp):
                         title = tracks[0]["name"]
                         artist = tracks[0]["artists"][0]["name"]
                         print(f"  [spotify] Playing: {title} by {artist}  ({uri})")
-                        for proc in psutil.process_iter(["name"]):
-                            if proc.info["name"] and "spotify" in proc.info["name"].lower():
-                                try:
-                                    proc.kill()
-                                except Exception:
-                                    pass
+                        subprocess.run(
+                            ["powershell", "-Command",
+                             "Stop-Process -Name Spotify -Force -ErrorAction SilentlyContinue"],
+                            capture_output=True, timeout=5
+                        )
                         time.sleep(2)
                         spotify_exe = os.path.expandvars(r"%APPDATA%\Spotify\Spotify.exe")
                         subprocess.Popen([spotify_exe, uri])
