@@ -378,7 +378,7 @@ def execute_tool(name, inp):
             query = inp["query"]
             # Open Spotify and search
             subprocess.Popen(f'start "" "spotify:search:{query}"', shell=True)
-            time.sleep(3)
+            time.sleep(4)
             # Force Spotify to foreground
             try:
                 subprocess.run(
@@ -386,13 +386,14 @@ def execute_tool(name, inp):
                      "(New-Object -ComObject WScript.Shell).AppActivate('Spotify')"],
                     capture_output=True, timeout=5
                 )
-                time.sleep(0.6)
+                time.sleep(0.8)
             except Exception:
                 pass
-            # Navigate to first result and play
-            for _ in range(3):
-                pyautogui.press("tab")
-                time.sleep(0.15)
+            # From search box: Tab to results, Down to first track, Enter to play
+            pyautogui.press("tab")
+            time.sleep(0.2)
+            pyautogui.press("down")
+            time.sleep(0.2)
             pyautogui.press("enter")
             return f"Playing {query} on Spotify"
 
@@ -631,6 +632,9 @@ def main():
     print("  Ctrl+C             → exit")
     print("=" * 40)
 
+    print(f"  Running file:      {__file__}")
+    print(f"  Song path:         {SONG_PATH or 'NOT FOUND'}")
+    print("=" * 40)
     if not SONG_PATH:
         print("Note: No theme MP3 found in sounds/. Run setup_jarvis.py first.\n")
 
