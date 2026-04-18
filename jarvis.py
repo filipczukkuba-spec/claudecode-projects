@@ -404,8 +404,8 @@ def execute_tool(name, inp):
                         uri = tracks[0]["uri"]
                         title = tracks[0]["name"]
                         artist = tracks[0]["artists"][0]["name"]
-                        # Open track directly in desktop Spotify — no clicks needed
-                        subprocess.Popen(f'start "" "{uri}"', shell=True)
+                        # Open track URI directly in desktop Spotify
+                        webbrowser.open(uri)
                         return f"Playing {title} by {artist}"
                     return "No track found"
                 except Exception as e:
@@ -415,29 +415,12 @@ def execute_tool(name, inp):
 
         elif name == "spotify_control":
             action = inp["action"].lower()
-            if sp:
-                try:
-                    if action in ("pause",):
-                        sp.pause_playback()
-                    elif action in ("resume", "play"):
-                        sp.start_playback()
-                    elif action == "next":
-                        sp.next_track()
-                    elif action == "previous":
-                        sp.previous_track()
-                    elif action == "mute":
-                        sp.volume(0)
-                    return f"Spotify: {action}"
-                except Exception as e:
-                    return f"Spotify error: {e}"
-            else:
-                # Fallback to media keys
-                key_map = {"pause": "playpause", "resume": "playpause",
-                           "next": "nexttrack", "previous": "prevtrack", "mute": "volumemute"}
-                key = key_map.get(action)
-                if key:
-                    pyautogui.press(key)
-                return f"Spotify: {action}"
+            key_map = {"pause": "playpause", "resume": "playpause", "play": "playpause",
+                       "next": "nexttrack", "previous": "prevtrack", "mute": "volumemute"}
+            key = key_map.get(action)
+            if key:
+                pyautogui.press(key)
+            return f"Spotify: {action}"
 
         elif name == "send_email":
             to = urllib.parse.quote(inp["to"])
@@ -459,7 +442,8 @@ SYSTEM = (
     "Keep spoken responses short and conversational — they will be read aloud. "
     "When taking actions, briefly confirm what you're doing. "
     "You have full access to the user's computer and can open apps, browse the web, manage files, "
-    "run commands, control system settings, play music on Spotify, and write/send emails via Gmail."
+    "run commands, control system settings, play music on Spotify (free account), and write/send emails via Gmail. "
+    "The user has Spotify Free — you can open and play any track directly, and control playback with media keys."
 )
 
 
