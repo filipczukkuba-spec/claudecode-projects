@@ -550,7 +550,7 @@ def wake_up():
         try:
             pygame.mixer.init()
             pygame.mixer.music.load(song)
-            pygame.mixer.music.play()
+            pygame.mixer.music.play(start=3.0)
             time.sleep(7)
             pygame.mixer.music.stop()
             pygame.mixer.quit()
