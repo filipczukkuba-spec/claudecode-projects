@@ -405,12 +405,11 @@ def execute_tool(name, inp):
                         title = tracks[0]["name"]
                         artist = tracks[0]["artists"][0]["name"]
                         print(f"  [spotify] Playing: {title} by {artist}  ({uri})")
+                        subprocess.run(["taskkill", "/f", "/im", "Spotify.exe"],
+                                       capture_output=True)
+                        time.sleep(1.5)
                         spotify_exe = os.path.expandvars(r"%APPDATA%\Spotify\Spotify.exe")
-                        if os.path.exists(spotify_exe):
-                            subprocess.Popen([spotify_exe, uri])
-                        else:
-                            import ctypes
-                            ctypes.windll.shell32.ShellExecuteW(0, "open", uri, None, None, 1)
+                        subprocess.Popen([spotify_exe, uri])
                         return f"Playing {title} by {artist}"
                     return "No track found"
                 except Exception as e:
