@@ -92,6 +92,23 @@
       transform: scale(1.04);
     }
 
+    #title-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+
+    #fireworks {
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      width: 180px;
+      height: 120px;
+    }
+
     #score {
       display: flex;
       gap: 2.5rem;
@@ -111,7 +128,10 @@
   </style>
 </head>
 <body>
-  <h1>Tic Tac Toe</h1>
+  <div id="title-wrap">
+    <h1>Tic Tac Toe</h1>
+    <canvas id="fireworks" width="180" height="120"></canvas>
+  </div>
 
   <div id="score">
     <div class="score-box x-score">
@@ -200,6 +220,7 @@
           scoreX.textContent = scores.X;
           scoreO.textContent = scores.O;
           scoreDraw.textContent = scores.D;
+          if (scores.X === 7 || scores.O === 7) launchFireworks();
         } else {
           current = current === 'X' ? 'O' : 'X';
           status.textContent = `${current}'s turn`;
@@ -208,6 +229,61 @@
     });
 
     document.getElementById('reset').addEventListener('click', init);
+
+    // Fireworks
+    const fwCanvas = document.getElementById('fireworks');
+    const fwCtx = fwCanvas.getContext('2d');
+    let particles = [];
+    let fwAnim = null;
+
+    function launchFireworks() {
+      for (let burst = 0; burst < 5; burst++) {
+        setTimeout(() => spawnBurst(), burst * 220);
+      }
+    }
+
+    function spawnBurst() {
+      const cx = 30 + Math.random() * 120;
+      const cy = 15 + Math.random() * 70;
+      const colors = ['#e94560','#a8dadc','#f5a623','#fff','#c8f7c5','#f9ca24'];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      for (let i = 0; i < 28; i++) {
+        const angle = (i / 28) * Math.PI * 2;
+        const speed = 1.5 + Math.random() * 2.5;
+        particles.push({
+          x: cx, y: cy,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          alpha: 1,
+          color,
+          size: 2 + Math.random() * 2
+        });
+      }
+      if (!fwAnim) fwAnim = requestAnimationFrame(drawFW);
+    }
+
+    function drawFW() {
+      fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.04;
+        p.alpha -= 0.018;
+        fwCtx.globalAlpha = Math.max(0, p.alpha);
+        fwCtx.fillStyle = p.color;
+        fwCtx.beginPath();
+        fwCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        fwCtx.fill();
+      });
+      fwCtx.globalAlpha = 1;
+      particles = particles.filter(p => p.alpha > 0);
+      if (particles.length > 0) {
+        fwAnim = requestAnimationFrame(drawFW);
+      } else {
+        fwAnim = null;
+        fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+      }
+    }
 
     init();
   </script>
