@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import math
+import random
 import struct
 import threading
 import subprocess
@@ -31,9 +32,9 @@ except ImportError as e:
 import urllib.parse
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "jarvis_config.json")
-SOUNDS_DIR = os.path.join(BASE_DIR, "sounds")
+SOUNDS_DIR  = os.path.join(BASE_DIR, "sounds")
 
 
 def load_api_key():
@@ -53,8 +54,8 @@ def save_api_key(key):
 
 API_KEY = load_api_key()
 
-# ─── Spotify API (Client Credentials — no redirect URI, no login) ─────────────
-SPOTIFY_CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID", "3772f28ca5c541e0a970a60274c84a68")
+# ─── Spotify ──────────────────────────────────────────────────────────────────
+SPOTIFY_CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID",     "3772f28ca5c541e0a970a60274c84a68")
 SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "d91e6f1761f940bb84ac6ce628bdd127")
 
 def make_spotify():
@@ -71,7 +72,6 @@ def make_spotify():
 
 sp = make_spotify()
 
-# Find any audio file in the sounds folder
 def find_song():
     if not os.path.exists(SOUNDS_DIR):
         return None
@@ -85,21 +85,304 @@ SONG_PATH = find_song() or r"C:\Users\filip\Desktop\claudecode\sounds\iron_man.m
 if not os.path.exists(SONG_PATH):
     SONG_PATH = None
 
-CHUNK = 1024
-FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 44100
-CLAP_THRESHOLD = 1400       # RMS amplitude — lower = more sensitive
-DOUBLE_CLAP_MAX = 1.2       # seconds max between two claps
-DOUBLE_CLAP_DEBOUNCE = 0.12 # seconds min between two claps
+CHUNK            = 1024
+FORMAT           = pyaudio.paInt16
+CHANNELS         = 1
+RATE             = 44100
+CLAP_THRESHOLD   = 1400
+DOUBLE_CLAP_MAX  = 1.2
+DOUBLE_CLAP_DEBOUNCE = 0.12
 
 # ─── State ────────────────────────────────────────────────────────────────────
-active = False
+active               = False
 conversation_history = []
+visual_state         = "idle"   # idle | waking | listening | speaking
 
 
+# ─── Visual Engine ────────────────────────────────────────────────────────────
+class JarvisVisual:
+    ORB_R = 95
+
+    def __init__(self):
+        self.W = self.H = self.cx = self.cy = 0
+        self.t          = 0.0
+        self.particles  = []
+        self.ripples    = []
+        self.arcs       = []
+        self.screen     = None
+        self.clock      = None
+        self.font_hud   = None
+        self.font_label = None
+
+    def setup(self):
+        pygame.display.init()
+        pygame.font.init()
+        info = pygame.display.Info()
+        self.W, self.H = info.current_w, info.current_h
+        self.screen = pygame.display.set_mode(
+            (self.W, self.H), pygame.FULLSCREEN | pygame.NOFRAME
+        )
+        pygame.display.set_caption("J.A.R.V.I.S.")
+        self.clock      = pygame.time.Clock()
+        self.cx         = self.W // 2
+        self.cy         = self.H // 2
+        try:
+            self.font_hud   = pygame.font.SysFont("consolas", 20, bold=True)
+            self.font_label = pygame.font.SysFont("consolas", 13)
+        except Exception:
+            self.font_hud   = pygame.font.Font(None, 26)
+            self.font_label = pygame.font.Font(None, 18)
+        self._init_particles()
+        self._init_arcs()
+
+    def _init_particles(self):
+        self.particles = []
+        for _ in range(28):
+            angle    = random.uniform(0, math.tau)
+            base_r   = random.uniform(145, 295)
+            speed    = random.uniform(0.004, 0.013) * random.choice([-1, 1])
+            size     = random.uniform(2.5, 5.5)
+            shape    = random.choices(['dot', 'diamond', 'cross'], weights=[5, 3, 2])[0]
+            self.particles.append({
+                'angle':   angle,
+                'base_r':  base_r,
+                'r':       base_r,
+                'speed':   speed,
+                'size':    size,
+                'shape':   shape,
+                'alpha':   random.uniform(0.45, 1.0),
+                'y_phase': random.uniform(0, math.tau),
+                'y_amp':   random.uniform(8, 22),
+                'y_speed': random.uniform(0.003, 0.007) * random.choice([-1, 1]),
+            })
+
+    def _init_arcs(self):
+        self.arcs = []
+        for i in range(4):
+            self.arcs.append({
+                'r':      145 + i * 48,
+                'start':  random.uniform(0, math.tau),
+                'span':   random.uniform(0.4, 1.2),
+                'speed':  random.uniform(0.003, 0.009) * random.choice([-1, 1]),
+                'alpha':  random.randint(25, 55),
+            })
+
+    # ── drawing helpers ────────────────────────────────────────────────────────
+    def _surf_circle(self, r, color_rgba):
+        s = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
+        pygame.draw.circle(s, color_rgba, (r + 1, r + 1), r)
+        return s
+
+    def _blit_centered(self, surf, cx, cy):
+        self.screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
+
+    def _draw_glow(self, cx, cy, r, rgb, layers=9):
+        for i in range(layers, 0, -1):
+            gr    = r + (layers - i) * 11
+            alpha = int(160 * (i / layers) * 0.16)
+            s = self._surf_circle(gr, (*rgb, alpha))
+            self._blit_centered(s, cx, cy)
+
+    def _draw_orb(self, cx, cy, r, state):
+        if state == "speaking":
+            glow = (15, 110, 255)
+            mid  = (70, 160, 255)
+            core = (160, 210, 255)
+        elif state == "listening":
+            glow = (0,  170, 220)
+            mid  = (50, 210, 245)
+            core = (130, 235, 255)
+        elif state == "waking":
+            glow = (80, 80, 255)
+            mid  = (140, 140, 255)
+            core = (220, 220, 255)
+        else:
+            glow = (8,   70, 195)
+            mid  = (45, 120, 230)
+            core = (110, 170, 245)
+
+        self._draw_glow(cx, cy, r, glow)
+        self._blit_centered(self._surf_circle(r,            (*glow, 210)), cx, cy)
+        self._blit_centered(self._surf_circle(int(r * 0.65),(*mid,  230)), cx, cy)
+        self._blit_centered(self._surf_circle(int(r * 0.30),(200, 230, 255, 200)), cx, cy)
+        # specular highlight
+        hx = cx - r // 3
+        hy = cy - r // 3
+        self._blit_centered(self._surf_circle(int(r * 0.15), (230, 245, 255, 160)), hx, hy)
+
+    def _draw_particle(self, x, y, size, shape, alpha):
+        s  = max(1, int(size))
+        c  = (100, 185, 255, int(255 * alpha))
+        pad = s * 3
+        surf = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
+        cx, cy = pad, pad
+        if shape == 'diamond':
+            pts = [(cx, cy - s), (cx + s, cy), (cx, cy + s), (cx - s, cy)]
+            pygame.draw.polygon(surf, c, pts)
+        elif shape == 'cross':
+            w = max(1, s // 2)
+            pygame.draw.line(surf, c, (cx - s, cy), (cx + s, cy), w)
+            pygame.draw.line(surf, c, (cx, cy - s), (cx, cy + s), w)
+        else:
+            pygame.draw.circle(surf, c, (cx, cy), s)
+        self.screen.blit(surf, (int(x) - pad, int(y) - pad))
+
+    def _draw_rings(self, state):
+        for arc in self.arcs:
+            arc['start'] += arc['speed']
+            r     = arc['r']
+            alpha = arc['alpha']
+            if state == "speaking":
+                r     += int(18 * math.sin(self.t * 5 + arc['start']))
+                alpha  = min(120, alpha + 40)
+            elif state == "listening":
+                alpha = min(90, alpha + 20)
+
+            steps = 60
+            span  = arc['span']
+            pts   = []
+            for i in range(steps + 1):
+                a = arc['start'] + span * (i / steps)
+                pts.append((
+                    int(self.cx + r * math.cos(a)),
+                    int(self.cy + r * math.sin(a) * 0.55),
+                ))
+            if len(pts) >= 2:
+                surf = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
+                pygame.draw.lines(surf, (40, 120, 255, alpha), False, pts, 1)
+                self.screen.blit(surf, (0, 0))
+
+    def _draw_ripples(self):
+        for rp in self.ripples[:]:
+            r     = int(rp['r'])
+            alpha = int(rp['alpha'])
+            if alpha <= 0 or r <= 0:
+                self.ripples.remove(rp)
+                continue
+            s = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
+            pygame.draw.circle(s, (60, 160, 255, alpha), (r + 2, r + 2), r, 2)
+            self._blit_centered(s, self.cx, self.cy)
+            rp['r']     += 3.5
+            rp['alpha'] -= 5
+
+    def _draw_corner_deco(self):
+        c  = (18, 55, 140)
+        sz = 44
+        W, H = self.W, self.H
+        for x0, y0, dx, dy in [
+            (10, 10,  1,  1),
+            (W - 10, 10, -1,  1),
+            (10, H - 10,  1, -1),
+            (W - 10, H - 10, -1, -1),
+        ]:
+            pygame.draw.lines(self.screen, c, False,
+                              [(x0 + dx * sz, y0), (x0, y0), (x0, y0 + dy * sz)], 1)
+
+    def _draw_hud(self, state):
+        labels = {
+            "idle":      "STANDBY",
+            "waking":    "ACTIVATING",
+            "listening": "LISTENING",
+            "speaking":  "SPEAKING",
+        }
+        colors = {
+            "idle":      (35, 70, 155),
+            "waking":    (100, 100, 255),
+            "listening": (0,  195, 215),
+            "speaking":  (80, 160, 255),
+        }
+        label = labels.get(state, "STANDBY")
+        color = colors.get(state, (35, 70, 155))
+        txt   = self.font_hud.render(f"J.A.R.V.I.S.  ·  {label}", True, color)
+        self.screen.blit(txt, (self.W // 2 - txt.get_width() // 2, self.H - 55))
+        hint = self.font_label.render("ESC to exit  |  double clap to wake", True, (20, 45, 100))
+        self.screen.blit(hint, (self.W // 2 - hint.get_width() // 2, self.H - 28))
+
+    # ── main loop ─────────────────────────────────────────────────────────────
+    def run(self):
+        global visual_state
+        self.setup()
+
+        while True:
+            dt     = self.clock.tick(60) / 1000.0
+            self.t += dt
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    return
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    return
+
+            state = visual_state
+
+            # ── background ────────────────────────────────────────────────────
+            self.screen.fill((0, 2, 12))
+
+            # ── orb pulse calculation ─────────────────────────────────────────
+            if state == "speaking":
+                pulse = 1.0 + 0.14 * math.sin(self.t * 9)
+                if random.random() < 0.18:
+                    self.ripples.append({'r': self.ORB_R * pulse, 'alpha': 110})
+            elif state == "listening":
+                pulse = 1.0 + 0.07 * math.sin(self.t * 3.5)
+            elif state == "waking":
+                pulse = 1.0 + 0.20 * math.sin(self.t * 5)
+            else:
+                pulse = 1.0 + 0.03 * math.sin(self.t * 1.3)
+
+            orb_r = int(self.ORB_R * pulse)
+
+            # ── arcs / rings ──────────────────────────────────────────────────
+            self._draw_rings(state)
+
+            # ── ripples ───────────────────────────────────────────────────────
+            self._draw_ripples()
+
+            # ── particles ─────────────────────────────────────────────────────
+            speed_mult = 2.8 if state == "speaking" else (1.6 if state == "listening" else 1.0)
+            for p in self.particles:
+                p['angle']   += p['speed']   * speed_mult
+                p['y_phase'] += p['y_speed'] * speed_mult
+
+                if state == "speaking":
+                    target_r = p['base_r'] + 38 * math.sin(self.t * 2.5 + p['angle'])
+                elif state == "waking":
+                    target_r = p['base_r'] + 20 * math.sin(self.t * 4 + p['angle'])
+                else:
+                    target_r = p['base_r']
+                p['r'] += (target_r - p['r']) * 0.06
+
+                x = self.cx + p['r'] * math.cos(p['angle'])
+                y = (self.cy
+                     + p['r'] * math.sin(p['angle']) * 0.48
+                     + p['y_amp'] * math.sin(p['y_phase']))
+
+                alpha = p['alpha']
+                if state == "idle":
+                    alpha *= 0.55 + 0.45 * math.sin(self.t * 0.9 + p['angle'])
+
+                self._draw_particle(x, y, p['size'], p['shape'], alpha)
+
+            # ── orb ───────────────────────────────────────────────────────────
+            self._draw_orb(self.cx, self.cy, orb_r, state)
+
+            # ── decorations & HUD ─────────────────────────────────────────────
+            self._draw_corner_deco()
+            self._draw_hud(state)
+
+            pygame.display.flip()
+
+
+visual = JarvisVisual()
+
+
+# ─── Speech & Audio ───────────────────────────────────────────────────────────
 def speak(text):
+    global visual_state
     print(f"\nJARVIS: {text}")
+    visual_state = "speaking"
     try:
         safe = text.replace("'", " ").replace('"', " ")
         subprocess.run(
@@ -112,20 +395,7 @@ def speak(text):
         )
     except Exception as e:
         print(f"TTS error: {e}")
-
-
-def play_music(path):
-    try:
-        ps = (
-            f'$wmp = New-Object -ComObject WMPlayer.OCX; '
-            f'$wmp.URL = "{path}"; '
-            f'$wmp.controls.play(); '
-            f'Start-Sleep -Seconds 6; '
-            f'$wmp.controls.stop()'
-        )
-        subprocess.Popen(["powershell", "-Command", ps])
-    except Exception as e:
-        print(f"Music error: {e}")
+    visual_state = "listening" if active else "idle"
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -326,7 +596,7 @@ def execute_tool(name, inp):
 
         elif name == "set_volume":
             level = max(0, min(100, inp["level"])) / 100.0
-            devices = AudioUtilities.GetSpeakers()
+            devices  = AudioUtilities.GetSpeakers()
             interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
             vol = interface.QueryInterface(IAudioEndpointVolume)
             vol.SetMasterVolumeLevelScalar(level, None)
@@ -359,29 +629,28 @@ def execute_tool(name, inp):
 
         elif name == "list_directory":
             path = inp.get("path") or os.path.join(os.path.expanduser("~"), "Desktop")
-            items = os.listdir(path)
-            return "\n".join(items)
+            return "\n".join(os.listdir(path))
 
         elif name == "get_system_info":
-            cpu = psutil.cpu_percent(interval=1)
-            ram = psutil.virtual_memory()
+            cpu  = psutil.cpu_percent(interval=1)
+            ram  = psutil.virtual_memory()
             disk = psutil.disk_usage("/")
             procs = sorted(
-                [p.info["name"] for p in psutil.process_iter(["name"]) if p.info["name"]],
+                [p.info["name"] for p in psutil.process_iter(["name"]) if p.info["name"]]
             )[:15]
             return json.dumps({
-                "cpu_percent": cpu,
-                "ram_used_gb": round(ram.used / 1e9, 2),
-                "ram_total_gb": round(ram.total / 1e9, 2),
-                "ram_percent": ram.percent,
-                "disk_used_gb": round(disk.used / 1e9, 2),
+                "cpu_percent":   cpu,
+                "ram_used_gb":   round(ram.used / 1e9, 2),
+                "ram_total_gb":  round(ram.total / 1e9, 2),
+                "ram_percent":   ram.percent,
+                "disk_used_gb":  round(disk.used / 1e9, 2),
                 "disk_total_gb": round(disk.total / 1e9, 2),
-                "processes": procs,
+                "processes":     procs,
             }, indent=2)
 
         elif name == "type_text":
             pyautogui.write(inp["text"], interval=0.02)
-            return f"Typed text"
+            return "Typed text"
 
         elif name == "press_keys":
             keys = inp["keys"].lower().split("+")
@@ -390,7 +659,7 @@ def execute_tool(name, inp):
 
         elif name == "take_screenshot":
             fname = inp.get("filename") or f"screenshot_{int(time.time())}.png"
-            path = os.path.join(os.path.expanduser("~"), "Desktop", fname)
+            path  = os.path.join(os.path.expanduser("~"), "Desktop", fname)
             pyautogui.screenshot().save(path)
             return f"Screenshot saved to {path}"
 
@@ -399,10 +668,10 @@ def execute_tool(name, inp):
             if sp:
                 try:
                     results = sp.search(q=query, type="track", limit=1)
-                    tracks = results["tracks"]["items"]
+                    tracks  = results["tracks"]["items"]
                     if tracks:
-                        uri = tracks[0]["uri"]
-                        title = tracks[0]["name"]
+                        uri    = tracks[0]["uri"]
+                        title  = tracks[0]["name"]
                         artist = tracks[0]["artists"][0]["name"]
                         print(f"  [spotify] Playing: {title} by {artist}  ({uri})")
                         subprocess.run(
@@ -421,7 +690,7 @@ def execute_tool(name, inp):
                 return "Spotify API not configured."
 
         elif name == "spotify_control":
-            action = inp["action"].lower()
+            action  = inp["action"].lower()
             key_map = {"pause": "playpause", "resume": "playpause", "play": "playpause",
                        "next": "nexttrack", "previous": "prevtrack", "mute": "volumemute"}
             key = key_map.get(action)
@@ -430,10 +699,12 @@ def execute_tool(name, inp):
             return f"Spotify: {action}"
 
         elif name == "send_email":
-            to = urllib.parse.quote(inp["to"])
+            to      = urllib.parse.quote(inp["to"])
             subject = urllib.parse.quote(inp["subject"])
-            body = urllib.parse.quote(inp["body"])
-            webbrowser.open(f"https://mail.google.com/mail/?view=cm&to={to}&su={subject}&body={body}")
+            body    = urllib.parse.quote(inp["body"])
+            webbrowser.open(
+                f"https://mail.google.com/mail/?view=cm&to={to}&su={subject}&body={body}"
+            )
             return f"Opened Gmail compose to {inp['to']}"
 
     except Exception as e:
@@ -449,9 +720,9 @@ SYSTEM = (
     "Keep spoken responses short and conversational — they will be read aloud. "
     "When taking actions, briefly confirm what you're doing. "
     "You have full access to the user's computer and can open apps, browse the web, manage files, "
-    "run commands, control system settings, play music on Spotify (free account), and write/send emails via Gmail. "
-    "The user has Spotify Premium — you can search and play any track, pause, resume, skip, and control volume via the Spotify API. "
-    "When play_spotify returns a result starting with 'Now playing', the track IS playing — never say Spotify isn't running or suggest the user do it manually. Just confirm the song is playing."
+    "run commands, control system settings, play music on Spotify, and write/send emails via Gmail. "
+    "The user has Spotify Premium — you can search and play any track, pause, resume, skip. "
+    "When play_spotify returns 'Now playing ...', the track IS playing — just confirm it naturally."
 )
 
 
@@ -470,7 +741,7 @@ def ask_claude(user_message):
         )
 
         text_parts = []
-        tool_uses = []
+        tool_uses  = []
 
         for block in response.content:
             if block.type == "text":
@@ -491,9 +762,9 @@ def ask_claude(user_message):
             print(f"  [tool] {tu.name}({tu.input})")
             result = execute_tool(tu.name, tu.input)
             tool_results.append({
-                "type": "tool_result",
+                "type":        "tool_result",
                 "tool_use_id": tu.id,
-                "content": str(result),
+                "content":     str(result),
             })
 
         conversation_history.append({"role": "user", "content": tool_results})
@@ -501,36 +772,33 @@ def ask_claude(user_message):
         if response.stop_reason == "end_turn":
             break
 
-    # Trim history to last 20 turns to avoid token overflow
     if len(conversation_history) > 20:
         conversation_history = conversation_history[-20:]
 
 
 # ─── Clap Detection ───────────────────────────────────────────────────────────
 def rms(data):
-    count = len(data) // 2
+    count  = len(data) // 2
     shorts = struct.unpack(f"{count}h", data)
     return math.sqrt(sum(s * s for s in shorts) / count) if count else 0
 
 
 def clap_listener():
     print("Listening for double clap...")
-
     while True:
-        # Release mic entirely while JARVIS is active so speech recognition can use it
         if active:
             time.sleep(0.2)
             continue
 
-        pa = pyaudio.PyAudio()
+        pa     = pyaudio.PyAudio()
         stream = pa.open(format=FORMAT, channels=CHANNELS, rate=RATE,
                          input=True, frames_per_buffer=CHUNK)
-        last_clap = 0.0
+        last_clap  = 0.0
         clap_count = 0
 
         while not active:
             try:
-                data = stream.read(CHUNK, exception_on_overflow=False)
+                data      = stream.read(CHUNK, exception_on_overflow=False)
                 amplitude = rms(data)
                 if amplitude > CLAP_THRESHOLD:
                     now = time.time()
@@ -554,9 +822,10 @@ def clap_listener():
 
 # ─── Wake-up & Loop ───────────────────────────────────────────────────────────
 def wake_up():
-    global active, conversation_history
+    global active, conversation_history, visual_state
 
-    active = True
+    active        = True
+    visual_state  = "waking"
     conversation_history = []
 
     print("\n" + "=" * 40)
@@ -564,7 +833,6 @@ def wake_up():
     print("=" * 40)
 
     song = SONG_PATH
-    print(f"Song path: {song}")
     if song:
         try:
             pygame.mixer.init()
@@ -581,17 +849,18 @@ def wake_up():
 
 
 def listen_loop():
-    global active
+    global active, visual_state
 
     recognizer = sr.Recognizer()
-    recognizer.energy_threshold = 300
+    recognizer.energy_threshold        = 300
     recognizer.dynamic_energy_threshold = True
-    recognizer.pause_threshold = 1.5      # wait 1.5s of silence before stopping
-    recognizer.phrase_threshold = 0.3
-    mic = sr.Microphone()
+    recognizer.pause_threshold         = 1.5
+    recognizer.phrase_threshold        = 0.3
+    mic      = sr.Microphone()
     timeouts = 0
 
     while active:
+        visual_state = "listening"
         with mic as source:
             recognizer.adjust_for_ambient_noise(source, duration=0.3)
             print("\nListening...")
@@ -601,7 +870,8 @@ def listen_loop():
                 timeouts += 1
                 if timeouts >= 3:
                     speak("Going to standby. Double clap when you need me.")
-                    active = False
+                    active       = False
+                    visual_state = "idle"
                 continue
 
         timeouts = 0
@@ -619,10 +889,13 @@ def listen_loop():
         lower = command.lower()
         if any(p in lower for p in ["goodbye jarvis", "go to sleep", "sleep jarvis", "shut down jarvis"]):
             speak("Going offline. Double clap when you need me.")
-            active = False
+            active       = False
+            visual_state = "idle"
             break
 
         ask_claude(command)
+
+    visual_state = "idle"
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -643,28 +916,10 @@ def main():
 
     pyautogui.FAILSAFE = False
 
-    print("=" * 40)
-    print("  J.A.R.V.I.S.  —  AI Assistant")
-    print("=" * 40)
-    print("  Double clap        → wake up")
-    print("  'Goodbye JARVIS'   → sleep")
-    print("  Ctrl+C             → exit")
-    print("=" * 40)
+    threading.Thread(target=clap_listener, daemon=True).start()
 
-    print(f"  Running file:      {__file__}")
-    print(f"  Song path:         {SONG_PATH or 'NOT FOUND'}")
-    print("=" * 40)
-    if not SONG_PATH:
-        print("Note: No theme MP3 found in sounds/. Run setup_jarvis.py first.\n")
-
-    t = threading.Thread(target=clap_listener, daemon=True)
-    t.start()
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nJARVIS shutting down.")
+    print("JARVIS visual starting — press ESC to exit")
+    visual.run()   # runs the pygame loop on main thread; blocks until ESC
 
 
 if __name__ == "__main__":
