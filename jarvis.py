@@ -17,12 +17,15 @@ try:
     import speech_recognition as sr
     import psutil
     import pyautogui
+    import pygetwindow as gw
     from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
     from comtypes import CLSCTX_ALL
 except ImportError as e:
     print(f"Missing dependency: {e}")
     print("Run: python setup_jarvis.py")
     sys.exit(1)
+
+import urllib.parse
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -374,7 +377,6 @@ def execute_tool(name, inp):
             subprocess.Popen(f'start "" "spotify:search:{query}"', shell=True)
             time.sleep(3)
             # Focus Spotify window then navigate to first song and play it
-            import pygetwindow as gw
             try:
                 wins = [w for w in gw.getAllWindows() if "spotify" in w.title.lower()]
                 if wins:
@@ -405,7 +407,6 @@ def execute_tool(name, inp):
             return f"Unknown action: {action}"
 
         elif name == "send_email":
-            import urllib.parse
             to = urllib.parse.quote(inp["to"])
             subject = urllib.parse.quote(inp["subject"])
             body = urllib.parse.quote(inp["body"])
@@ -437,9 +438,10 @@ def ask_claude(user_message):
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
-            system=SYSTEM,
+            system=[{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
             tools=TOOLS,
             messages=conversation_history,
+            extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
         )
 
         text_parts = []
@@ -536,13 +538,7 @@ def wake_up():
     print("  ⚡  JARVIS ACTIVATED  ⚡")
     print("=" * 40)
 
-    # Try multiple paths to find the song
-    candidates = [
-        os.path.join(BASE_DIR, "sounds", "iron_man.mp3"),
-        r"C:\Users\filip\Desktop\claudecode\sounds\iron_man.mp3",
-        os.path.join(os.path.dirname(sys.executable), "sounds", "iron_man.mp3"),
-    ]
-    song = next((p for p in candidates if os.path.exists(p)), None)
+    song = SONG_PATH
     print(f"Song path: {song}")
     if song:
         subprocess.run(

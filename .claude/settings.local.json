@@ -19,7 +19,8 @@
       "Bash(python -m pip install anthropic)",
       "Bash(/c/Users/filip/AppData/Local/Programs/Python/Python312/python.exe *)",
       "Bash(python *)",
-      "WebSearch"
+      "WebSearch",
+      "Skill(claude-api)"
     ]
   }
 }
