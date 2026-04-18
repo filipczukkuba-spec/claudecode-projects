@@ -544,18 +544,15 @@ def wake_up():
     song = SONG_PATH
     print(f"Song path: {song}")
     if song:
-        def _play_intro():
-            try:
-                pygame.mixer.init()
-                pygame.mixer.music.load(song)
-                pygame.mixer.music.play()
-                time.sleep(7)
-                pygame.mixer.music.stop()
-                pygame.mixer.quit()
-            except Exception as e:
-                print(f"Intro music error: {e}")
-        threading.Thread(target=_play_intro, daemon=True).start()
-        time.sleep(0.5)
+        try:
+            pygame.mixer.init()
+            pygame.mixer.music.load(song)
+            pygame.mixer.music.play()
+            time.sleep(7)
+            pygame.mixer.music.stop()
+            pygame.mixer.quit()
+        except Exception as e:
+            print(f"Intro music error: {e}")
 
     speak("Good day. JARVIS online. What can I do for you?")
     listen_loop()
