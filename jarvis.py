@@ -524,11 +524,12 @@ def wake_up():
     print("=" * 40)
 
     song = os.path.join(BASE_DIR, "sounds", "iron_man.mp3")
-    print(f"Looking for music at: {song}")
-    print(f"Exists: {os.path.exists(song)}")
     if os.path.exists(song):
-        os.startfile(song)
-        time.sleep(7)
+        subprocess.run(
+            ["ffplay", "-nodisp", "-autoexit", "-t", "7", song],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     speak("Good day. JARVIS online. What can I do for you?")
     listen_loop()
