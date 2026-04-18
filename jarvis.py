@@ -15,8 +15,6 @@ try:
     import anthropic
     import pyaudio
     import speech_recognition as sr
-    import pyttsx3
-    import pygame
     import psutil
     import pyautogui
     from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
@@ -72,23 +70,36 @@ DOUBLE_CLAP_DEBOUNCE = 0.12 # seconds min between two claps
 # ─── State ────────────────────────────────────────────────────────────────────
 active = False
 conversation_history = []
-speak_lock = threading.Lock()
-
-# ─── TTS ──────────────────────────────────────────────────────────────────────
-tts_engine = pyttsx3.init()
-tts_engine.setProperty("rate", 175)
-tts_engine.setProperty("volume", 1.0)
-for v in tts_engine.getProperty("voices"):
-    if any(name in v.name.lower() for name in ["david", "mark", "male"]):
-        tts_engine.setProperty("voice", v.id)
-        break
 
 
 def speak(text):
     print(f"\nJARVIS: {text}")
-    with speak_lock:
-        tts_engine.say(text)
-        tts_engine.runAndWait()
+    try:
+        safe = text.replace("'", " ").replace('"', " ")
+        subprocess.run(
+            ["powershell", "-Command",
+             f"Add-Type -AssemblyName System.Speech; "
+             f"$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+             f"$s.Rate = 2; $s.Volume = 100; $s.Speak('{safe}')"],
+            timeout=60,
+            capture_output=True,
+        )
+    except Exception as e:
+        print(f"TTS error: {e}")
+
+
+def play_music(path):
+    try:
+        ps = (
+            f'$wmp = New-Object -ComObject WMPlayer.OCX; '
+            f'$wmp.URL = "{path}"; '
+            f'$wmp.controls.play(); '
+            f'Start-Sleep -Seconds 6; '
+            f'$wmp.controls.stop()'
+        )
+        subprocess.Popen(["powershell", "-Command", ps])
+    except Exception as e:
+        print(f"Music error: {e}")
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -443,8 +454,9 @@ def wake_up():
     print("  ⚡  JARVIS ACTIVATED  ⚡")
     print("=" * 40)
 
-    webbrowser.open("https://www.youtube.com/watch?v=XgWUDbYfNe4&list=RDXgWUDbYfNe4&start_radio=1")
-    time.sleep(3)
+    if SONG_PATH:
+        play_music(SONG_PATH)
+        time.sleep(7)
 
     speak("Good day. JARVIS online. What can I do for you?")
     listen_loop()
