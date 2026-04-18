@@ -392,16 +392,12 @@ def execute_tool(name, inp):
             except Exception as e:
                 print(f"  [spotify] window error: {e}")
             if spotify_win:
-                # Hover over the Top Result card first to reveal the green play button,
-                # then click it — button sits next to the artist name ~300px from top
-                hover_x = spotify_win.left + 320
-                hover_y = spotify_win.top + 220
-                play_x  = spotify_win.left + 350
-                play_y  = spotify_win.top + 300
-                pyautogui.moveTo(hover_x, hover_y, duration=0.4)
-                time.sleep(0.6)
-                pyautogui.moveTo(play_x, play_y, duration=0.3)
-                time.sleep(0.4)
+                # Green play button is below artist name/monthly listeners,
+                # left side of content area — x~255, y~375 for 960x1032 window
+                play_x = spotify_win.left + 255
+                play_y = spotify_win.top + 375
+                pyautogui.moveTo(play_x, play_y, duration=0.4)
+                time.sleep(0.5)
                 pyautogui.click(play_x, play_y)
             return f"Playing {query} on Spotify"
 
