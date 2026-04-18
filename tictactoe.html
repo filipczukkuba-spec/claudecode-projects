@@ -220,7 +220,7 @@
           scoreX.textContent = scores.X;
           scoreO.textContent = scores.O;
           scoreDraw.textContent = scores.D;
-          if (scores.X === 7 || scores.O === 7) launchFireworks();
+          if ((scores.X === 7 && scores.O === 6) || (scores.X === 6 && scores.O === 7)) launchFireworks();
         } else {
           current = current === 'X' ? 'O' : 'X';
           status.textContent = `${current}'s turn`;
