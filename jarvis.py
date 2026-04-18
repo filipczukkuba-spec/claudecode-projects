@@ -15,6 +15,8 @@ try:
     import anthropic
     import pyaudio
     import pygame
+    import spotipy
+    from spotipy.oauth2 import SpotifyOAuth
     import speech_recognition as sr
     import psutil
     import pyautogui
@@ -50,6 +52,28 @@ def save_api_key(key):
 
 
 API_KEY = load_api_key()
+
+# ─── Spotify API ──────────────────────────────────────────────────────────────
+SPOTIFY_CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID", "")
+SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+SPOTIFY_REDIRECT_URI  = "http://localhost:8080"
+
+def make_spotify():
+    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+        return None
+    try:
+        return spotipy.Spotify(auth_manager=SpotifyOAuth(
+            client_id=SPOTIFY_CLIENT_ID,
+            client_secret=SPOTIFY_CLIENT_SECRET,
+            redirect_uri=SPOTIFY_REDIRECT_URI,
+            scope="user-modify-playback-state user-read-playback-state",
+            open_browser=True,
+        ))
+    except Exception as e:
+        print(f"Spotify init error: {e}")
+        return None
+
+sp = make_spotify()
 
 # Find any audio file in the sounds folder
 def find_song():
@@ -376,45 +400,49 @@ def execute_tool(name, inp):
 
         elif name == "play_spotify":
             query = inp["query"]
-            subprocess.Popen(f'start "" "spotify:search:{query}"', shell=True)
-            time.sleep(5)
-            # Find Spotify window and get its bounds
-            spotify_win = None
-            try:
-                all_wins = [w for w in gw.getAllWindows() if w.title.strip()]
-                wins = [w for w in all_wins if "spotify" in w.title.lower()]
-                if wins:
-                    spotify_win = wins[0]
-                    spotify_win.restore()
-                    time.sleep(0.3)
-                    spotify_win.activate()
-                    time.sleep(1.2)
-            except Exception as e:
-                print(f"  [spotify] window error: {e}")
-            if spotify_win:
-                # Green play button is below artist name/monthly listeners,
-                # left side of content area — x~255, y~375 for 960x1032 window
-                play_x = spotify_win.left + 415
-                play_y = spotify_win.top + 320
-                pyautogui.moveTo(play_x, play_y, duration=0.4)
-                time.sleep(0.5)
-                pyautogui.click(play_x, play_y)
-            return f"Playing {query} on Spotify"
+            if sp:
+                try:
+                    results = sp.search(q=query, type="track", limit=1)
+                    tracks = results["tracks"]["items"]
+                    if tracks:
+                        uri = tracks[0]["uri"]
+                        title = tracks[0]["name"]
+                        artist = tracks[0]["artists"][0]["name"]
+                        sp.start_playback(uris=[uri])
+                        return f"Playing {title} by {artist}"
+                    return "No track found"
+                except spotipy.exceptions.SpotifyException as e:
+                    if "NO_ACTIVE_DEVICE" in str(e):
+                        return "Open Spotify on your device first, then ask again."
+                    return f"Spotify error: {e}"
+            else:
+                return "Spotify API not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET env vars."
 
         elif name == "spotify_control":
             action = inp["action"].lower()
-            key_map = {
-                "pause": "playpause",
-                "resume": "playpause",
-                "next": "nexttrack",
-                "previous": "prevtrack",
-                "mute": "volumemute",
-            }
-            key = key_map.get(action)
-            if key:
-                pyautogui.press(key)
+            if sp:
+                try:
+                    if action in ("pause",):
+                        sp.pause_playback()
+                    elif action in ("resume", "play"):
+                        sp.start_playback()
+                    elif action == "next":
+                        sp.next_track()
+                    elif action == "previous":
+                        sp.previous_track()
+                    elif action == "mute":
+                        sp.volume(0)
+                    return f"Spotify: {action}"
+                except Exception as e:
+                    return f"Spotify error: {e}"
+            else:
+                # Fallback to media keys
+                key_map = {"pause": "playpause", "resume": "playpause",
+                           "next": "nexttrack", "previous": "prevtrack", "mute": "volumemute"}
+                key = key_map.get(action)
+                if key:
+                    pyautogui.press(key)
                 return f"Spotify: {action}"
-            return f"Unknown action: {action}"
 
         elif name == "send_email":
             to = urllib.parse.quote(inp["to"])
