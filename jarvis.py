@@ -64,7 +64,7 @@ def make_spotify():
         return spotipy.Spotify(auth_manager=SpotifyOAuth(
             client_id=SPOTIFY_CLIENT_ID,
             client_secret=SPOTIFY_CLIENT_SECRET,
-            redirect_uri="http://localhost:8080",
+            redirect_uri="http://127.0.0.1:8080",
             scope="user-modify-playback-state user-read-playback-state",
             open_browser=True,
             cache_path=os.path.join(BASE_DIR, ".spotify_cache"),
