@@ -394,35 +394,42 @@ def rms(data):
 
 
 def clap_listener():
-    pa = pyaudio.PyAudio()
-    stream = pa.open(format=FORMAT, channels=CHANNELS, rate=RATE,
-                     input=True, frames_per_buffer=CHUNK)
-
-    last_clap = 0.0
-    clap_count = 0
-
     print("Listening for double clap...")
 
     while True:
-        try:
-            data = stream.read(CHUNK, exception_on_overflow=False)
-            if active:
-                continue  # don't detect claps while already active
-            amplitude = rms(data)
-            if amplitude > CLAP_THRESHOLD:
-                now = time.time()
-                gap = now - last_clap
-                if gap > DOUBLE_CLAP_DEBOUNCE:
-                    if gap < DOUBLE_CLAP_MAX:
-                        clap_count += 1
-                    else:
-                        clap_count = 1
-                    last_clap = now
-                    if clap_count >= 2:
-                        clap_count = 0
-                        threading.Thread(target=wake_up, daemon=True).start()
-        except Exception:
-            pass
+        # Release mic entirely while JARVIS is active so speech recognition can use it
+        if active:
+            time.sleep(0.2)
+            continue
+
+        pa = pyaudio.PyAudio()
+        stream = pa.open(format=FORMAT, channels=CHANNELS, rate=RATE,
+                         input=True, frames_per_buffer=CHUNK)
+        last_clap = 0.0
+        clap_count = 0
+
+        while not active:
+            try:
+                data = stream.read(CHUNK, exception_on_overflow=False)
+                amplitude = rms(data)
+                if amplitude > CLAP_THRESHOLD:
+                    now = time.time()
+                    gap = now - last_clap
+                    if gap > DOUBLE_CLAP_DEBOUNCE:
+                        if gap < DOUBLE_CLAP_MAX:
+                            clap_count += 1
+                        else:
+                            clap_count = 1
+                        last_clap = now
+                        if clap_count >= 2:
+                            clap_count = 0
+                            threading.Thread(target=wake_up, daemon=True).start()
+            except Exception:
+                pass
+
+        stream.stop_stream()
+        stream.close()
+        pa.terminate()
 
 
 # ─── Wake-up & Loop ───────────────────────────────────────────────────────────
