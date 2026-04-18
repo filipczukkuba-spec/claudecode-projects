@@ -29,7 +29,17 @@ except ImportError as e:
 # ─── Config ───────────────────────────────────────────────────────────────────
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 SOUNDS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds")
-SONG_PATH = os.path.join(SOUNDS_DIR, "iron_man.mp3")
+
+# Find any mp3 in the sounds folder, not just iron_man.mp3
+def find_song():
+    if not os.path.exists(SOUNDS_DIR):
+        return None
+    for f in os.listdir(SOUNDS_DIR):
+        if f.endswith(".mp3"):
+            return os.path.join(SOUNDS_DIR, f)
+    return None
+
+SONG_PATH = find_song()
 
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
@@ -406,7 +416,7 @@ def wake_up():
     print("  ⚡  JARVIS ACTIVATED  ⚡")
     print("=" * 40)
 
-    if os.path.exists(SONG_PATH):
+    if SONG_PATH and os.path.exists(SONG_PATH):
         pygame.mixer.init()
         pygame.mixer.music.load(SONG_PATH)
         pygame.mixer.music.set_volume(0.7)
@@ -481,8 +491,8 @@ def main():
     print("  Ctrl+C             → exit")
     print("=" * 40)
 
-    if not os.path.exists(SONG_PATH):
-        print(f"Note: No theme MP3 found. Run setup_jarvis.py first.\n")
+    if not SONG_PATH:
+        print("Note: No theme MP3 found in sounds/. Run setup_jarvis.py first.\n")
 
     t = threading.Thread(target=clap_listener, daemon=True)
     t.start()
