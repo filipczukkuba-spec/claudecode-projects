@@ -436,16 +436,8 @@ def wake_up():
     print("  ⚡  JARVIS ACTIVATED  ⚡")
     print("=" * 40)
 
-    if SONG_PATH and os.path.exists(SONG_PATH):
-        pygame.mixer.init()
-        pygame.mixer.music.load(SONG_PATH)
-        pygame.mixer.music.set_volume(0.7)
-        pygame.mixer.music.play()
-        time.sleep(5)
-        pygame.mixer.music.fadeout(1500)
-        time.sleep(1.5)
-    else:
-        print(f"(No theme found at {SONG_PATH})")
+    webbrowser.open("https://www.youtube.com/watch?v=XgWUDbYfNe4&list=RDXgWUDbYfNe4&start_radio=1")
+    time.sleep(3)
 
     speak("Good day. JARVIS online. What can I do for you?")
     listen_loop()
