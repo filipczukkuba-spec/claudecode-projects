@@ -236,6 +236,44 @@ TOOLS = [
             }
         }
     },
+    {
+        "name": "play_spotify",
+        "description": "Play a song, artist, album or playlist on Spotify.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Song name, artist, album or playlist to search for"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "spotify_control",
+        "description": "Control Spotify playback: pause, resume, next track, previous track, or set volume.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "One of: pause, resume, next, previous, mute"
+                }
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "send_email",
+        "description": "Open Gmail in the browser to compose and send an email.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "to": {"type": "string", "description": "Recipient email address"},
+                "subject": {"type": "string", "description": "Email subject"},
+                "body": {"type": "string", "description": "Email body text"}
+            },
+            "required": ["to", "subject", "body"]
+        }
+    },
 ]
 
 
@@ -330,6 +368,37 @@ def execute_tool(name, inp):
             pyautogui.screenshot().save(path)
             return f"Screenshot saved to {path}"
 
+        elif name == "play_spotify":
+            query = inp["query"].replace(" ", "%20")
+            webbrowser.open(f"spotify:search:{inp['query']}")
+            time.sleep(2)
+            # Press enter to play first result
+            pyautogui.hotkey("enter")
+            return f"Searching Spotify for: {inp['query']}"
+
+        elif name == "spotify_control":
+            action = inp["action"].lower()
+            key_map = {
+                "pause": "playpause",
+                "resume": "playpause",
+                "next": "nexttrack",
+                "previous": "prevtrack",
+                "mute": "volumemute",
+            }
+            key = key_map.get(action)
+            if key:
+                pyautogui.press(key)
+                return f"Spotify: {action}"
+            return f"Unknown action: {action}"
+
+        elif name == "send_email":
+            import urllib.parse
+            to = urllib.parse.quote(inp["to"])
+            subject = urllib.parse.quote(inp["subject"])
+            body = urllib.parse.quote(inp["body"])
+            webbrowser.open(f"https://mail.google.com/mail/?view=cm&to={to}&su={subject}&body={body}")
+            return f"Opened Gmail compose to {inp['to']}"
+
     except Exception as e:
         return f"Error in {name}: {e}"
 
@@ -343,7 +412,7 @@ SYSTEM = (
     "Keep spoken responses short and conversational — they will be read aloud. "
     "When taking actions, briefly confirm what you're doing. "
     "You have full access to the user's computer and can open apps, browse the web, manage files, "
-    "run commands, and control system settings."
+    "run commands, control system settings, play music on Spotify, and write/send emails via Gmail."
 )
 
 
@@ -454,8 +523,9 @@ def wake_up():
     print("  ⚡  JARVIS ACTIVATED  ⚡")
     print("=" * 40)
 
-    if SONG_PATH:
-        play_music(SONG_PATH)
+    song = os.path.join(BASE_DIR, "sounds", "iron_man.mp3")
+    if os.path.exists(song):
+        os.startfile(song)
         time.sleep(7)
 
     speak("Good day. JARVIS online. What can I do for you?")
@@ -468,6 +538,8 @@ def listen_loop():
     recognizer = sr.Recognizer()
     recognizer.energy_threshold = 300
     recognizer.dynamic_energy_threshold = True
+    recognizer.pause_threshold = 2.5      # wait 2.5s of silence before stopping
+    recognizer.phrase_threshold = 0.3
     mic = sr.Microphone()
     timeouts = 0
 
@@ -476,7 +548,7 @@ def listen_loop():
             recognizer.adjust_for_ambient_noise(source, duration=0.3)
             print("\nListening...")
             try:
-                audio = recognizer.listen(source, timeout=8, phrase_time_limit=20)
+                audio = recognizer.listen(source, timeout=10, phrase_time_limit=40)
             except sr.WaitTimeoutError:
                 timeouts += 1
                 if timeouts >= 3:
