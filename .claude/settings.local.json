@@ -9,7 +9,13 @@
       "Bash(where node *)",
       "Bash(where npx *)",
       "Bash(where php *)",
-      "Read(//c/Windows/System32/WindowsPowerShell//**)"
+      "Read(//c/Windows/System32/WindowsPowerShell//**)",
+      "Bash(where winget *)",
+      "Bash(where choco *)",
+      "Bash(where scoop *)",
+      "Bash(winget install *)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/nodejs\")",
+      "Bash(npx --yes serve \"C:/Users/filip/Desktop/claudecode\" --listen 8080)"
     ]
   }
 }
