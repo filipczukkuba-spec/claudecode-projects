@@ -369,12 +369,25 @@ def execute_tool(name, inp):
             return f"Screenshot saved to {path}"
 
         elif name == "play_spotify":
-            query = inp["query"].replace(" ", "%20")
-            webbrowser.open(f"spotify:search:{inp['query']}")
-            time.sleep(2)
-            # Press enter to play first result
-            pyautogui.hotkey("enter")
-            return f"Searching Spotify for: {inp['query']}"
+            query = inp["query"]
+            # Open Spotify and search
+            subprocess.Popen(f'start "" "spotify:search:{query}"', shell=True)
+            time.sleep(3)
+            # Focus Spotify window then navigate to first song and play it
+            import pygetwindow as gw
+            try:
+                wins = [w for w in gw.getAllWindows() if "spotify" in w.title.lower()]
+                if wins:
+                    wins[0].activate()
+                    time.sleep(0.5)
+            except Exception:
+                pass
+            # Press Tab to get to first result, Enter to play
+            for _ in range(3):
+                pyautogui.press("tab")
+                time.sleep(0.1)
+            pyautogui.press("enter")
+            return f"Playing {query} on Spotify"
 
         elif name == "spotify_control":
             action = inp["action"].lower()
@@ -523,8 +536,15 @@ def wake_up():
     print("  ⚡  JARVIS ACTIVATED  ⚡")
     print("=" * 40)
 
-    song = os.path.join(BASE_DIR, "sounds", "iron_man.mp3")
-    if os.path.exists(song):
+    # Try multiple paths to find the song
+    candidates = [
+        os.path.join(BASE_DIR, "sounds", "iron_man.mp3"),
+        r"C:\Users\filip\Desktop\claudecode\sounds\iron_man.mp3",
+        os.path.join(os.path.dirname(sys.executable), "sounds", "iron_man.mp3"),
+    ]
+    song = next((p for p in candidates if os.path.exists(p)), None)
+    print(f"Song path: {song}")
+    if song:
         subprocess.run(
             ["ffplay", "-nodisp", "-autoexit", "-t", "7", song],
             stdout=subprocess.DEVNULL,
