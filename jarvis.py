@@ -13,6 +13,12 @@ import webbrowser
 import json
 
 try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+
+try:
     import anthropic
     import pyaudio
     import pygame
@@ -101,18 +107,19 @@ visual_state         = "idle"   # idle | waking | listening | speaking
 
 # ─── Visual Engine ────────────────────────────────────────────────────────────
 class JarvisVisual:
-    ORB_R = 95
+    ORB_R = 105
 
     def __init__(self):
         self.W = self.H = self.cx = self.cy = 0
-        self.t          = 0.0
-        self.particles  = []
-        self.ripples    = []
-        self.arcs       = []
-        self.screen     = None
-        self.clock      = None
-        self.font_hud   = None
-        self.font_label = None
+        self.t            = 0.0
+        self.particles    = []
+        self.ripples      = []
+        self.arcs         = []
+        self.screen       = None
+        self.clock        = None
+        self.font_hud     = None
+        self.font_label   = None
+        self._orb_cache   = {}   # (r, state) → Surface, rebuilt each frame for plasma
 
     def setup(self):
         pygame.display.init()
@@ -134,15 +141,18 @@ class JarvisVisual:
             self.font_label = pygame.font.Font(None, 18)
         self._init_particles()
         self._init_arcs()
+        # Pre-compute static sphere base (expensive, done once per radius)
+        if HAS_NUMPY:
+            self._base_cache = {}
 
     def _init_particles(self):
         self.particles = []
         for _ in range(28):
-            angle    = random.uniform(0, math.tau)
-            base_r   = random.uniform(145, 295)
-            speed    = random.uniform(0.004, 0.013) * random.choice([-1, 1])
-            size     = random.uniform(2.5, 5.5)
-            shape    = random.choices(['dot', 'diamond', 'cross'], weights=[5, 3, 2])[0]
+            angle  = random.uniform(0, math.tau)
+            base_r = random.uniform(165, 310)
+            speed  = random.uniform(0.004, 0.013) * random.choice([-1, 1])
+            size   = random.uniform(2.5, 5.5)
+            shape  = random.choices(['dot', 'diamond', 'cross'], weights=[5, 3, 2])[0]
             self.particles.append({
                 'angle':   angle,
                 'base_r':  base_r,
@@ -160,71 +170,204 @@ class JarvisVisual:
         self.arcs = []
         for i in range(4):
             self.arcs.append({
-                'r':      145 + i * 48,
-                'start':  random.uniform(0, math.tau),
-                'span':   random.uniform(0.4, 1.2),
-                'speed':  random.uniform(0.003, 0.009) * random.choice([-1, 1]),
-                'alpha':  random.randint(25, 55),
+                'r':     165 + i * 52,
+                'start': random.uniform(0, math.tau),
+                'span':  random.uniform(0.4, 1.2),
+                'speed': random.uniform(0.003, 0.009) * random.choice([-1, 1]),
+                'alpha': random.randint(25, 55),
             })
 
-    # ── drawing helpers ────────────────────────────────────────────────────────
+    # ── helpers ───────────────────────────────────────────────────────────────
+    def _blit_centered(self, surf, cx, cy):
+        self.screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
+
     def _surf_circle(self, r, color_rgba):
         s = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
         pygame.draw.circle(s, color_rgba, (r + 1, r + 1), r)
         return s
 
-    def _blit_centered(self, surf, cx, cy):
-        self.screen.blit(surf, (cx - surf.get_width() // 2, cy - surf.get_height() // 2))
+    # ── numpy-based realistic orb ─────────────────────────────────────────────
+    def _state_palette(self, state):
+        if state == "speaking":
+            return (
+                np.array([0.96, 0.98, 1.00]),  # core
+                np.array([0.16, 0.52, 1.00]),  # mid
+                np.array([0.02, 0.16, 0.72]),  # edge
+                np.array([0.00, 0.06, 0.45]),  # glow
+                np.array([0.45, 0.72, 1.00]),  # rim
+            )
+        elif state == "listening":
+            return (
+                np.array([0.88, 1.00, 1.00]),
+                np.array([0.02, 0.72, 0.92]),
+                np.array([0.00, 0.40, 0.68]),
+                np.array([0.00, 0.20, 0.50]),
+                np.array([0.18, 0.88, 1.00]),
+            )
+        elif state == "waking":
+            return (
+                np.array([1.00, 1.00, 1.00]),
+                np.array([0.45, 0.50, 1.00]),
+                np.array([0.12, 0.12, 0.75]),
+                np.array([0.06, 0.06, 0.45]),
+                np.array([0.72, 0.72, 1.00]),
+            )
+        else:
+            return (
+                np.array([0.78, 0.90, 1.00]),
+                np.array([0.06, 0.38, 0.88]),
+                np.array([0.01, 0.12, 0.58]),
+                np.array([0.00, 0.05, 0.35]),
+                np.array([0.22, 0.52, 0.96]),
+            )
 
-    def _draw_glow(self, cx, cy, r, rgb, layers=9):
-        for i in range(layers, 0, -1):
-            gr    = r + (layers - i) * 11
-            alpha = int(160 * (i / layers) * 0.16)
-            s = self._surf_circle(gr, (*rgb, alpha))
-            self._blit_centered(s, cx, cy)
+    def _build_orb_surf(self, r, state, t):
+        """Build a hyper-realistic energy orb Surface using numpy."""
+        glow_pad = int(r * 1.9)
+        size     = (r + glow_pad) * 2 + 4
+        half     = size // 2
+
+        core_c, mid_c, edge_c, glow_c, rim_c = self._state_palette(state)
+
+        # Coordinate grids (height, width)
+        Yg, Xg = np.mgrid[-half:half, -half:half].astype(np.float32)
+        dist    = np.sqrt(Xg * Xg + Yg * Yg)
+        norm    = dist / r   # 0 = centre, 1 = edge, >1 = outside
+
+        inside  = norm <= 1.0
+        outside = ~inside
+
+        # ── Volumetric atmospheric glow (outside sphere) ─────────────────────
+        glow_f  = np.where(outside, np.exp(-np.clip(norm - 1.0, 0, None) * 2.8) * 0.80, 0.0)
+        # Pulse the outer glow with time
+        glow_f *= 0.85 + 0.15 * math.sin(t * 2.1)
+
+        R_acc = glow_c[0] * glow_f
+        G_acc = glow_c[1] * glow_f
+        B_acc = glow_c[2] * glow_f
+        A_acc = glow_f.copy()
+
+        # ── 3-D sphere normals ───────────────────────────────────────────────
+        safe_dist = np.where(dist > 0, dist, 1.0)
+        nx = Xg / (safe_dist)   # normalised screen-space normals
+        ny = Yg / (safe_dist)
+        nz = np.where(inside, np.sqrt(np.clip(1.0 - norm ** 2, 0.0, 1.0)), 0.0)
+        nx = np.where(inside, nx * norm, 0.0)
+        ny = np.where(inside, ny * norm, 0.0)
+
+        # ── Key light (upper-left) ───────────────────────────────────────────
+        lx, ly, lz = -0.38, -0.46, 0.80
+        ln = math.sqrt(lx*lx + ly*ly + lz*lz)
+        lx, ly, lz = lx/ln, ly/ln, lz/ln
+
+        NdotL   = np.clip(nx*lx + ny*ly + nz*lz, 0.0, 1.0)
+        diffuse = NdotL ** 0.65
+
+        # ── Specular (Blinn-Phong) ───────────────────────────────────────────
+        hx = lx; hy = ly; hz = lz + 1.0   # half-vector (view = +Z)
+        hn = math.sqrt(hx*hx + hy*hy + hz*hz)
+        hx, hy, hz = hx/hn, hy/hn, hz/hn
+        NdotH  = np.clip(nx*hx + ny*hy + nz*hz, 0.0, 1.0)
+        spec1  = np.where(inside, NdotH ** 85  * 0.95, 0.0)   # tight highlight
+        spec2  = np.where(inside, NdotH ** 18  * 0.35, 0.0)   # broad sheen
+
+        # ── Fresnel rim (bright edge ring) ──────────────────────────────────
+        fresnel = np.where(inside, (1.0 - np.clip(nz, 0, 1)) ** 3.0, 0.0)
+
+        # ── Subsurface / inner glow ───────────────────────────────────────────
+        sss = np.where(inside, np.exp(-norm * 2.2) * 0.55, 0.0)
+        # Animated inner plasma ripple
+        plasma = np.where(inside,
+                          np.clip(
+                              0.18 * np.sin(norm * 12 - t * 3.5)
+                              * np.sin(np.arctan2(Yg, Xg) * 4 + t * 1.8),
+                              0.0, 1.0),
+                          0.0)
+
+        # ── Base sphere colour (tri-lerp: core → mid → edge) ─────────────────
+        def triblend(c_inner, c_mid, c_outer, n):
+            return np.where(
+                n < 0.5,
+                c_inner + (c_mid - c_inner) * (n / 0.5),
+                c_mid   + (c_outer - c_mid) * ((n - 0.5) / 0.5)
+            )
+
+        base_r = triblend(core_c[0], mid_c[0], edge_c[0], norm)
+        base_g = triblend(core_c[1], mid_c[1], edge_c[1], norm)
+        base_b = triblend(core_c[2], mid_c[2], edge_c[2], norm)
+
+        amb = 0.30
+        sph_r = base_r * (amb + diffuse * (1-amb)) + sss * core_c[0] + fresnel * rim_c[0] * 0.5 + spec1 + spec2 * core_c[0] + plasma * rim_c[0] * 0.25
+        sph_g = base_g * (amb + diffuse * (1-amb)) + sss * core_c[1] + fresnel * rim_c[1] * 0.5 + spec1 + spec2 * core_c[1] + plasma * rim_c[1] * 0.25
+        sph_b = base_b * (amb + diffuse * (1-amb)) + sss * core_c[2] + fresnel * rim_c[2] * 0.5 + spec1 + spec2 * core_c[2] + plasma * rim_c[2] * 0.25
+
+        # Anti-alias at sphere edge
+        aa = np.where(inside, np.clip((1.0 - norm) * r * 0.5, 0.0, 1.0), 0.0)
+
+        R_acc = np.where(inside, R_acc + sph_r, R_acc)
+        G_acc = np.where(inside, G_acc + sph_g, G_acc)
+        B_acc = np.where(inside, B_acc + sph_b, B_acc)
+        A_acc = np.where(inside, aa * 0.97, A_acc)
+
+        rgba = np.stack([
+            np.clip(R_acc, 0, 1),
+            np.clip(G_acc, 0, 1),
+            np.clip(B_acc, 0, 1),
+            np.clip(A_acc, 0, 1),
+        ], axis=-1)
+
+        rgba8 = (rgba * 255).astype(np.uint8)
+
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        # surfarray uses (width, height) = transposed
+        px = pygame.surfarray.pixels3d(surf)
+        px[:] = rgba8[..., :3].transpose(1, 0, 2)
+        del px
+        al = pygame.surfarray.pixels_alpha(surf)
+        al[:] = rgba8[..., 3].T
+        del al
+        return surf, half
 
     def _draw_orb(self, cx, cy, r, state):
-        if state == "speaking":
-            glow = (15, 110, 255)
-            mid  = (70, 160, 255)
-            core = (160, 210, 255)
-        elif state == "listening":
-            glow = (0,  170, 220)
-            mid  = (50, 210, 245)
-            core = (130, 235, 255)
-        elif state == "waking":
-            glow = (80, 80, 255)
-            mid  = (140, 140, 255)
-            core = (220, 220, 255)
+        if HAS_NUMPY:
+            surf, half = self._build_orb_surf(r, state, self.t)
+            self.screen.blit(surf, (cx - half, cy - half))
         else:
-            glow = (8,   70, 195)
-            mid  = (45, 120, 230)
-            core = (110, 170, 245)
+            # Fallback: multi-circle gradient
+            palettes = {
+                "speaking":  ((15, 110, 255), (70, 160, 255),  (160, 210, 255)),
+                "listening": ((0,  170, 220), (50, 210, 245),  (130, 235, 255)),
+                "waking":    ((80, 80, 255),  (140, 140, 255), (220, 220, 255)),
+                "idle":      ((8,   70, 195), (45, 120, 230),  (110, 170, 245)),
+            }
+            glow, mid, core = palettes.get(state, palettes["idle"])
+            for i in range(12, 0, -1):
+                gr    = r + int(r * 1.8 * i / 12)
+                alpha = int(160 * (i/12) * 0.13)
+                s = self._surf_circle(gr, (*glow, alpha))
+                self._blit_centered(s, cx, cy)
+            self._blit_centered(self._surf_circle(r,             (*glow, 210)), cx, cy)
+            self._blit_centered(self._surf_circle(int(r * 0.65), (*mid,  230)), cx, cy)
+            self._blit_centered(self._surf_circle(int(r * 0.30), (200, 230, 255, 200)), cx, cy)
+            self._blit_centered(self._surf_circle(int(r * 0.14), (230, 245, 255, 160)),
+                                cx - r//3, cy - r//3)
 
-        self._draw_glow(cx, cy, r, glow)
-        self._blit_centered(self._surf_circle(r,            (*glow, 210)), cx, cy)
-        self._blit_centered(self._surf_circle(int(r * 0.65),(*mid,  230)), cx, cy)
-        self._blit_centered(self._surf_circle(int(r * 0.30),(200, 230, 255, 200)), cx, cy)
-        # specular highlight
-        hx = cx - r // 3
-        hy = cy - r // 3
-        self._blit_centered(self._surf_circle(int(r * 0.15), (230, 245, 255, 160)), hx, hy)
-
+    # ── particles, rings, ripples, HUD ────────────────────────────────────────
     def _draw_particle(self, x, y, size, shape, alpha):
-        s  = max(1, int(size))
-        c  = (100, 185, 255, int(255 * alpha))
+        s   = max(1, int(size))
+        c   = (100, 185, 255, int(255 * alpha))
         pad = s * 3
         surf = pygame.Surface((pad * 2, pad * 2), pygame.SRCALPHA)
-        cx, cy = pad, pad
+        bx, by = pad, pad
         if shape == 'diamond':
-            pts = [(cx, cy - s), (cx + s, cy), (cx, cy + s), (cx - s, cy)]
+            pts = [(bx, by - s), (bx + s, by), (bx, by + s), (bx - s, by)]
             pygame.draw.polygon(surf, c, pts)
         elif shape == 'cross':
             w = max(1, s // 2)
-            pygame.draw.line(surf, c, (cx - s, cy), (cx + s, cy), w)
-            pygame.draw.line(surf, c, (cx, cy - s), (cx, cy + s), w)
+            pygame.draw.line(surf, c, (bx - s, by), (bx + s, by), w)
+            pygame.draw.line(surf, c, (bx, by - s), (bx, by + s), w)
         else:
-            pygame.draw.circle(surf, c, (cx, cy), s)
+            pygame.draw.circle(surf, c, (bx, by), s)
         self.screen.blit(surf, (int(x) - pad, int(y) - pad))
 
     def _draw_rings(self, state):
@@ -233,16 +376,14 @@ class JarvisVisual:
             r     = arc['r']
             alpha = arc['alpha']
             if state == "speaking":
-                r     += int(18 * math.sin(self.t * 5 + arc['start']))
-                alpha  = min(120, alpha + 40)
+                r    += int(18 * math.sin(self.t * 5 + arc['start']))
+                alpha = min(120, alpha + 40)
             elif state == "listening":
                 alpha = min(90, alpha + 20)
-
             steps = 60
-            span  = arc['span']
             pts   = []
             for i in range(steps + 1):
-                a = arc['start'] + span * (i / steps)
+                a = arc['start'] + arc['span'] * (i / steps)
                 pts.append((
                     int(self.cx + r * math.cos(a)),
                     int(self.cy + r * math.sin(a) * 0.55),
@@ -269,31 +410,19 @@ class JarvisVisual:
         c  = (18, 55, 140)
         sz = 44
         W, H = self.W, self.H
-        for x0, y0, dx, dy in [
-            (10, 10,  1,  1),
-            (W - 10, 10, -1,  1),
-            (10, H - 10,  1, -1),
-            (W - 10, H - 10, -1, -1),
-        ]:
+        for x0, y0, dx, dy in [(10, 10, 1, 1), (W-10, 10, -1, 1),
+                                (10, H-10, 1, -1), (W-10, H-10, -1, -1)]:
             pygame.draw.lines(self.screen, c, False,
-                              [(x0 + dx * sz, y0), (x0, y0), (x0, y0 + dy * sz)], 1)
+                              [(x0 + dx*sz, y0), (x0, y0), (x0, y0 + dy*sz)], 1)
 
     def _draw_hud(self, state):
-        labels = {
-            "idle":      "STANDBY",
-            "waking":    "ACTIVATING",
-            "listening": "LISTENING",
-            "speaking":  "SPEAKING",
-        }
-        colors = {
-            "idle":      (35, 70, 155),
-            "waking":    (100, 100, 255),
-            "listening": (0,  195, 215),
-            "speaking":  (80, 160, 255),
-        }
+        labels = {"idle": "STANDBY", "waking": "ACTIVATING",
+                  "listening": "LISTENING", "speaking": "SPEAKING"}
+        colors = {"idle": (35, 70, 155), "waking": (100, 100, 255),
+                  "listening": (0, 195, 215), "speaking": (80, 160, 255)}
         label = labels.get(state, "STANDBY")
         color = colors.get(state, (35, 70, 155))
-        txt   = self.font_hud.render(f"J.A.R.V.I.S.  ·  {label}", True, color)
+        txt  = self.font_hud.render(f"J.A.R.V.I.S.  ·  {label}", True, color)
         self.screen.blit(txt, (self.W // 2 - txt.get_width() // 2, self.H - 55))
         hint = self.font_label.render("ESC to exit  |  double clap to wake", True, (20, 45, 100))
         self.screen.blit(hint, (self.W // 2 - hint.get_width() // 2, self.H - 28))
@@ -304,74 +433,55 @@ class JarvisVisual:
         self.setup()
 
         while True:
-            dt     = self.clock.tick(60) / 1000.0
+            dt     = self.clock.tick(40) / 1000.0   # 40 fps — numpy orb is heavy
             self.t += dt
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()
-                    return
+                    pygame.quit(); return
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    pygame.quit()
-                    return
+                    pygame.quit(); return
 
             state = visual_state
 
-            # ── background ────────────────────────────────────────────────────
             self.screen.fill((0, 2, 12))
 
-            # ── orb pulse calculation ─────────────────────────────────────────
             if state == "speaking":
-                pulse = 1.0 + 0.14 * math.sin(self.t * 9)
-                if random.random() < 0.18:
-                    self.ripples.append({'r': self.ORB_R * pulse, 'alpha': 110})
+                pulse = 1.0 + 0.13 * math.sin(self.t * 8)
+                if random.random() < 0.22:
+                    self.ripples.append({'r': self.ORB_R, 'alpha': 100})
             elif state == "listening":
-                pulse = 1.0 + 0.07 * math.sin(self.t * 3.5)
+                pulse = 1.0 + 0.06 * math.sin(self.t * 3.5)
             elif state == "waking":
-                pulse = 1.0 + 0.20 * math.sin(self.t * 5)
+                pulse = 1.0 + 0.18 * math.sin(self.t * 5)
             else:
-                pulse = 1.0 + 0.03 * math.sin(self.t * 1.3)
+                pulse = 1.0 + 0.025 * math.sin(self.t * 1.2)
 
             orb_r = int(self.ORB_R * pulse)
 
-            # ── arcs / rings ──────────────────────────────────────────────────
             self._draw_rings(state)
-
-            # ── ripples ───────────────────────────────────────────────────────
             self._draw_ripples()
 
-            # ── particles ─────────────────────────────────────────────────────
             speed_mult = 2.8 if state == "speaking" else (1.6 if state == "listening" else 1.0)
             for p in self.particles:
                 p['angle']   += p['speed']   * speed_mult
                 p['y_phase'] += p['y_speed'] * speed_mult
-
-                if state == "speaking":
-                    target_r = p['base_r'] + 38 * math.sin(self.t * 2.5 + p['angle'])
-                elif state == "waking":
-                    target_r = p['base_r'] + 20 * math.sin(self.t * 4 + p['angle'])
-                else:
-                    target_r = p['base_r']
+                target_r = (p['base_r'] + 38 * math.sin(self.t * 2.5 + p['angle'])
+                            if state == "speaking"
+                            else p['base_r'] + (20 * math.sin(self.t * 4 + p['angle'])
+                                                if state == "waking" else 0))
                 p['r'] += (target_r - p['r']) * 0.06
-
                 x = self.cx + p['r'] * math.cos(p['angle'])
-                y = (self.cy
-                     + p['r'] * math.sin(p['angle']) * 0.48
+                y = (self.cy + p['r'] * math.sin(p['angle']) * 0.48
                      + p['y_amp'] * math.sin(p['y_phase']))
-
                 alpha = p['alpha']
                 if state == "idle":
-                    alpha *= 0.55 + 0.45 * math.sin(self.t * 0.9 + p['angle'])
-
+                    alpha *= 0.5 + 0.5 * math.sin(self.t * 0.9 + p['angle'])
                 self._draw_particle(x, y, p['size'], p['shape'], alpha)
 
-            # ── orb ───────────────────────────────────────────────────────────
             self._draw_orb(self.cx, self.cy, orb_r, state)
-
-            # ── decorations & HUD ─────────────────────────────────────────────
             self._draw_corner_deco()
             self._draw_hud(state)
-
             pygame.display.flip()
 
 
