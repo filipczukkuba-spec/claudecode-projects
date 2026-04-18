@@ -404,19 +404,19 @@ def execute_tool(name, inp):
                         uri = tracks[0]["uri"]
                         title = tracks[0]["name"]
                         artist = tracks[0]["artists"][0]["name"]
+                        print(f"  [spotify] Playing: {title} by {artist}  ({uri})")
                         spotify_exe = os.path.expandvars(r"%APPDATA%\Spotify\Spotify.exe")
-                        subprocess.run(['taskkill', '/F', '/IM', 'Spotify.exe'], capture_output=True)
-                        time.sleep(1.5)
                         if os.path.exists(spotify_exe):
                             subprocess.Popen([spotify_exe, uri])
                         else:
-                            os.startfile(uri)
+                            import ctypes
+                            ctypes.windll.shell32.ShellExecuteW(0, "open", uri, None, None, 1)
                         return f"Playing {title} by {artist}"
                     return "No track found"
                 except Exception as e:
                     return f"Spotify error: {e}"
             else:
-                return "Spotify API not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET env vars."
+                return "Spotify API not configured."
 
         elif name == "spotify_control":
             action = inp["action"].lower()
