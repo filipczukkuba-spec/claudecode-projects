@@ -1,5 +1,8 @@
+import sys
 import os
 from anthropic import Anthropic
+
+sys.stdout.reconfigure(encoding="utf-8")
 
 client = Anthropic()
 
