@@ -381,15 +381,17 @@ def execute_tool(name, inp):
             # Find Spotify window and get its bounds
             spotify_win = None
             try:
-                wins = [w for w in gw.getAllWindows() if "spotify" in w.title.lower()]
+                all_wins = [w for w in gw.getAllWindows() if w.title.strip()]
+                print(f"  [spotify] all windows: {[w.title for w in all_wins]}")
+                wins = [w for w in all_wins if "spotify" in w.title.lower()]
                 if wins:
                     spotify_win = wins[0]
                     spotify_win.restore()
                     time.sleep(0.3)
                     spotify_win.activate()
                     time.sleep(1.2)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  [spotify] window error: {e}")
             if spotify_win:
                 print(f"  [spotify] win: left={spotify_win.left} top={spotify_win.top} w={spotify_win.width} h={spotify_win.height}")
                 # Top Result card play button: just past the left sidebar, ~280px down
