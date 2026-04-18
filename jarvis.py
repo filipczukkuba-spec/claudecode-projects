@@ -391,16 +391,14 @@ def execute_tool(name, inp):
             except Exception:
                 pass
             if spotify_win:
-                # Save screenshot so we can inspect the layout
-                debug_path = r"C:\Users\filip\Desktop\spotify_debug.png"
-                pyautogui.screenshot(debug_path)
-                print(f"  [spotify] win bounds: left={spotify_win.left} top={spotify_win.top} w={spotify_win.width} h={spotify_win.height}")
-                print(f"  [spotify] screenshot saved to {debug_path}")
-                song_x = spotify_win.left + int(spotify_win.width * 0.45)
-                song_y = spotify_win.top + 200
-                pyautogui.moveTo(song_x, song_y, duration=0.4)
-                time.sleep(0.4)
-                pyautogui.doubleClick(song_x, song_y)
+                print(f"  [spotify] win: left={spotify_win.left} top={spotify_win.top} w={spotify_win.width} h={spotify_win.height}")
+                # Top Result card play button: just past the left sidebar, ~280px down
+                play_x = spotify_win.left + 310
+                play_y = spotify_win.top + 280
+                # Hover to reveal play button, then click
+                pyautogui.moveTo(play_x, play_y, duration=0.5)
+                time.sleep(0.5)
+                pyautogui.click(play_x, play_y)
             return f"Playing {query} on Spotify"
 
         elif name == "spotify_control":
