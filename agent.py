@@ -25,7 +25,6 @@ def run_tool(name, inputs):
         return str(eval(inputs["expression"]))
 
 def run_agent(user_message):
-    print(f"You: {user_message}")
     messages = [{"role": "user", "content": user_message}]
 
     while True:
@@ -57,4 +56,8 @@ def run_agent(user_message):
             messages.append({"role": "user", "content": tool_results})
 
 if __name__ == "__main__":
-    run_agent("What is 1234 multiplied by 5678?")
+    while True:
+        user_input = input("You: ").strip()
+        if user_input.lower() in ("exit", "quit", ""):
+            break
+        run_agent(user_input)
