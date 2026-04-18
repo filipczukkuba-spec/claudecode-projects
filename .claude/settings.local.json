@@ -15,7 +15,8 @@
       "Bash(where scoop *)",
       "Bash(winget install *)",
       "Bash(export PATH=\"$PATH:/c/Program Files/nodejs\")",
-      "Bash(npx --yes serve \"C:/Users/filip/Desktop/claudecode\" --listen 8080)"
+      "Bash(npx --yes serve \"C:/Users/filip/Desktop/claudecode\" --listen 8080)",
+      "Bash(python -m pip install anthropic)"
     ]
   }
 }
