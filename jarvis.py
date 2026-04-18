@@ -16,7 +16,7 @@ try:
     import pyaudio
     import pygame
     import spotipy
-    from spotipy.oauth2 import SpotifyOAuth
+    from spotipy.oauth2 import SpotifyClientCredentials
     import speech_recognition as sr
     import psutil
     import pyautogui
@@ -61,13 +61,9 @@ def make_spotify():
     if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
         return None
     try:
-        return spotipy.Spotify(auth_manager=SpotifyOAuth(
+        return spotipy.Spotify(auth_manager=SpotifyClientCredentials(
             client_id=SPOTIFY_CLIENT_ID,
             client_secret=SPOTIFY_CLIENT_SECRET,
-            redirect_uri="http://127.0.0.1:8080",
-            scope="user-modify-playback-state user-read-playback-state",
-            open_browser=True,
-            cache_path=os.path.join(BASE_DIR, ".spotify_cache"),
         ))
     except Exception as e:
         print(f"Spotify init error: {e}")
@@ -408,7 +404,7 @@ def execute_tool(name, inp):
                         uri = tracks[0]["uri"]
                         title = tracks[0]["name"]
                         artist = tracks[0]["artists"][0]["name"]
-                        sp.start_playback(uris=[uri])
+                        os.startfile(uri)
                         return f"Playing {title} by {artist}"
                     return "No track found"
                 except Exception as e:
@@ -418,21 +414,6 @@ def execute_tool(name, inp):
 
         elif name == "spotify_control":
             action = inp["action"].lower()
-            if sp:
-                try:
-                    if action == "pause":
-                        sp.pause_playback()
-                    elif action in ("resume", "play"):
-                        sp.start_playback()
-                    elif action == "next":
-                        sp.next_track()
-                    elif action == "previous":
-                        sp.previous_track()
-                    elif action == "mute":
-                        sp.volume(0)
-                    return f"Spotify: {action}"
-                except Exception as e:
-                    return f"Spotify error: {e}"
             key_map = {"pause": "playpause", "resume": "playpause", "play": "playpause",
                        "next": "nexttrack", "previous": "prevtrack", "mute": "volumemute"}
             key = key_map.get(action)
