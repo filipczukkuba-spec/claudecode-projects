@@ -524,6 +524,8 @@ def wake_up():
     print("=" * 40)
 
     song = os.path.join(BASE_DIR, "sounds", "iron_man.mp3")
+    print(f"Looking for music at: {song}")
+    print(f"Exists: {os.path.exists(song)}")
     if os.path.exists(song):
         os.startfile(song)
         time.sleep(7)
