@@ -16,7 +16,7 @@ try:
     import pyaudio
     import pygame
     import spotipy
-    from spotipy.oauth2 import SpotifyOAuth
+    from spotipy.oauth2 import SpotifyClientCredentials
     import speech_recognition as sr
     import psutil
     import pyautogui
@@ -53,21 +53,17 @@ def save_api_key(key):
 
 API_KEY = load_api_key()
 
-# ─── Spotify API ──────────────────────────────────────────────────────────────
+# ─── Spotify API (Client Credentials — no redirect URI, no login) ─────────────
 SPOTIFY_CLIENT_ID     = os.environ.get("SPOTIFY_CLIENT_ID", "")
 SPOTIFY_CLIENT_SECRET = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
-SPOTIFY_REDIRECT_URI  = "http://localhost:8080"
 
 def make_spotify():
     if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
         return None
     try:
-        return spotipy.Spotify(auth_manager=SpotifyOAuth(
+        return spotipy.Spotify(auth_manager=SpotifyClientCredentials(
             client_id=SPOTIFY_CLIENT_ID,
             client_secret=SPOTIFY_CLIENT_SECRET,
-            redirect_uri=SPOTIFY_REDIRECT_URI,
-            scope="user-modify-playback-state user-read-playback-state",
-            open_browser=True,
         ))
     except Exception as e:
         print(f"Spotify init error: {e}")
@@ -408,12 +404,11 @@ def execute_tool(name, inp):
                         uri = tracks[0]["uri"]
                         title = tracks[0]["name"]
                         artist = tracks[0]["artists"][0]["name"]
-                        sp.start_playback(uris=[uri])
+                        # Open track directly in desktop Spotify — no clicks needed
+                        subprocess.Popen(f'start "" "{uri}"', shell=True)
                         return f"Playing {title} by {artist}"
                     return "No track found"
-                except spotipy.exceptions.SpotifyException as e:
-                    if "NO_ACTIVE_DEVICE" in str(e):
-                        return "Open Spotify on your device first, then ask again."
+                except Exception as e:
                     return f"Spotify error: {e}"
             else:
                 return "Spotify API not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET env vars."
