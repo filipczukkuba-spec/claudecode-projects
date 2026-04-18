@@ -395,7 +395,7 @@ def execute_tool(name, inp):
                 # Green play button is below artist name/monthly listeners,
                 # left side of content area — x~255, y~375 for 960x1032 window
                 play_x = spotify_win.left + 415
-                play_y = spotify_win.top + 145
+                play_y = spotify_win.top + 195
                 pyautogui.moveTo(play_x, play_y, duration=0.4)
                 time.sleep(0.5)
                 pyautogui.click(play_x, play_y)
