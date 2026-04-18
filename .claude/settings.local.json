@@ -21,7 +21,8 @@
       "Bash(python *)",
       "WebSearch",
       "Skill(claude-api)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(git push *)"
     ]
   }
 }
