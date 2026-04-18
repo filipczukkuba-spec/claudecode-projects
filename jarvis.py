@@ -14,6 +14,7 @@ import json
 try:
     import anthropic
     import pyaudio
+    import pygame
     import speech_recognition as sr
     import psutil
     import pyautogui
@@ -376,18 +377,20 @@ def execute_tool(name, inp):
             # Open Spotify and search
             subprocess.Popen(f'start "" "spotify:search:{query}"', shell=True)
             time.sleep(3)
-            # Focus Spotify window then navigate to first song and play it
+            # Force Spotify to foreground
             try:
-                wins = [w for w in gw.getAllWindows() if "spotify" in w.title.lower()]
-                if wins:
-                    wins[0].activate()
-                    time.sleep(0.5)
+                subprocess.run(
+                    ["powershell", "-Command",
+                     "(New-Object -ComObject WScript.Shell).AppActivate('Spotify')"],
+                    capture_output=True, timeout=5
+                )
+                time.sleep(0.6)
             except Exception:
                 pass
-            # Press Tab to get to first result, Enter to play
+            # Navigate to first result and play
             for _ in range(3):
                 pyautogui.press("tab")
-                time.sleep(0.1)
+                time.sleep(0.15)
             pyautogui.press("enter")
             return f"Playing {query} on Spotify"
 
@@ -541,14 +544,18 @@ def wake_up():
     song = SONG_PATH
     print(f"Song path: {song}")
     if song:
-        ps = (
-            f'$wmp = New-Object -ComObject WMPlayer.OCX; '
-            f'$wmp.URL = "{song}"; '
-            f'$wmp.controls.play(); '
-            f'Start-Sleep -Seconds 7; '
-            f'$wmp.controls.stop()'
-        )
-        subprocess.Popen(["powershell", "-Command", ps])
+        def _play_intro():
+            try:
+                pygame.mixer.init()
+                pygame.mixer.music.load(song)
+                pygame.mixer.music.play()
+                time.sleep(7)
+                pygame.mixer.music.stop()
+                pygame.mixer.quit()
+            except Exception as e:
+                print(f"Intro music error: {e}")
+        threading.Thread(target=_play_intro, daemon=True).start()
+        time.sleep(0.5)
 
     speak("Good day. JARVIS online. What can I do for you?")
     listen_loop()
@@ -560,7 +567,7 @@ def listen_loop():
     recognizer = sr.Recognizer()
     recognizer.energy_threshold = 300
     recognizer.dynamic_energy_threshold = True
-    recognizer.pause_threshold = 1.0      # wait 1s of silence before stopping
+    recognizer.pause_threshold = 1.5      # wait 1.5s of silence before stopping
     recognizer.phrase_threshold = 0.3
     mic = sr.Microphone()
     timeouts = 0
