@@ -541,11 +541,14 @@ def wake_up():
     song = SONG_PATH
     print(f"Song path: {song}")
     if song:
-        subprocess.run(
-            ["ffplay", "-nodisp", "-autoexit", "-t", "7", song],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+        ps = (
+            f'$wmp = New-Object -ComObject WMPlayer.OCX; '
+            f'$wmp.URL = "{song}"; '
+            f'$wmp.controls.play(); '
+            f'Start-Sleep -Seconds 7; '
+            f'$wmp.controls.stop()'
         )
+        subprocess.Popen(["powershell", "-Command", ps])
 
     speak("Good day. JARVIS online. What can I do for you?")
     listen_loop()
