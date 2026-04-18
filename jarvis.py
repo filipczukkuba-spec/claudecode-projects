@@ -61,7 +61,9 @@ def find_song():
                 return os.path.join(SOUNDS_DIR, f)
     return None
 
-SONG_PATH = find_song()
+SONG_PATH = find_song() or r"C:\Users\filip\Desktop\claudecode\sounds\iron_man.mp3"
+if not os.path.exists(SONG_PATH):
+    SONG_PATH = None
 
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
