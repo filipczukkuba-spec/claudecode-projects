@@ -382,7 +382,6 @@ def execute_tool(name, inp):
             spotify_win = None
             try:
                 all_wins = [w for w in gw.getAllWindows() if w.title.strip()]
-                print(f"  [spotify] all windows: {[w.title for w in all_wins]}")
                 wins = [w for w in all_wins if "spotify" in w.title.lower()]
                 if wins:
                     spotify_win = wins[0]
@@ -393,13 +392,16 @@ def execute_tool(name, inp):
             except Exception as e:
                 print(f"  [spotify] window error: {e}")
             if spotify_win:
-                print(f"  [spotify] win: left={spotify_win.left} top={spotify_win.top} w={spotify_win.width} h={spotify_win.height}")
-                # Top Result card play button: just past the left sidebar, ~280px down
-                play_x = spotify_win.left + 310
-                play_y = spotify_win.top + 280
-                # Hover to reveal play button, then click
-                pyautogui.moveTo(play_x, play_y, duration=0.5)
-                time.sleep(0.5)
+                # Hover over the Top Result card first to reveal the green play button,
+                # then click it — button sits next to the artist name ~300px from top
+                hover_x = spotify_win.left + 320
+                hover_y = spotify_win.top + 220
+                play_x  = spotify_win.left + 350
+                play_y  = spotify_win.top + 300
+                pyautogui.moveTo(hover_x, hover_y, duration=0.4)
+                time.sleep(0.6)
+                pyautogui.moveTo(play_x, play_y, duration=0.3)
+                time.sleep(0.4)
                 pyautogui.click(play_x, play_y)
             return f"Playing {query} on Spotify"
 
