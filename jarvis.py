@@ -49,13 +49,14 @@ def save_api_key(key):
 
 API_KEY = load_api_key()
 
-# Find any mp3 in the sounds folder, not just iron_man.mp3
+# Find any audio file in the sounds folder
 def find_song():
     if not os.path.exists(SOUNDS_DIR):
         return None
-    for f in os.listdir(SOUNDS_DIR):
-        if f.endswith(".mp3"):
-            return os.path.join(SOUNDS_DIR, f)
+    for ext in (".mp3", ".webm", ".ogg", ".wav"):
+        for f in os.listdir(SOUNDS_DIR):
+            if f.endswith(ext):
+                return os.path.join(SOUNDS_DIR, f)
     return None
 
 SONG_PATH = find_song()
@@ -64,7 +65,7 @@ CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 44100
-CLAP_THRESHOLD = 2500       # RMS amplitude — lower = more sensitive
+CLAP_THRESHOLD = 1400       # RMS amplitude — lower = more sensitive
 DOUBLE_CLAP_MAX = 1.2       # seconds max between two claps
 DOUBLE_CLAP_DEBOUNCE = 0.12 # seconds min between two claps
 
