@@ -37,7 +37,9 @@ def run_agent(user_message):
         )
 
         if response.stop_reason == "end_turn":
-            print(f"Agent: {response.content[0].text}")
+            for block in response.content:
+                if hasattr(block, "text"):
+                    print(f"Agent: {block.text}")
             break
 
         if response.stop_reason == "tool_use":
