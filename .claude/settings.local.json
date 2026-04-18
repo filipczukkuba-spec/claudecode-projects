@@ -20,7 +20,8 @@
       "Bash(/c/Users/filip/AppData/Local/Programs/Python/Python312/python.exe *)",
       "Bash(python *)",
       "WebSearch",
-      "Skill(claude-api)"
+      "Skill(claude-api)",
+      "Bash(pip install *)"
     ]
   }
 }
