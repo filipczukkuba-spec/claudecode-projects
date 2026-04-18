@@ -410,9 +410,8 @@ def execute_tool(name, inp):
                              "Stop-Process -Name Spotify -Force -ErrorAction SilentlyContinue"],
                             capture_output=True, timeout=5
                         )
-                        time.sleep(2)
-                        spotify_exe = os.path.expandvars(r"%APPDATA%\Spotify\Spotify.exe")
-                        subprocess.Popen([spotify_exe, uri])
+                        time.sleep(2.5)
+                        subprocess.Popen(["cmd", "/c", "start", "", uri])
                         return f"Playing {title} by {artist}"
                     return "No track found"
                 except Exception as e:
@@ -450,7 +449,8 @@ SYSTEM = (
     "When taking actions, briefly confirm what you're doing. "
     "You have full access to the user's computer and can open apps, browse the web, manage files, "
     "run commands, control system settings, play music on Spotify (free account), and write/send emails via Gmail. "
-    "The user has Spotify Premium — you can search and play any track, pause, resume, skip, and control volume via the Spotify API."
+    "The user has Spotify Premium — you can search and play any track, pause, resume, skip, and control volume via the Spotify API. "
+    "When play_spotify returns a 'Playing ...' result, the song IS playing — do not say Spotify isn't running or suggest manual action. Trust the tool result."
 )
 
 
