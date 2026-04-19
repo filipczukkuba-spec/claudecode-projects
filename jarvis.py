@@ -223,7 +223,10 @@ def fetch_calendar_events(days=7):
                 cur = {}
             elif in_event:
                 key, value, params = _parse_ics_line(line)
-                if key == "SUMMARY": cur["summary"] = value
+                if key == "SUMMARY":
+                    cur["summary"] = (value.replace("\\,", ",").replace("\\;", ";")
+                                           .replace("\\n", " ").replace("\\N", " ")
+                                           .replace("\\\\", "\\").strip())
                 elif key == "DTSTART": cur["start"] = _parse_ics_datetime(value, params)
                 elif key == "DTEND":   cur["end"]   = _parse_ics_datetime(value, params)
         today = _dt.date.today()
