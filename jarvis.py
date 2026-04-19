@@ -2026,7 +2026,6 @@ def wake_up():
         parts.append("Breaking news: " + ". ".join(titles) + ".")
     if suggestion:
         parts.append(suggestion)
-    parts.append("Shall I display the week ahead?")
 
     speak(" ".join(parts))
 
@@ -2039,10 +2038,8 @@ def wake_up():
     threading.Thread(target=_fade_briefing_cards, daemon=True).start()
 
     # ── Week ahead (Google Calendar) ──────────────────────────────────────────
+    speak("Shall I show the week ahead? Yes or no.")
     want_week = listen_yes_no()
-    if want_week is None:
-        speak("Sorry, shall I show the week ahead? Yes or no.")
-        want_week = listen_yes_no()
     if want_week:
         cur_mem = load_memory()
         cal_events = fetch_calendar_events(days=7) if cur_mem.get("gcal_ics_url") else []

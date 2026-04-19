@@ -31,14 +31,22 @@
     {
       "text": "display the week ahead",
       "time": 1776613836.6317275
+    },
+    {
+      "text": "open Gmail for me",
+      "time": 1776614187.2236598
+    },
+    {
+      "text": "open Gmail on Google Chrome",
+      "time": 1776614201.2407556
     }
   ],
   "habits": {
-    "h17": 8
+    "h17": 10
   },
   "birthdays": [],
-  "wake_count": 3,
-  "last_wake": 1776613790.2607312,
+  "wake_count": 5,
+  "last_wake": 1776614218.2619984,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "",
