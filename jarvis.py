@@ -1653,20 +1653,6 @@ def wake_up():
             speak("Your calendar looks clear this week.")
         time.sleep(0.3)
 
-    # ── Birthdays (next 30 days) ──────────────────────────────────────────────
-    speak("Shall I flag any upcoming birthdays this month?")
-    want_bd = listen_yes_no()
-    if want_bd:
-        bds = upcoming_birthdays(days=30)
-        show_birthday_view(bds)
-        if bds:
-            lines = [(f"{b['name']} today" if b['days'] == 0
-                      else f"{b['name']} in {b['days']} days") for b in bds[:5]]
-            speak("On the horizon: " + ", ".join(lines) + ".")
-        else:
-            speak("No birthdays on record for the coming month.")
-        time.sleep(0.3)
-
     speak("How may I assist you?")
     listen_loop()
 
