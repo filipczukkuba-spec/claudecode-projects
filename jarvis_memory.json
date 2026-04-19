@@ -107,20 +107,56 @@
     {
       "text": "goodbye jar",
       "time": 1776631163.501724
+    },
+    {
+      "text": "Drive reset my Gmail credential",
+      "time": 1776631417.4040344
+    },
+    {
+      "text": "do it",
+      "time": 1776631454.632132
+    },
+    {
+      "text": "I want to give it to you",
+      "time": 1776631473.2718349
+    },
+    {
+      "text": "give me the box where I can type",
+      "time": 1776631485.844759
+    },
+    {
+      "text": "the password is xjmx c y u space z r a n space b j a p repeat it for me",
+      "time": 1776631525.0487974
+    },
+    {
+      "text": "no it's wrong",
+      "time": 1776631544.7040193
+    },
+    {
+      "text": "x j p m x c y u z r i n b j a p",
+      "time": 1776631576.6211932
+    },
+    {
+      "text": "so summarize my emails from the past 2 days",
+      "time": 1776631628.0588846
+    },
+    {
+      "text": "can you talk to me about a things happening on the hormones Canal like Samurai is it for me",
+      "time": 1776631695.123996
     }
   ],
   "habits": {
     "h17": 10,
     "h18": 9,
-    "h22": 8
+    "h22": 17
   },
   "birthdays": [],
-  "wake_count": 13,
-  "last_wake": 1776630880.3227897,
+  "wake_count": 14,
+  "last_wake": 1776631364.8939295,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "",
   "librus_pass": "",
-  "gmail_imap_user": "filipcsuk.kubargumal.com",
-  "gmail_imap_pass": "XJPMXCYOUZRINBJAP"
+  "gmail_imap_user": "filipczuk.kuba@gmail.com",
+  "gmail_imap_pass": "xjpmxcyuzrinbjap"
 }

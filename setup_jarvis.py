@@ -16,6 +16,7 @@ PACKAGES = [
     "pycaw",
     "comtypes",
     "yt-dlp",
+    "playwright",
 ]
 
 SOUNDS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds")

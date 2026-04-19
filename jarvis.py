@@ -1755,6 +1755,12 @@ TOOLS = [
                           "app_password": {"type": "string", "description": "16-character Google App Password (spaces are stripped automatically)"},
                       },
                       "required": ["email", "app_password"]}},
+    {"name": "setup_tiktok",
+     "description": "Open TikTok in a browser window so the user can log in. Only needed once — the session is saved after that.",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "run_tiktok_streak_check",
+     "description": "Manually run the TikTok streak keeper right now. Checks all active streaks and sends the 2nd FYP video or 'passa!' as needed.",
+     "input_schema": {"type": "object", "properties": {}}},
 ]
 
 
@@ -1881,6 +1887,12 @@ def execute_tool(name, inp):
             buckets = group_events_by_day(cal, 7) if cal else [[] for _ in range(7)]
             show_week_view(buckets)
             return "Week overlay displayed"
+        elif name == "setup_tiktok":
+            from tiktok_agent import setup_tiktok_session
+            return setup_tiktok_session()
+        elif name == "run_tiktok_streak_check":
+            from tiktok_agent import run_streak_check
+            return run_streak_check()
         elif name == "dispatch_agent":
             return run_agent_pipeline(inp.get("pipeline_type", ""), inp.get("context", ""))
         elif name == "set_gmail_credentials":
@@ -2523,6 +2535,25 @@ def main():
     print('  Say "Jarvis" → wake  |  ESC → exit')
 
     threading.Thread(target=wake_word_listener, daemon=True).start()
+
+    def _tiktok_scheduler():
+        import datetime as _dt
+        check_hour = 23  # 11 PM — change this to adjust timing
+        while True:
+            now    = _dt.datetime.now()
+            target = now.replace(hour=check_hour, minute=0, second=0, microsecond=0)
+            if target <= now:
+                target += _dt.timedelta(days=1)
+            time.sleep((target - now).total_seconds())
+            try:
+                from tiktok_agent import run_streak_check
+                result = run_streak_check()
+                speak(f"TikTok streak check complete, sir. {result}")
+            except Exception as e:
+                print(f"[tiktok scheduler] {e}")
+
+    threading.Thread(target=_tiktok_scheduler, daemon=True).start()
+
     visual.run()
 
 if __name__ == "__main__":
