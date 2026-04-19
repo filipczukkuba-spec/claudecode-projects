@@ -1005,7 +1005,7 @@ def wake_up():
     ]
 
     if weather:
-        visual.add_news_card(weather, cx, cy - 340, delay=9.0, tag="WEATHER",
+        visual.add_news_card(weather, cx, cy - 340, delay=0.0, tag="WEATHER",
                              img_url=None, fly_dx=0, fly_dy=-900)
 
     for i, art in enumerate(headlines[:6]):
