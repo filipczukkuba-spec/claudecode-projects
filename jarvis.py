@@ -121,6 +121,201 @@ def fetch_headlines(count=6):
         return out
     except Exception: return []
 
+# ─── Memory System ────────────────────────────────────────────────────────────
+MEMORY_PATH = os.path.join(BASE_DIR, "jarvis_memory.json")
+_memory_lock = threading.Lock()
+
+def _default_memory():
+    return {"commands": [], "habits": {}, "birthdays": [],
+            "wake_count": 0, "last_wake": 0,
+            "gcal_ics_url": "", "librus_user": "", "librus_pass": ""}
+
+def load_memory():
+    if os.path.exists(MEMORY_PATH):
+        try:
+            with open(MEMORY_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            base = _default_memory(); base.update(data); return base
+        except Exception as e:
+            print(f"Memory load error: {e}")
+    return _default_memory()
+
+def save_memory(mem):
+    with _memory_lock:
+        try:
+            with open(MEMORY_PATH, "w", encoding="utf-8") as f:
+                json.dump(mem, f, indent=2, default=str)
+        except Exception as e:
+            print(f"Memory save error: {e}")
+
+def record_command(command):
+    mem = load_memory()
+    mem.setdefault("commands", []).append({"text": command, "time": time.time()})
+    mem["commands"] = mem["commands"][-200:]
+    hour = time.localtime().tm_hour
+    habits = mem.setdefault("habits", {})
+    habits[f"h{hour}"] = habits.get(f"h{hour}", 0) + 1
+    save_memory(mem)
+
+def get_suggestion(mem):
+    if not mem: return None
+    if mem.get("wake_count", 0) <= 1: return None
+    hour = time.localtime().tm_hour
+    recent = " ".join((c.get("text","") or "").lower() for c in mem.get("commands", [])[-40:])
+    if 6 <= hour < 11 and "spotify" in recent:
+        return "Shall I resume your morning playlist?"
+    if 20 <= hour or hour < 2:
+        return "Working late, I see."
+    return None
+
+# ─── Calendar / Librus / Birthdays ────────────────────────────────────────────
+def _parse_ics_line(line):
+    if ":" not in line: return None, None, {}
+    key_part, value = line.split(":", 1)
+    params = {}
+    if ";" in key_part:
+        parts = key_part.split(";")
+        key = parts[0]
+        for p in parts[1:]:
+            if "=" in p:
+                k, v = p.split("=", 1); params[k.upper()] = v
+    else:
+        key = key_part
+    return key.upper(), value, params
+
+def _parse_ics_datetime(value, params):
+    import datetime as _dt
+    v = value.strip().replace("Z", "")
+    try:
+        if params.get("VALUE") == "DATE" or len(v) == 8:
+            return _dt.datetime.strptime(v[:8], "%Y%m%d")
+        return _dt.datetime.strptime(v[:15], "%Y%m%dT%H%M%S")
+    except Exception:
+        return None
+
+def _unfold_ics(text):
+    lines = []
+    for raw in text.splitlines():
+        if (raw.startswith(" ") or raw.startswith("\t")) and lines:
+            lines[-1] += raw[1:]
+        else:
+            lines.append(raw.rstrip("\r"))
+    return lines
+
+def fetch_calendar_events(days=7):
+    if not HAS_REQUESTS: return []
+    mem = load_memory()
+    url = (mem.get("gcal_ics_url") or "").strip()
+    if not url: return []
+    import datetime as _dt
+    try:
+        r = _requests.get(url, timeout=10)
+        if r.status_code != 200:
+            print(f"Calendar HTTP {r.status_code}")
+            return []
+        events = []; in_event = False; cur = {}
+        for line in _unfold_ics(r.text):
+            if line == "BEGIN:VEVENT": in_event = True; cur = {}
+            elif line == "END:VEVENT":
+                in_event = False
+                if cur.get("start"):
+                    events.append(cur)
+                cur = {}
+            elif in_event:
+                key, value, params = _parse_ics_line(line)
+                if key == "SUMMARY": cur["summary"] = value
+                elif key == "DTSTART": cur["start"] = _parse_ics_datetime(value, params)
+                elif key == "DTEND":   cur["end"]   = _parse_ics_datetime(value, params)
+        today = _dt.date.today()
+        end_date = today + _dt.timedelta(days=days)
+        out = [e for e in events
+               if e.get("start") and today <= e["start"].date() < end_date]
+        out.sort(key=lambda e: e["start"])
+        return out
+    except Exception as e:
+        print(f"Calendar fetch error: {e}")
+        return []
+
+def group_events_by_day(events, days=7):
+    import datetime as _dt
+    today = _dt.date.today()
+    buckets = [[] for _ in range(days)]
+    for e in events:
+        d = e["start"].date()
+        delta = (d - today).days
+        if 0 <= delta < days:
+            has_time = e["start"].time() != _dt.time(0, 0)
+            label = e.get("summary", "(untitled)")
+            if has_time:
+                label = f"{e['start'].strftime('%H:%M')} {label}"
+            buckets[delta].append(label)
+    return buckets
+
+def fetch_librus_events(days=7):
+    mem = load_memory()
+    user = (mem.get("librus_user") or "").strip()
+    pw   = (mem.get("librus_pass") or "").strip()
+    if not user or not pw: return []
+    try:
+        from librus_apix.client import new_client
+        from librus_apix.schedule import get_schedule
+    except ImportError:
+        print("librus-apix not installed"); return []
+    try:
+        import datetime as _dt
+        cli = new_client()
+        cli.get_token(user, pw)
+        today = _dt.date.today()
+        out, seen_months = [], set()
+        for d in range(days):
+            day = today + _dt.timedelta(days=d)
+            mk = (day.month, day.year)
+            if mk in seen_months: continue
+            seen_months.add(mk)
+            try:
+                sched = get_schedule(cli, str(day.month), str(day.year), True)
+            except Exception as e:
+                print(f"Librus schedule error: {e}"); continue
+            for k, items in (sched or {}).items():
+                try: day_num = int(k)
+                except Exception: continue
+                try: event_date = _dt.date(day.year, day.month, day_num)
+                except Exception: continue
+                delta_d = (event_date - today).days
+                if 0 <= delta_d < days:
+                    for e in items:
+                        title = (getattr(e, "title", None)
+                                 or getattr(e, "name", None)
+                                 or getattr(e, "subject", None)
+                                 or str(e))
+                        title = str(title).strip()
+                        if title and title not in out:
+                            out.append(title)
+        return out
+    except Exception as e:
+        print(f"Librus error: {e}")
+        return []
+
+def upcoming_birthdays(days=30):
+    import datetime as _dt
+    mem = load_memory()
+    today = _dt.date.today()
+    out = []
+    for b in mem.get("birthdays", []):
+        try:
+            name = b["name"]; m, d = b["date"].split("-")
+            m, d = int(m), int(d)
+            this_year = _dt.date(today.year, m, d)
+            if this_year < today:
+                this_year = _dt.date(today.year + 1, m, d)
+            delta_d = (this_year - today).days
+            if 0 <= delta_d <= days:
+                out.append({"name": name, "date": this_year, "days": delta_d})
+        except Exception:
+            continue
+    out.sort(key=lambda x: x["days"])
+    return out
+
 class NewsCard:
     IMG_W, IMG_H = 158, 102
     CARD_W, CARD_H = 475, 120
@@ -312,6 +507,115 @@ class NewsCard:
             pygame.draw.lines(screen, tc, False,
                               [(cx2+sx*13, cy2),(cx2, cy2),(cx2, cy2+sy*13)], 1)
 
+class DayCard:
+    """Holographic single-day tile — part of the weekly preview strip."""
+    DEFAULT_W, DEFAULT_H = 210, 140
+
+    def __init__(self, day_label, events, tx, ty, delay=0.0,
+                 fly_dx=0, fly_dy=-700, w=None, h=None, tag_color=(0, 210, 255),
+                 lifetime=55.0):
+        import random as _r
+        self.day_label = day_label
+        self.events    = events or []
+        self.tx, self.ty = tx, ty
+        self.x = tx + fly_dx
+        self.y = ty + fly_dy
+        self.alpha   = 0.0
+        self.delay   = delay
+        self.age     = 0.0
+        self.alive   = True
+        self.lifetime = lifetime
+        self.phase   = _r.uniform(0, 6.283)
+        self.CARD_W = w or self.DEFAULT_W
+        self.CARD_H = h or self.DEFAULT_H
+        self.tag_color = tag_color
+        self._glitch_t   = _r.uniform(3, 8)
+        self._glitch_on  = False
+        self._glitch_dur = 0.0
+
+    def update(self, dt):
+        import math as _m, random as _r
+        self.age += dt
+        if self.age < self.delay: return
+        a = self.age - self.delay
+        if a < 1.0:
+            self.alpha = min(1.0, a)
+            self.x += (self.tx - self.x) * 0.18
+            self.y += (self.ty - self.y) * 0.18
+        elif a > self.lifetime - 1.2:
+            self.alpha = max(0.0, 1.0 - (a - (self.lifetime - 1.2)) / 1.2)
+        else:
+            self.y = self.ty + 4 * _m.sin(self.phase + a * 1.1)
+        self._glitch_t -= dt
+        if self._glitch_t <= 0 and a > 2.0:
+            self._glitch_on  = True
+            self._glitch_dur = 0.12
+            self._glitch_t   = _r.uniform(6, 12)
+        if self._glitch_on:
+            self._glitch_dur -= dt
+            if self._glitch_dur <= 0: self._glitch_on = False
+        if self.age > self.lifetime + self.delay:
+            self.alive = False
+
+    def draw(self, screen, font_tag, font_body):
+        if self.alpha <= 0: return
+        a = int(self.alpha * 255)
+        W, H = self.CARD_W, self.CARD_H
+        x = int(self.x) - W // 2
+        y = int(self.y) - H // 2
+
+        # panel
+        bg = pygame.Surface((W, H), pygame.SRCALPHA)
+        bg.fill((0, 5, 22, int(a * 0.88)))
+        screen.blit(bg, (x, y))
+
+        # header band
+        hh = 26
+        hdr = pygame.Surface((W, hh), pygame.SRCALPHA)
+        hdr.fill((0, 45, 115, int(a * 0.65)))
+        screen.blit(hdr, (x, y))
+        ts = font_tag.render(self.day_label, True, (220, 240, 255))
+        ts.set_alpha(a)
+        screen.blit(ts, (x + W // 2 - ts.get_width() // 2, y + 6))
+
+        # event lines
+        yy = y + hh + 8
+        max_w = W - 16
+        if not self.events:
+            es = font_body.render("— clear —", True, (100, 140, 200))
+            es.set_alpha(int(a * 0.75))
+            screen.blit(es, (x + W // 2 - es.get_width() // 2, yy + 10))
+        else:
+            max_lines = max(1, (H - hh - 18) // 18)
+            for i, ev in enumerate(self.events[:max_lines]):
+                txt = ev
+                while font_body.size("• " + txt)[0] > max_w and len(txt) > 3:
+                    txt = txt[:-1]
+                if txt != ev:
+                    txt = txt[:-1] + "…"
+                col = (210, 230, 255) if i == 0 else (175, 200, 240)
+                es = font_body.render("• " + txt, True, col)
+                es.set_alpha(a)
+                screen.blit(es, (x + 8, yy + i * 18))
+            if len(self.events) > max_lines:
+                more = font_body.render(f"+{len(self.events) - max_lines} more", True, (120, 170, 220))
+                more.set_alpha(int(a * 0.8))
+                screen.blit(more, (x + 8, yy + max_lines * 18))
+
+        # border
+        bc = ((0, 235, 255, int(a * 0.95)) if self._glitch_on
+              else (0, 135, 255, int(a * 0.6)))
+        bd = pygame.Surface((W, H), pygame.SRCALPHA)
+        pygame.draw.rect(bd, bc, (0, 0, W, H), 1)
+        pygame.draw.line(bd, bc, (0, hh), (W, hh), 1)
+        screen.blit(bd, (x, y))
+
+        # corner ticks
+        tc = (0, 210, 255, a)
+        for cx2, cy2, sx, sy in [(x,y,1,1),(x+W,y,-1,1),(x,y+H,1,-1),(x+W,y+H,-1,-1)]:
+            pygame.draw.lines(screen, tc, False,
+                              [(cx2+sx*10, cy2),(cx2, cy2),(cx2, cy2+sy*10)], 1)
+
 class JarvisVisual:
     def __init__(self):
         self.W = self.H = self.cx = self.cy = 0
@@ -330,6 +634,11 @@ class JarvisVisual:
         self._sphere_edges  = []
         self._sphere_rot    = 0.0
         self._flow_offsets  = []   # per-edge animated flow pulse position
+        self._orbit_labels  = [
+            "SYS.OK", "BIOMETRIC.AUTH", "CORE.SYNC", "NET.NODE.3F",
+            "ENC.AES-256", "TELEMETRY.LIVE", "RELAY.HUB", "WATCH.ACTIVE",
+        ]
+        self._orbit_surfs   = []
 
     def setup(self):
         pygame.display.init(); pygame.font.init()
@@ -347,6 +656,12 @@ class JarvisVisual:
             self.font_hud = self.font_card_body = self.font_data = pygame.font.Font(None, 18)
         self._overlay = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
         self._init_particles()
+        try:
+            small = pygame.font.SysFont("consolas", 10, bold=True)
+            self._orbit_surfs = [small.render(lbl, True, (130, 200, 255))
+                                 for lbl in self._orbit_labels]
+        except Exception:
+            self._orbit_surfs = []
         if HAS_NUMPY:
             self._init_sphere_numpy()
         else:
@@ -581,6 +896,29 @@ class JarvisVisual:
             self._blit_c(rs, cx, cy)
             rp["r"]+=3.2; rp["alpha"]-=3.8
 
+        # ── Orbital data labels ───────────────────────────────────────────────
+        if self._orbit_surfs:
+            n = len(self._orbit_surfs)
+            orbit_r = R + 92
+            for i, surf in enumerate(self._orbit_surfs):
+                ang = t * 0.14 + i * _m.tau / n
+                ox = cx + int(_m.cos(ang) * orbit_r)
+                oy = cy + int(_m.sin(ang) * orbit_r * 0.55)  # elliptical
+                s  = surf.copy()
+                fade = int(120 + 90 * _m.sin(t * 0.8 + i))
+                s.set_alpha(max(40, min(220, fade)))
+                self.screen.blit(s, (ox - s.get_width() // 2, oy - s.get_height() // 2))
+
+        # ── Lens flare during speaking ────────────────────────────────────────
+        if state == "speaking":
+            fa = int(30 + 20 * _m.sin(t * 9.5))
+            fl = pygame.Surface((self.W, 2), pygame.SRCALPHA)
+            fl.fill((*bright, fa))
+            self.screen.blit(fl, (0, cy - 1))
+            fv = pygame.Surface((2, self.H), pygame.SRCALPHA)
+            fv.fill((*bright, fa))
+            self.screen.blit(fv, (cx - 1, 0))
+
         # ── Data readouts ─────────────────────────────────────────────────────
         a_fade = int(110+50*_m.sin(t*0.75))
         for lx,ly,text in [(cx+270,cy-100,f"SYS  {int(50+30*_m.sin(t*0.7))}%"),
@@ -710,6 +1048,86 @@ def speak(text):
 
     visual_state = "listening" if active else "idle"
 
+# ─── Yes/No Listener ──────────────────────────────────────────────────────────
+_YES_WORDS = ("yes", "yeah", "yep", "yup", "sure", "please", "go ahead",
+              "ok", "okay", "affirmative", "do it", "go on", "proceed",
+              "absolutely", "of course", "fine")
+_NO_WORDS  = ("no", "nope", "nah", "negative", "cancel", "skip",
+              "not now", "don't", "dont", "never mind", "nevermind", "pass")
+
+def listen_yes_no(timeout=6, phrase_time_limit=4):
+    """Listen for a short yes/no answer. Returns True / False / None (no answer)."""
+    global visual_state
+    visual_state = "listening"
+    recognizer = sr.Recognizer()
+    recognizer.pause_threshold = 0.8
+    recognizer.dynamic_energy_threshold = True
+    try:
+        with sr.Microphone() as source:
+            recognizer.adjust_for_ambient_noise(source, duration=0.3)
+            print("  (awaiting yes/no…)")
+            audio = recognizer.listen(source, timeout=timeout,
+                                      phrase_time_limit=phrase_time_limit)
+    except sr.WaitTimeoutError:
+        return None
+    except Exception as e:
+        print(f"Yes/no mic error: {e}"); return None
+    try:
+        text = recognizer.recognize_google(audio).lower()
+    except Exception:
+        return None
+    print(f"You: {text}")
+    if any(w in text for w in _NO_WORDS):  return False
+    if any(w in text for w in _YES_WORDS): return True
+    return None
+
+# ─── Week + Birthday Overlays ─────────────────────────────────────────────────
+def show_week_view(day_buckets):
+    """Add 7 holographic day tiles above the sphere."""
+    import datetime as _dt
+    cx, cy = visual.cx, visual.cy
+    today = _dt.date.today()
+    names = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+
+    card_w, gap = 210, 10
+    strip_w = 7 * card_w + 6 * gap
+    # fit within screen width
+    if strip_w > visual.W - 40:
+        card_w = max(150, (visual.W - 40 - 6 * gap) // 7)
+        strip_w = 7 * card_w + 6 * gap
+    first_cx = cx - strip_w // 2 + card_w // 2
+
+    ty = cy - 370
+    if ty < 40:  # fallback if screen too short
+        ty = max(80, cy - int(visual.H * 0.38))
+
+    for i in range(7):
+        d = today + _dt.timedelta(days=i)
+        label = f"{names[d.weekday()]} {d.day:02d}/{d.month:02d}"
+        events = day_buckets[i] if i < len(day_buckets) else []
+        tx = first_cx + i * (card_w + gap)
+        # cards sweep in from upper-right, staggered
+        visual.news_cards.append(DayCard(
+            label, events, tx, ty,
+            delay=0.15 + i * 0.14,
+            fly_dx=900 - i * 40, fly_dy=-650,
+            w=card_w, h=140, lifetime=55.0))
+
+def show_birthday_view(birthdays):
+    """Show a single wide card listing upcoming birthdays."""
+    cx, cy = visual.cx, visual.cy
+    if not birthdays:
+        lines = ["— none in the next month —"]
+    else:
+        lines = [f"{b['name']}  ·  {b['date'].strftime('%b %d')}  ·  in {b['days']}d"
+                 if b['days'] > 0 else
+                 f"{b['name']}  ·  TODAY"
+                 for b in birthdays[:6]]
+    visual.news_cards.append(DayCard(
+        "UPCOMING BIRTHDAYS", lines, cx, cy + 310,
+        delay=0.0, fly_dx=0, fly_dy=700,
+        w=520, h=150, lifetime=45.0))
+
 # ─── Tools ────────────────────────────────────────────────────────────────────
 TOOLS = [
     {"name": "open_application",
@@ -787,6 +1205,34 @@ TOOLS = [
                                      "subject": {"type": "string"},
                                      "body": {"type": "string"}},
                       "required": ["to", "subject", "body"]}},
+    {"name": "set_calendar_url",
+     "description": "Save the user's Google Calendar secret iCal URL for weekly previews. User finds it at calendar.google.com → Settings → Integrate calendar → Secret address in iCal format.",
+     "input_schema": {"type": "object",
+                      "properties": {"url": {"type": "string"}},
+                      "required": ["url"]}},
+    {"name": "set_librus",
+     "description": "Save Librus Synergia credentials (stored locally on disk).",
+     "input_schema": {"type": "object",
+                      "properties": {"username": {"type": "string"},
+                                     "password": {"type": "string"}},
+                      "required": ["username", "password"]}},
+    {"name": "add_birthday",
+     "description": "Save someone's birthday. Date format MM-DD, e.g. 07-25.",
+     "input_schema": {"type": "object",
+                      "properties": {"name": {"type": "string"},
+                                     "date": {"type": "string"}},
+                      "required": ["name", "date"]}},
+    {"name": "remove_birthday",
+     "description": "Remove a saved birthday by name.",
+     "input_schema": {"type": "object",
+                      "properties": {"name": {"type": "string"}},
+                      "required": ["name"]}},
+    {"name": "list_birthdays",
+     "description": "List birthdays in the coming month.",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "show_week",
+     "description": "Display the holographic 7-day calendar overlay on the JARVIS visual.",
+     "input_schema": {"type": "object", "properties": {}}},
 ]
 
 
@@ -873,6 +1319,43 @@ def execute_tool(name, inp):
             body = urllib.parse.quote(inp["body"])
             webbrowser.open(f"https://mail.google.com/mail/?view=cm&to={to}&su={sub}&body={body}")
             return f"Opened Gmail compose to {inp['to']}"
+        elif name == "set_calendar_url":
+            mem = load_memory(); mem["gcal_ics_url"] = inp["url"].strip(); save_memory(mem)
+            return "Calendar URL saved"
+        elif name == "set_librus":
+            mem = load_memory()
+            mem["librus_user"] = inp["username"]; mem["librus_pass"] = inp["password"]
+            save_memory(mem)
+            return "Librus credentials saved (stored locally)"
+        elif name == "add_birthday":
+            mem = load_memory()
+            bds = [b for b in mem.get("birthdays", [])
+                   if b.get("name", "").lower() != inp["name"].lower()]
+            # validate MM-DD
+            try:
+                m, d = inp["date"].split("-"); int(m); int(d)
+            except Exception:
+                return "Date must be MM-DD format, e.g. 07-25"
+            bds.append({"name": inp["name"], "date": inp["date"]})
+            mem["birthdays"] = bds; save_memory(mem)
+            return f"Saved: {inp['name']} on {inp['date']}"
+        elif name == "remove_birthday":
+            mem = load_memory()
+            before = len(mem.get("birthdays", []))
+            mem["birthdays"] = [b for b in mem.get("birthdays", [])
+                                if b.get("name", "").lower() != inp["name"].lower()]
+            save_memory(mem)
+            removed = before - len(mem["birthdays"])
+            return f"Removed {removed} entry for {inp['name']}" if removed else f"No birthday found for {inp['name']}"
+        elif name == "list_birthdays":
+            bds = upcoming_birthdays(30)
+            if not bds: return "No birthdays in the next month"
+            return ", ".join(f"{b['name']} in {b['days']}d ({b['date']})" for b in bds)
+        elif name == "show_week":
+            cal = fetch_calendar_events(days=7)
+            buckets = group_events_by_day(cal, 7) if cal else [[] for _ in range(7)]
+            show_week_view(buckets)
+            return "Week overlay displayed"
     except Exception as e:
         return f"Error in {name}: {e}"
 
@@ -955,6 +1438,12 @@ def wake_up():
     visual_state = "waking"
     conversation_history = []
 
+    # Update wake count + last wake timestamp
+    mem = load_memory()
+    mem["wake_count"] = mem.get("wake_count", 0) + 1
+    mem["last_wake"]  = time.time()
+    save_memory(mem)
+
     print("\n" + "=" * 42)
     print("  ⚡  JARVIS ACTIVATED  ⚡")
     print("=" * 42)
@@ -965,7 +1454,7 @@ def wake_up():
     weather_result = [None]; news_result = [[]]; memory_result = [None]
     def _fw(): weather_result[0] = fetch_weather()
     def _fn(): news_result[0]    = fetch_headlines(6)
-    def _fm(): memory_result[0]  = get_suggestion(load_memory())
+    def _fm(): memory_result[0]  = get_suggestion(mem)
     for fn in (_fw, _fn, _fm):
         threading.Thread(target=fn, daemon=True).start()
 
@@ -1036,9 +1525,48 @@ def wake_up():
         parts.append("Breaking news: " + ". ".join(titles) + ".")
     if suggestion:
         parts.append(suggestion)
-    parts.append("How may I assist you?")
+    parts.append("Shall I display the week ahead?")
 
     speak(" ".join(parts))
+
+    # ── Week ahead (calendar + librus) ────────────────────────────────────────
+    want_week = listen_yes_no()
+    if want_week:
+        cur_mem = load_memory()
+        cal_events = fetch_calendar_events(days=7) if cur_mem.get("gcal_ics_url") else []
+        buckets = group_events_by_day(cal_events, 7) if cal_events else [[] for _ in range(7)]
+        show_week_view(buckets)
+
+        librus_events = fetch_librus_events(days=7)
+
+        msg = []
+        if not cur_mem.get("gcal_ics_url"):
+            msg.append("Your Google Calendar isn't linked yet. Say, set calendar URL, when ready.")
+        elif not cal_events:
+            msg.append("Your Google Calendar looks clear this week.")
+        if librus_events:
+            msg.append("From Librus: " + ", ".join(librus_events[:8]) + ".")
+        elif cur_mem.get("librus_user"):
+            msg.append("Librus shows nothing scheduled.")
+        if msg:
+            speak(" ".join(msg))
+        time.sleep(0.3)
+
+    # ── Birthdays (next 30 days) ──────────────────────────────────────────────
+    speak("Shall I flag any upcoming birthdays this month?")
+    want_bd = listen_yes_no()
+    if want_bd:
+        bds = upcoming_birthdays(days=30)
+        show_birthday_view(bds)
+        if bds:
+            lines = [(f"{b['name']} today" if b['days'] == 0
+                      else f"{b['name']} in {b['days']} days") for b in bds[:5]]
+            speak("On the horizon: " + ", ".join(lines) + ".")
+        else:
+            speak("No birthdays on record for the coming month.")
+        time.sleep(0.3)
+
+    speak("How may I assist you?")
     listen_loop()
 
 # ─── Listen Loop ──────────────────────────────────────────────────────────────
@@ -1080,6 +1608,8 @@ def listen_loop():
             visual.clear_news_cards()
             active = False; visual_state = "idle"; break
 
+        try: record_command(command)
+        except Exception as e: print(f"record_command: {e}")
         ask_claude(command)
 
     visual_state = "idle"
