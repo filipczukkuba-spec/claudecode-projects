@@ -1341,10 +1341,7 @@ class JarvisVisual:
             fill_w = int(panel_w * b["value"])
             s_fg = pygame.Surface((max(1, fill_w), bar_h), pygame.SRCALPHA)
             pulse = int(40 * _m.sin(t * 2.5 + i))
-            r_ = max(0, min(255, int(b["col"][0]) + pulse))
-            g_ = max(0, min(255, int(b["col"][1]) + pulse))
-            b_ = max(0, min(255, int(b["col"][2])))
-            s_fg.fill((r_, g_, b_, 220))
+            s_fg.fill((int(b["col"][0]), int(b["col"][1]), int(b["col"][2]), 220))
             self.screen.blit(s_fg, (bx, bby))
             pygame.draw.rect(self.screen, (0, 80, 170), (bx, bby, panel_w, bar_h), 1)
 
@@ -1369,10 +1366,7 @@ class JarvisVisual:
             fill_w = int(panel_w * b["value"])
             s_fg = pygame.Surface((max(1, fill_w), bar_h), pygame.SRCALPHA)
             pulse = int(40 * _m.sin(t * 2.5 + i + 2))
-            r_ = max(0, min(255, int(b["col"][0]) + pulse))
-            g_ = max(0, min(255, int(b["col"][1]) + pulse))
-            b_ = max(0, min(255, int(b["col"][2])))
-            s_fg.fill((r_, g_, b_, 220))
+            s_fg.fill((int(b["col"][0]), int(b["col"][1]), int(b["col"][2]), 220))
             self.screen.blit(s_fg, (bx, bby))
             pygame.draw.rect(self.screen, (0, 80, 170), (bx, bby, panel_w, bar_h), 1)
 
