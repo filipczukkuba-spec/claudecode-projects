@@ -888,6 +888,43 @@ def listen_loop():
 
     visual_state = "idle"
 
+# ─── Startup Registration ─────────────────────────────────────────────────────
+def register_startup():
+    """Register JARVIS to launch automatically on Windows login."""
+    try:
+        import winreg
+        jarvis_path = os.path.abspath(__file__)
+        # pythonw.exe = no console window on startup
+        pythonw = sys.executable.replace("python.exe", "pythonw.exe")
+        if not os.path.exists(pythonw):
+            pythonw = sys.executable
+        cmd = f'"{pythonw}" "{jarvis_path}"'
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0, winreg.KEY_SET_VALUE
+        )
+        winreg.SetValueEx(key, "JARVIS", 0, winreg.REG_SZ, cmd)
+        winreg.CloseKey(key)
+        return True
+    except Exception as e:
+        print(f"  Startup registration failed: {e}")
+        return False
+
+def is_registered_startup():
+    try:
+        import winreg
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0, winreg.KEY_READ
+        )
+        winreg.QueryValueEx(key, "JARVIS")
+        winreg.CloseKey(key)
+        return True
+    except Exception:
+        return False
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():
     global API_KEY, client
@@ -903,6 +940,16 @@ def main():
         print("Key saved.\n")
 
     pyautogui.FAILSAFE = False
+
+    # Auto-register as startup app (silent, only once)
+    if not is_registered_startup():
+        if register_startup():
+            print("  Startup        : registered (will launch on login)")
+        else:
+            print("  Startup        : not registered")
+    else:
+        print("  Startup        : already registered")
+
     print(f"  edge-tts voice : {'en-GB-RyanNeural' if HAS_EDGE_TTS else 'Windows TTS fallback'}")
     print(f"  News feed      : {'BBC RSS' if HAS_FEEDPARSER else 'unavailable'}")
     print(f"  Weather        : {'wttr.in' if HAS_REQUESTS else 'unavailable'}")
