@@ -39,14 +39,60 @@
     {
       "text": "open Gmail on Google Chrome",
       "time": 1776614201.2407556
+    },
+    {
+      "text": "open Gmail",
+      "time": 1776614588.7723138
+    },
+    {
+      "text": "put on Drake and Drake for me",
+      "time": 1776615839.1766102
+    },
+    {
+      "text": "show me some fireworks on screen",
+      "time": 1776616214.50287
+    },
+    {
+      "text": "tracker on shirt show me a YouTube video about fire",
+      "time": 1776616237.22308
+    },
+    {
+      "text": "play one of them",
+      "time": 1776616254.5885105
+    },
+    {
+      "text": "send a mail to Agatha Philip took about yesterday's greeting",
+      "time": 1776616275.363763
+    },
+    {
+      "text": "be creative",
+      "time": 1776616295.6014507
+    },
+    {
+      "text": "send me an email with a summary of the last 10 emails on my Gmail account",
+      "time": 1776616326.1518533
+    },
+    {
+      "text": "where is option",
+      "time": 1776616357.4449816
+    },
+    {
+      "text": "can you open cursor for me",
+      "time": 1776629241.7376363
+    },
+    {
+      "text": "open Spotify for me and play some chill jazz",
+      "time": 1776629261.6792963
     }
   ],
   "habits": {
-    "h17": 10
+    "h17": 10,
+    "h18": 9,
+    "h22": 2
   },
   "birthdays": [],
-  "wake_count": 6,
-  "last_wake": 1776614337.817754,
+  "wake_count": 12,
+  "last_wake": 1776629187.1682262,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "",
