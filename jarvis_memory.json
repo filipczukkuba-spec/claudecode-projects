@@ -83,18 +83,44 @@
     {
       "text": "open Spotify for me and play some chill jazz",
       "time": 1776629261.6792963
+    },
+    {
+      "text": "set up my Gmail credent",
+      "time": 1776630931.5269148
+    },
+    {
+      "text": "how can I provide you with",
+      "time": 1776630980.6329746
+    },
+    {
+      "text": "I cannot write anything in this chat",
+      "time": 1776631026.5481236
+    },
+    {
+      "text": "the first option",
+      "time": 1776631076.2042453
+    },
+    {
+      "text": "f i l i p c s u k dot k u b a r g m a l dot C O M now password X JPM space XC you space z r i n space b j a p",
+      "time": 1776631126.4819503
+    },
+    {
+      "text": "goodbye jar",
+      "time": 1776631163.501724
     }
   ],
   "habits": {
     "h17": 10,
     "h18": 9,
-    "h22": 2
+    "h22": 8
   },
   "birthdays": [],
-  "wake_count": 12,
-  "last_wake": 1776629187.1682262,
+  "wake_count": 13,
+  "last_wake": 1776630880.3227897,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "",
-  "librus_pass": ""
+  "librus_pass": "",
+  "gmail_imap_user": "filipcsuk.kubargumal.com",
+  "gmail_imap_pass": "XJPMXCYOUZRINBJAP"
 }
