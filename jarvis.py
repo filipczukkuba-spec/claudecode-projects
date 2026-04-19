@@ -2042,39 +2042,42 @@ def listen_loop():
     visual_state = "idle"
 
 # ─── Startup Registration ─────────────────────────────────────────────────────
+_TASK_NAME = "JarvisLogin"
+
 def register_startup():
-    """Register JARVIS to launch automatically on Windows login."""
+    """Register JARVIS via Task Scheduler (ONLOGON, no Windows startup delay)."""
     try:
-        import winreg
         jarvis_path = os.path.abspath(__file__)
-        # pythonw.exe = no console window on startup
         pythonw = sys.executable.replace("python.exe", "pythonw.exe")
         if not os.path.exists(pythonw):
             pythonw = sys.executable
-        cmd = f'"{pythonw}" "{jarvis_path}"'
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Run",
-            0, winreg.KEY_SET_VALUE
+        ps = (
+            f"$a = New-ScheduledTaskAction -Execute '{pythonw}' "
+            f"-Argument '\"{jarvis_path}\"' "
+            f"-WorkingDirectory '{os.path.dirname(jarvis_path)}'; "
+            f"$t = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; "
+            f"$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries "
+            f"-DontStopIfGoingOnBatteries -ExecutionTimeLimit 0 -StartWhenAvailable; "
+            f"$p = New-ScheduledTaskPrincipal -UserId $env:USERNAME "
+            f"-LogonType Interactive -RunLevel Limited; "
+            f"Register-ScheduledTask -TaskName '{_TASK_NAME}' -Action $a "
+            f"-Trigger $t -Settings $s -Principal $p -Force | Out-Null"
         )
-        winreg.SetValueEx(key, "JARVIS", 0, winreg.REG_SZ, cmd)
-        winreg.CloseKey(key)
-        return True
+        r = subprocess.run(["powershell.exe", "-NoProfile", "-Command", ps],
+                           capture_output=True, text=True)
+        return r.returncode == 0
     except Exception as e:
         print(f"  Startup registration failed: {e}")
         return False
 
 def is_registered_startup():
     try:
-        import winreg
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Run",
-            0, winreg.KEY_READ
+        r = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Command",
+             f"if (Get-ScheduledTask -TaskName '{_TASK_NAME}' -ErrorAction SilentlyContinue) {{'yes'}}"],
+            capture_output=True, text=True
         )
-        winreg.QueryValueEx(key, "JARVIS")
-        winreg.CloseKey(key)
-        return True
+        return "yes" in r.stdout
     except Exception:
         return False
 
