@@ -1341,10 +1341,10 @@ class JarvisVisual:
             fill_w = int(panel_w * b["value"])
             s_fg = pygame.Surface((max(1, fill_w), bar_h), pygame.SRCALPHA)
             pulse = int(40 * _m.sin(t * 2.5 + i))
-            col = (max(0, min(255, b["col"][0] + pulse)),
-                   max(0, min(255, b["col"][1] + pulse)),
-                   max(0, min(255, b["col"][2])), 220)
-            s_fg.fill(col)
+            r_ = max(0, min(255, int(b["col"][0]) + pulse))
+            g_ = max(0, min(255, int(b["col"][1]) + pulse))
+            b_ = max(0, min(255, int(b["col"][2])))
+            s_fg.fill((r_, g_, b_, 220))
             self.screen.blit(s_fg, (bx, bby))
             pygame.draw.rect(self.screen, (0, 80, 170), (bx, bby, panel_w, bar_h), 1)
 
@@ -1369,10 +1369,10 @@ class JarvisVisual:
             fill_w = int(panel_w * b["value"])
             s_fg = pygame.Surface((max(1, fill_w), bar_h), pygame.SRCALPHA)
             pulse = int(40 * _m.sin(t * 2.5 + i + 2))
-            col = (max(0, min(255, b["col"][0] + pulse)),
-                   max(0, min(255, b["col"][1] + pulse)),
-                   max(0, min(255, b["col"][2])), 220)
-            s_fg.fill(col)
+            r_ = max(0, min(255, int(b["col"][0]) + pulse))
+            g_ = max(0, min(255, int(b["col"][1]) + pulse))
+            b_ = max(0, min(255, int(b["col"][2])))
+            s_fg.fill((r_, g_, b_, 220))
             self.screen.blit(s_fg, (bx, bby))
             pygame.draw.rect(self.screen, (0, 80, 170), (bx, bby, panel_w, bar_h), 1)
 
@@ -1413,7 +1413,7 @@ class JarvisVisual:
         self.setup()
         fps_font = pygame.font.SysFont("consolas", 11)
         while True:
-            dt=self.clock.tick(120)/1000.0; self.t+=dt
+            dt=self.clock.tick(60)/1000.0; self.t+=dt
             for event in pygame.event.get():
                 if event.type==pygame.QUIT: pygame.quit(); return
                 if event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE:
