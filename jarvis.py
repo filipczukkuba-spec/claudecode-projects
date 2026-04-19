@@ -129,7 +129,8 @@ def _default_memory():
     return {"commands": [], "habits": {}, "birthdays": [],
             "wake_count": 0, "last_wake": 0,
             "gcal_ics_url": "", "gcal_birthdays_ics_url": "",
-            "librus_user": "", "librus_pass": ""}
+            "librus_user": "", "librus_pass": "",
+            "gmail_imap_user": "", "gmail_imap_pass": ""}
 
 def load_memory():
     if os.path.exists(MEMORY_PATH):
@@ -1724,6 +1725,36 @@ TOOLS = [
     {"name": "show_week",
      "description": "Display the holographic 7-day calendar overlay on the JARVIS visual.",
      "input_schema": {"type": "object", "properties": {}}},
+    {"name": "dispatch_agent",
+     "description": (
+         "Dispatch a specialist sub-agent pipeline for complex multi-step tasks that require "
+         "fetching and synthesising information from external sources. "
+         "Use this when the user asks for email summaries, inbox analysis, or in-depth web research "
+         "that requires reading actual page content rather than just opening a browser. "
+         "Available pipeline types: 'email_summary' (reads Gmail inbox and summarises), "
+         "'web_research' (searches the web and synthesises a factual briefing). "
+         "Pass the user's original request verbatim as context."
+     ),
+     "input_schema": {"type": "object",
+                      "properties": {
+                          "pipeline_type": {"type": "string",
+                                            "description": "One of: email_summary, web_research"},
+                          "context": {"type": "string",
+                                      "description": "The user's original request verbatim"},
+                      },
+                      "required": ["pipeline_type", "context"]}},
+    {"name": "set_gmail_credentials",
+     "description": (
+         "Save the user's Gmail IMAP credentials so JARVIS can read emails. "
+         "Requires the Gmail address and a Google App Password (NOT the main Gmail password). "
+         "The user generates App Passwords at myaccount.google.com → Security → App passwords."
+     ),
+     "input_schema": {"type": "object",
+                      "properties": {
+                          "email":        {"type": "string", "description": "Full Gmail address"},
+                          "app_password": {"type": "string", "description": "16-character Google App Password (spaces are stripped automatically)"},
+                      },
+                      "required": ["email", "app_password"]}},
 ]
 
 
@@ -1850,8 +1881,299 @@ def execute_tool(name, inp):
             buckets = group_events_by_day(cal, 7) if cal else [[] for _ in range(7)]
             show_week_view(buckets)
             return "Week overlay displayed"
+        elif name == "dispatch_agent":
+            return run_agent_pipeline(inp.get("pipeline_type", ""), inp.get("context", ""))
+        elif name == "set_gmail_credentials":
+            mem = load_memory()
+            mem["gmail_imap_user"] = inp["email"].strip()
+            mem["gmail_imap_pass"] = inp["app_password"].replace(" ", "").strip()
+            save_memory(mem)
+            return "Gmail IMAP credentials saved securely in local memory."
     except Exception as e:
         return f"Error in {name}: {e}"
+
+# ─── Sub-Agent Infrastructure ────────────────────────────────────────────────
+
+class AgentResult:
+    def __init__(self, success, text, data=None, error=None):
+        self.success = success
+        self.text    = text
+        self.data    = data or {}
+        self.error   = error or ""
+
+    def __repr__(self):
+        return f"AgentResult(success={self.success}, text={self.text[:80]!r})"
+
+
+class SubAgent:
+    """
+    An isolated Claude conversation with its own system prompt, tool set, and history.
+    Never shares state with Jarvis's main conversation_history.
+    """
+    def __init__(self, name, system, tools, tool_fn,
+                 model="claude-sonnet-4-6", max_tokens=2048, max_rounds=6):
+        self.name       = name
+        self.system     = system
+        self.tools      = tools
+        self.tool_fn    = tool_fn
+        self.model      = model
+        self.max_tokens = max_tokens
+        self.max_rounds = max_rounds
+
+    def run(self, task):
+        messages = [{"role": "user", "content": task}]
+        rounds   = 0
+        try:
+            while rounds < self.max_rounds:
+                rounds += 1
+                kwargs = dict(
+                    model      = self.model,
+                    max_tokens = self.max_tokens,
+                    system     = self.system,
+                    messages   = messages,
+                )
+                if self.tools:
+                    kwargs["tools"] = self.tools
+                response = _agent_client.messages.create(**kwargs)
+                text_parts = [b.text for b in response.content
+                              if hasattr(b, "text") and b.type == "text"]
+                tool_uses  = [b for b in response.content if b.type == "tool_use"]
+                messages.append({"role": "assistant", "content": response.content})
+                if not tool_uses or response.stop_reason == "end_turn":
+                    return AgentResult(success=True, text=" ".join(text_parts).strip())
+                tool_results = []
+                for tu in tool_uses:
+                    print(f"  [{self.name}] tool: {tu.name}({tu.input})")
+                    result = self.tool_fn(tu.name, tu.input)
+                    tool_results.append({
+                        "type": "tool_result", "tool_use_id": tu.id, "content": str(result),
+                    })
+                messages.append({"role": "user", "content": tool_results})
+            return AgentResult(success=False, text="",
+                               error=f"{self.name} exceeded max_rounds={self.max_rounds}")
+        except Exception as exc:
+            return AgentResult(success=False, text="", error=f"{self.name} exception: {exc}")
+
+
+# Separate client for sub-agents so it is always available even before the main client is created
+_agent_client = anthropic.Anthropic(api_key=API_KEY)
+
+# ─── Gmail IMAP Reader ────────────────────────────────────────────────────────
+
+def _imap_read_emails(n=10, folder="INBOX"):
+    import imaplib, email as _email
+    from email.header import decode_header as _dh
+    mem  = load_memory()
+    user = (mem.get("gmail_imap_user") or "").strip()
+    pw   = (mem.get("gmail_imap_pass")  or "").strip()
+    if not user or not pw:
+        return [{"error": "Gmail credentials not set. Ask me to set your Gmail credentials first."}]
+    try:
+        mail = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+        mail.login(user, pw)
+        mail.select(folder, readonly=True)
+        _, msg_ids = mail.search(None, "ALL")
+        ids = msg_ids[0].split()[-n:]
+        results = []
+        for uid in reversed(ids):
+            _, data = mail.fetch(uid, "(RFC822)")
+            raw = data[0][1]
+            msg = _email.message_from_bytes(raw)
+            subject_parts = _dh(msg.get("Subject") or "")
+            subject = "".join(
+                part.decode(enc or "utf-8") if isinstance(part, bytes) else part
+                for part, enc in subject_parts
+            )
+            body = ""
+            if msg.is_multipart():
+                for part in msg.walk():
+                    if part.get_content_type() == "text/plain":
+                        charset = part.get_content_charset() or "utf-8"
+                        try: body = part.get_payload(decode=True).decode(charset, errors="replace")
+                        except Exception: body = str(part.get_payload())
+                        break
+            else:
+                charset = msg.get_content_charset() or "utf-8"
+                try: body = msg.get_payload(decode=True).decode(charset, errors="replace")
+                except Exception: body = str(msg.get_payload())
+            results.append({
+                "uid": uid.decode(), "subject": subject.strip(),
+                "sender": msg.get("From", ""), "date": msg.get("Date", ""),
+                "snippet": body[:300].replace("\n", " ").strip(),
+                "body": body[:3000],
+            })
+        mail.logout()
+        return results
+    except imaplib.IMAP4.error as e:
+        return [{"error": f"IMAP auth failed: {e}. Check your App Password."}]
+    except Exception as e:
+        return [{"error": f"IMAP error: {e}"}]
+
+# ─── Web Helpers ──────────────────────────────────────────────────────────────
+
+def _ddg_search(query, max_results=5):
+    """DuckDuckGo Instant Answer API — no key required."""
+    if not HAS_REQUESTS:
+        return {"error": "requests library not installed"}
+    try:
+        url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json&no_redirect=1&no_html=1"
+        r = _requests.get(url, timeout=8, headers={"User-Agent": "JARVIS/1.0"})
+        data = r.json()
+        results = []
+        if data.get("AbstractText"):
+            results.append({"title": data.get("Heading", query),
+                            "snippet": data["AbstractText"],
+                            "url": data.get("AbstractURL", "")})
+        for item in data.get("RelatedTopics", [])[:max_results]:
+            if isinstance(item, dict) and item.get("Text"):
+                results.append({"title": item.get("Text", "")[:80],
+                                 "snippet": item.get("Text", ""),
+                                 "url": item.get("FirstURL", "")})
+        return results or [{"snippet": "No instant results. Try a more specific query."}]
+    except Exception as e:
+        return [{"error": str(e)}]
+
+def _web_fetch(url, max_chars=4000):
+    """Fetch a URL and return stripped plain text."""
+    if not HAS_REQUESTS:
+        return "requests library not installed"
+    try:
+        r = _requests.get(url, timeout=10, headers={"User-Agent": "JARVIS/1.0"})
+        text = r.text
+        # Very lightweight HTML stripping — remove tags
+        import re as _re
+        text = _re.sub(r"<style[^>]*>.*?</style>", " ", text, flags=_re.S | _re.I)
+        text = _re.sub(r"<script[^>]*>.*?</script>", " ", text, flags=_re.S | _re.I)
+        text = _re.sub(r"<[^>]+>", " ", text)
+        text = _re.sub(r"[ \t]{2,}", " ", text)
+        text = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+        return text[:max_chars]
+    except Exception as e:
+        return f"Fetch error: {e}"
+
+# ─── Agent Factories ──────────────────────────────────────────────────────────
+
+_EMAIL_AGENT_SYSTEM = (
+    "You are the EmailAgent, a specialist sub-system of JARVIS. "
+    "Your only job is to read and analyse emails from the user's Gmail inbox using the read_emails tool. "
+    "Produce a clear, concise spoken summary — one line per notable email: sender, subject, key point. "
+    "Flag anything urgent or requiring action. Be factual; do not invent content. "
+    "No greetings, no preamble, no sign-off. Output only the summary text."
+)
+
+_EMAIL_AGENT_TOOLS = [{"name": "read_emails",
+                        "description": "Fetch the last N emails from the Gmail inbox via IMAP.",
+                        "input_schema": {"type": "object",
+                                         "properties": {
+                                             "count":  {"type": "integer", "description": "Emails to fetch (default 15, max 25)"},
+                                             "folder": {"type": "string",  "description": "Mailbox folder, default INBOX"},
+                                         }}}]
+
+def _email_tool_fn(name, inp):
+    if name == "read_emails":
+        n      = min(int(inp.get("count", 15)), 25)
+        folder = inp.get("folder", "INBOX")
+        return json.dumps(_imap_read_emails(n, folder), ensure_ascii=False)
+    return f"Unknown tool: {name}"
+
+def make_email_agent():
+    return SubAgent("EmailAgent", _EMAIL_AGENT_SYSTEM, _EMAIL_AGENT_TOOLS,
+                    _email_tool_fn, model="claude-sonnet-4-6", max_rounds=4)
+
+
+_WEB_RESEARCH_SYSTEM = (
+    "You are the WebResearchAgent, a specialist sub-system of JARVIS. "
+    "Your job is to answer the user's research question by searching the web and synthesising the findings. "
+    "Use ddg_search to find relevant results, then use web_fetch on the most promising URL to get detail. "
+    "Return a concise, factual briefing — spoken aloud by a TTS engine so keep it under 100 words. "
+    "Cite the source briefly at the end (just the domain). No preamble, no sign-off."
+)
+
+_WEB_RESEARCH_TOOLS = [
+    {"name": "ddg_search",
+     "description": "Search the web via DuckDuckGo and return snippets.",
+     "input_schema": {"type": "object",
+                      "properties": {"query": {"type": "string"}},
+                      "required": ["query"]}},
+    {"name": "web_fetch",
+     "description": "Fetch the plain-text content of a URL.",
+     "input_schema": {"type": "object",
+                      "properties": {"url": {"type": "string"}},
+                      "required": ["url"]}},
+]
+
+def _web_research_tool_fn(name, inp):
+    if name == "ddg_search":
+        return json.dumps(_ddg_search(inp.get("query", ""), max_results=5), ensure_ascii=False)
+    if name == "web_fetch":
+        return _web_fetch(inp.get("url", ""))
+    return f"Unknown tool: {name}"
+
+def make_web_research_agent():
+    return SubAgent("WebResearchAgent", _WEB_RESEARCH_SYSTEM, _WEB_RESEARCH_TOOLS,
+                    _web_research_tool_fn, model="claude-sonnet-4-6", max_rounds=5)
+
+
+_REVIEWER_SYSTEM = (
+    "You are the ReviewerAgent, a quality-control sub-system of JARVIS. "
+    "You receive text produced by another agent and must review it critically. "
+    "Check for: factual errors, missing key information, unclear phrasing, anything that would sound "
+    "awkward when spoken aloud by a TTS engine. "
+    "If the text is good, respond with exactly: APPROVED: <the text unchanged>. "
+    "If you found issues, respond with exactly: REVISED: <your corrected version>. "
+    "Output only that — no commentary, no explanation."
+)
+
+def make_reviewer_agent():
+    return SubAgent("ReviewerAgent", _REVIEWER_SYSTEM, [], lambda n, i: "",
+                    model="claude-haiku-4-5-20251001", max_rounds=2)
+
+# ─── Orchestrator Pipelines ───────────────────────────────────────────────────
+
+def _strip_review_prefix(text):
+    for prefix in ("APPROVED:", "REVISED:"):
+        if text.startswith(prefix):
+            return text[len(prefix):].strip()
+    return text
+
+def run_email_summary_pipeline(timeframe="recent"):
+    speak("Accessing your inbox now, sir.")
+    agent  = make_email_agent()
+    task   = (f"Fetch the last 15 emails and produce a spoken summary. "
+              f"The user asked about: '{timeframe}'. "
+              f"Group by sender or topic if there's a cluster. "
+              f"Highlight anything requiring action. Keep it under 120 words.")
+    result = agent.run(task)
+    if not result.success or not result.text:
+        return f"I'm afraid the email retrieval hit a snag, sir. {result.error}"
+    speak("Reviewing the summary now.")
+    reviewer = make_reviewer_agent()
+    reviewed = reviewer.run(f"Review this email summary for spoken clarity:\n\n{result.text}")
+    if reviewed.success and reviewed.text:
+        return _strip_review_prefix(reviewed.text)
+    return result.text
+
+def run_web_research_pipeline(query=""):
+    speak("Initiating research, sir.")
+    agent  = make_web_research_agent()
+    task   = (f"Research this question and provide a concise spoken briefing: {query}. "
+              f"Keep it under 100 words. Cite the source domain at the end.")
+    result = agent.run(task)
+    if not result.success or not result.text:
+        return f"Research hit a snag, sir. {result.error}"
+    speak("Reviewing findings.")
+    reviewer = make_reviewer_agent()
+    reviewed = reviewer.run(f"Review this research briefing for spoken clarity:\n\n{result.text}")
+    if reviewed.success and reviewed.text:
+        return _strip_review_prefix(reviewed.text)
+    return result.text
+
+def run_agent_pipeline(pipeline_type, context):
+    if pipeline_type == "email_summary":
+        return run_email_summary_pipeline(timeframe=context)
+    if pipeline_type == "web_research":
+        return run_web_research_pipeline(query=context)
+    return f"I don't have an agent pipeline for '{pipeline_type}' yet, sir."
 
 # ─── Claude ───────────────────────────────────────────────────────────────────
 client = anthropic.Anthropic(api_key=API_KEY)
@@ -1868,7 +2190,10 @@ SYSTEM = (
     "Occasionally reference the fact that you run on a Windows machine with mild, dignified disappointment. "
     "A second system block below contains the user's recent habits and session context — use it to make "
     "familiar, personalised suggestions (e.g. referencing their usual music, routines, or recent topics) "
-    "rather than behaving like you've just met them."
+    "rather than behaving like you've just met them. "
+    "For complex tasks that require fetching external data — reading emails, in-depth web research — "
+    "use the dispatch_agent tool. Always say a brief line before dispatching (e.g. 'On it, sir.'). "
+    "Never dispatch agents unless the user explicitly asks for something that requires it."
 )
 
 def ask_claude(user_message):
