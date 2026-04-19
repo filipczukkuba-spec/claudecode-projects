@@ -128,7 +128,8 @@ _memory_lock = threading.Lock()
 def _default_memory():
     return {"commands": [], "habits": {}, "birthdays": [],
             "wake_count": 0, "last_wake": 0,
-            "gcal_ics_url": "", "librus_user": "", "librus_pass": ""}
+            "gcal_ics_url": "", "gcal_birthdays_ics_url": "",
+            "librus_user": "", "librus_pass": ""}
 
 def load_memory():
     if os.path.exists(MEMORY_PATH):
@@ -299,23 +300,88 @@ def fetch_librus_events(days=7):
         print(f"Librus error: {e}")
         return []
 
+def _fetch_birthday_ics():
+    """Fetch birthdays from Google Birthday calendar ICS. Returns list of {name, month, day}."""
+    if not HAS_REQUESTS: return []
+    mem = load_memory()
+    url = (mem.get("gcal_birthdays_ics_url") or "").strip()
+    if not url: return []
+    try:
+        r = _requests.get(url, timeout=10)
+        if r.status_code != 200:
+            print(f"Birthday ICS HTTP {r.status_code}"); return []
+        events = []; in_event = False; cur = {}
+        for line in _unfold_ics(r.text):
+            if line == "BEGIN:VEVENT": in_event = True; cur = {}
+            elif line == "END:VEVENT":
+                in_event = False
+                if cur.get("start") and cur.get("summary"):
+                    events.append(cur)
+                cur = {}
+            elif in_event:
+                key, value, params = _parse_ics_line(line)
+                if key == "SUMMARY":
+                    s = (value.replace("\\,", ",").replace("\\;", ";")
+                              .replace("\\n", " ").replace("\\\\", "\\").strip())
+                    # Google formats these as "Alice Smith's birthday" — strip the suffix
+                    low = s.lower()
+                    for suf in ("'s birthday", "’s birthday", " birthday"):
+                        if low.endswith(suf):
+                            s = s[:len(s) - len(suf)]; break
+                    cur["summary"] = s.strip()
+                elif key == "DTSTART":
+                    cur["start"] = _parse_ics_datetime(value, params)
+        out = []
+        for e in events:
+            dt = e.get("start")
+            if dt: out.append({"name": e["summary"], "month": dt.month, "day": dt.day})
+        return out
+    except Exception as e:
+        print(f"Birthday ICS fetch error: {e}"); return []
+
 def upcoming_birthdays(days=30):
     import datetime as _dt
     mem = load_memory()
     today = _dt.date.today()
     out = []
+    seen = set()
+
+    # manual entries
     for b in mem.get("birthdays", []):
         try:
             name = b["name"]; m, d = b["date"].split("-")
             m, d = int(m), int(d)
-            this_year = _dt.date(today.year, m, d)
-            if this_year < today:
-                this_year = _dt.date(today.year + 1, m, d)
-            delta_d = (this_year - today).days
-            if 0 <= delta_d <= days:
-                out.append({"name": name, "date": this_year, "days": delta_d})
         except Exception:
             continue
+        key = (name.lower().strip(), m, d)
+        if key in seen: continue
+        seen.add(key)
+        this_year = _dt.date(today.year, m, d)
+        if this_year < today:
+            this_year = _dt.date(today.year + 1, m, d)
+        delta_d = (this_year - today).days
+        if 0 <= delta_d <= days:
+            out.append({"name": name, "date": this_year, "days": delta_d})
+
+    # ICS-sourced birthdays
+    for b in _fetch_birthday_ics():
+        try:
+            m, d = int(b["month"]), int(b["day"])
+        except Exception:
+            continue
+        key = (b["name"].lower().strip(), m, d)
+        if key in seen: continue
+        seen.add(key)
+        try:
+            this_year = _dt.date(today.year, m, d)
+        except ValueError:
+            continue
+        if this_year < today:
+            this_year = _dt.date(today.year + 1, m, d)
+        delta_d = (this_year - today).days
+        if 0 <= delta_d <= days:
+            out.append({"name": b["name"], "date": this_year, "days": delta_d})
+
     out.sort(key=lambda x: x["days"])
     return out
 
@@ -512,7 +578,7 @@ class NewsCard:
 
 class DayCard:
     """Holographic single-day tile — part of the weekly preview strip."""
-    DEFAULT_W, DEFAULT_H = 210, 140
+    DEFAULT_W, DEFAULT_H = 260, 210
 
     def __init__(self, day_label, events, tx, ty, delay=0.0,
                  fly_dx=0, fly_dy=-700, w=None, h=None, tag_color=(0, 210, 255),
@@ -581,29 +647,61 @@ class DayCard:
         ts.set_alpha(a)
         screen.blit(ts, (x + W // 2 - ts.get_width() // 2, y + 6))
 
-        # event lines
+        # event lines (word-wrapped, max 2 wrapped lines per event)
         yy = y + hh + 8
-        max_w = W - 16
+        max_w = W - 18
+        line_h = 17
         if not self.events:
             es = font_body.render("— clear —", True, (100, 140, 200))
             es.set_alpha(int(a * 0.75))
             screen.blit(es, (x + W // 2 - es.get_width() // 2, yy + 10))
         else:
-            max_lines = max(1, (H - hh - 18) // 18)
-            for i, ev in enumerate(self.events[:max_lines]):
-                txt = ev
-                while font_body.size("• " + txt)[0] > max_w and len(txt) > 3:
-                    txt = txt[:-1]
-                if txt != ev:
-                    txt = txt[:-1] + "…"
-                col = (210, 230, 255) if i == 0 else (175, 200, 240)
-                es = font_body.render("• " + txt, True, col)
-                es.set_alpha(a)
-                screen.blit(es, (x + 8, yy + i * 18))
-            if len(self.events) > max_lines:
-                more = font_body.render(f"+{len(self.events) - max_lines} more", True, (120, 170, 220))
-                more.set_alpha(int(a * 0.8))
-                screen.blit(more, (x + 8, yy + max_lines * 18))
+            total_line_budget = max(2, (H - hh - 18) // line_h)
+            rendered_count = 0          # how many source events fully fit
+            used_lines = 0
+            # reserve 1 line for "+N more" footer if needed
+            for idx, ev in enumerate(self.events):
+                # wrap this event to at most 2 lines
+                bullet = "• "
+                indent = "  "
+                words = str(ev).split()
+                wrapped = []
+                cur_line = bullet
+                for w in words:
+                    test = cur_line + (w if cur_line in (bullet, indent) else " " + w)
+                    if font_body.size(test)[0] <= max_w:
+                        cur_line = test
+                    else:
+                        wrapped.append(cur_line)
+                        cur_line = indent + w
+                        if len(wrapped) >= 2:
+                            break
+                if len(wrapped) < 2:
+                    wrapped.append(cur_line)
+                # ellipsize last line if it overflows
+                last = wrapped[-1]
+                if font_body.size(last)[0] > max_w:
+                    while font_body.size(last + "…")[0] > max_w and len(last) > 3:
+                        last = last[:-1]
+                    wrapped[-1] = last + "…"
+                # remaining budget check (reserve 1 line for "+N more")
+                remaining_events = len(self.events) - idx
+                reserve = 1 if remaining_events > 1 else 0
+                if used_lines + len(wrapped) > total_line_budget - reserve:
+                    break
+                col_first  = (215, 232, 255)
+                col_cont   = (165, 195, 235)
+                for wi, ln in enumerate(wrapped):
+                    es = font_body.render(ln, True, col_first if wi == 0 else col_cont)
+                    es.set_alpha(a if wi == 0 else int(a * 0.85))
+                    screen.blit(es, (x + 8, yy + (used_lines + wi) * line_h))
+                used_lines    += len(wrapped)
+                rendered_count = idx + 1
+            if rendered_count < len(self.events):
+                more = font_body.render(f"+{len(self.events) - rendered_count} more",
+                                         True, (120, 170, 220))
+                more.set_alpha(int(a * 0.85))
+                screen.blit(more, (x + 8, yy + used_lines * line_h))
 
         # border
         bc = ((0, 235, 255, int(a * 0.95)) if self._glitch_on
@@ -1092,17 +1190,18 @@ def show_week_view(day_buckets):
     today = _dt.date.today()
     names = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 
-    card_w, gap = 210, 10
+    card_w, card_h, gap = 260, 210, 10
     strip_w = 7 * card_w + 6 * gap
-    # fit within screen width
-    if strip_w > visual.W - 40:
-        card_w = max(150, (visual.W - 40 - 6 * gap) // 7)
+    # fit within screen width (leave 30px margin each side)
+    if strip_w > visual.W - 60:
+        card_w = max(170, (visual.W - 60 - 6 * gap) // 7)
         strip_w = 7 * card_w + 6 * gap
     first_cx = cx - strip_w // 2 + card_w // 2
 
-    ty = cy - 370
-    if ty < 40:  # fallback if screen too short
-        ty = max(80, cy - int(visual.H * 0.38))
+    # position: high enough to clear sphere + rings; half card above, half below
+    ty = cy - 340
+    if ty - card_h // 2 < 20:
+        ty = card_h // 2 + 30
 
     for i in range(7):
         d = today + _dt.timedelta(days=i)
@@ -1113,8 +1212,8 @@ def show_week_view(day_buckets):
         visual.news_cards.append(DayCard(
             label, events, tx, ty,
             delay=0.15 + i * 0.14,
-            fly_dx=900 - i * 40, fly_dy=-650,
-            w=card_w, h=140, lifetime=55.0))
+            fly_dx=900 - i * 40, fly_dy=-700,
+            w=card_w, h=card_h, lifetime=55.0))
 
 def show_birthday_view(birthdays):
     """Show a single wide card listing upcoming birthdays."""
@@ -1210,6 +1309,11 @@ TOOLS = [
                       "required": ["to", "subject", "body"]}},
     {"name": "set_calendar_url",
      "description": "Save the user's Google Calendar secret iCal URL for weekly previews. User finds it at calendar.google.com → Settings → Integrate calendar → Secret address in iCal format.",
+     "input_schema": {"type": "object",
+                      "properties": {"url": {"type": "string"}},
+                      "required": ["url"]}},
+    {"name": "set_birthdays_url",
+     "description": "Save the user's Google Contacts birthday calendar secret iCal URL (used to surface upcoming birthdays).",
      "input_schema": {"type": "object",
                       "properties": {"url": {"type": "string"}},
                       "required": ["url"]}},
@@ -1325,6 +1429,9 @@ def execute_tool(name, inp):
         elif name == "set_calendar_url":
             mem = load_memory(); mem["gcal_ics_url"] = inp["url"].strip(); save_memory(mem)
             return "Calendar URL saved"
+        elif name == "set_birthdays_url":
+            mem = load_memory(); mem["gcal_birthdays_ics_url"] = inp["url"].strip(); save_memory(mem)
+            return "Birthday calendar URL saved"
         elif name == "set_librus":
             mem = load_memory()
             mem["librus_user"] = inp["username"]; mem["librus_pass"] = inp["password"]
