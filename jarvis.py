@@ -1552,11 +1552,18 @@ def listen_yes_no(timeout=6, phrase_time_limit=4):
         print(f"Yes/no mic error: {e}"); return None
     try:
         text = recognizer.recognize_google(audio).lower()
-    except Exception:
-        return None
-    print(f"You: {text}")
-    if any(w in text for w in _NO_WORDS):  return False
-    if any(w in text for w in _YES_WORDS): return True
+    except Exception as e:
+        print(f"  (yes/no recog error: {e})"); return None
+    print(f"You (yes/no): {text}")
+    tokens = set(text.replace(",", " ").replace(".", " ").split())
+    no_phrases  = [w for w in _NO_WORDS  if " " in w]
+    yes_phrases = [w for w in _YES_WORDS if " " in w]
+    no_single   = [w for w in _NO_WORDS  if " " not in w]
+    yes_single  = [w for w in _YES_WORDS if " " not in w]
+    if any(p in text for p in no_phrases):  return False
+    if any(w in tokens for w in no_single): return False
+    if any(p in text for p in yes_phrases): return True
+    if any(w in tokens for w in yes_single): return True
     return None
 
 # ─── Week + Birthday Overlays ─────────────────────────────────────────────────
@@ -2023,8 +2030,19 @@ def wake_up():
 
     speak(" ".join(parts))
 
+    # Hide weather/news cards 1s after the briefing finishes
+    def _fade_briefing_cards():
+        time.sleep(1.0)
+        for c in list(visual.news_cards):
+            if getattr(c, "tag", "") in ("WEATHER", "WORLD NEWS", "NEWS"):
+                c.alive = False
+    threading.Thread(target=_fade_briefing_cards, daemon=True).start()
+
     # ── Week ahead (Google Calendar) ──────────────────────────────────────────
     want_week = listen_yes_no()
+    if want_week is None:
+        speak("Sorry, shall I show the week ahead? Yes or no.")
+        want_week = listen_yes_no()
     if want_week:
         cur_mem = load_memory()
         cal_events = fetch_calendar_events(days=7) if cur_mem.get("gcal_ics_url") else []

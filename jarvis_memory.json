@@ -27,14 +27,18 @@
     {
       "text": "thank you",
       "time": 1776612732.3636205
+    },
+    {
+      "text": "display the week ahead",
+      "time": 1776613836.6317275
     }
   ],
   "habits": {
-    "h17": 7
+    "h17": 8
   },
   "birthdays": [],
-  "wake_count": 2,
-  "last_wake": 1776612656.0121784,
+  "wake_count": 3,
+  "last_wake": 1776613790.2607312,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "",
