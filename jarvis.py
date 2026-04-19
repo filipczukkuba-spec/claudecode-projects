@@ -1430,7 +1430,7 @@ class JarvisVisual:
         txt=self.font_hud.render(f"{dot}J.A.R.V.I.S.  ·  {labels.get(state,'STANDBY')}",
                                  True,colors.get(state,(35,70,155)))
         self.screen.blit(txt,(self.W//2-txt.get_width()//2,self.H-52))
-        hint=self.font_data.render("ESC · exit   DOUBLE CLAP · wake",True,(20,45,100))
+        hint=self.font_data.render('ESC · exit   SAY "JARVIS" · wake',True,(20,45,100))
         self.screen.blit(hint,(self.W//2-hint.get_width()//2,self.H-27))
 
     def add_news_card(self, text, tx, ty, delay=0.0, tag="NEWS", img_url=None, fly_dx=-500, fly_dy=0):
@@ -1902,34 +1902,44 @@ def ask_claude(user_message):
     if len(conversation_history) > 20:
         conversation_history = conversation_history[-20:]
 
-# ─── Clap Detection ───────────────────────────────────────────────────────────
+# ─── Wake Word Detection ──────────────────────────────────────────────────────
+WAKE_WORD = "jarvis"
+
 def rms(data):
     count = len(data) // 2
     shorts = struct.unpack(f"{count}h", data)
     return math.sqrt(sum(s*s for s in shorts) / count) if count else 0
 
-def clap_listener():
-    print("Listening for double clap...")
+def wake_word_listener():
+    print(f'Listening for wake word: "{WAKE_WORD}"...')
+    recognizer = sr.Recognizer()
+    recognizer.energy_threshold         = 300
+    recognizer.dynamic_energy_threshold = True
+    recognizer.pause_threshold          = 0.6
     while True:
-        if active: time.sleep(0.2); continue
-        pa = pyaudio.PyAudio()
-        stream = pa.open(format=FORMAT, channels=CHANNELS, rate=RATE,
-                         input=True, frames_per_buffer=CHUNK)
-        last_clap = 0.0; clap_count = 0
-        while not active:
-            try:
-                data = stream.read(CHUNK, exception_on_overflow=False)
-                amp  = rms(data)
-                if amp > CLAP_THRESHOLD:
-                    now = time.time(); gap = now - last_clap
-                    if gap > DOUBLE_CLAP_DEBOUNCE:
-                        clap_count = clap_count + 1 if gap < DOUBLE_CLAP_MAX else 1
-                        last_clap = now
-                        if clap_count >= 2:
-                            clap_count = 0
-                            threading.Thread(target=wake_up, daemon=True).start()
-            except: pass
-        stream.stop_stream(); stream.close(); pa.terminate()
+        if active:
+            time.sleep(0.3); continue
+        try:
+            with sr.Microphone() as source:
+                recognizer.adjust_for_ambient_noise(source, duration=0.3)
+                while not active:
+                    try:
+                        audio = recognizer.listen(source, timeout=5, phrase_time_limit=3)
+                    except sr.WaitTimeoutError:
+                        continue
+                    try:
+                        text = recognizer.recognize_google(audio).lower()
+                    except sr.UnknownValueError:
+                        continue
+                    except sr.RequestError as e:
+                        print(f"  (wake-word recog error: {e})"); time.sleep(1); continue
+                    tokens = set(text.replace(",", " ").replace(".", " ").split())
+                    if WAKE_WORD in tokens:
+                        print(f'  Wake word detected: "{text}"')
+                        threading.Thread(target=wake_up, daemon=True).start()
+                        break
+        except Exception as e:
+            print(f"  (wake-word mic error: {e})"); time.sleep(1)
 
 # ─── Wake-up ──────────────────────────────────────────────────────────────────
 def wake_up():
@@ -2026,6 +2036,7 @@ def wake_up():
         parts.append("Breaking news: " + ". ".join(titles) + ".")
     if suggestion:
         parts.append(suggestion)
+    parts.append("Shall I display the week ahead?")
 
     speak(" ".join(parts))
 
@@ -2038,8 +2049,10 @@ def wake_up():
     threading.Thread(target=_fade_briefing_cards, daemon=True).start()
 
     # ── Week ahead (Google Calendar) ──────────────────────────────────────────
-    speak("Shall I show the week ahead? Yes or no.")
     want_week = listen_yes_no()
+    if want_week is None:
+        speak("Sorry, shall I show the week ahead? Yes or no.")
+        want_week = listen_yes_no()
     if want_week:
         cur_mem = load_memory()
         cal_events = fetch_calendar_events(days=7) if cur_mem.get("gcal_ics_url") else []
@@ -2076,7 +2089,7 @@ def listen_loop():
             except sr.WaitTimeoutError:
                 timeouts += 1
                 if timeouts >= 3:
-                    speak("Going to standby. Double clap when you need me.")
+                    speak('Going to standby. Say "Jarvis" when you need me.')
                     active = False; visual_state = "idle"
                 continue
 
@@ -2090,7 +2103,7 @@ def listen_loop():
         print(f"You: {command}")
         lower = command.lower()
         if any(p in lower for p in ["goodbye jarvis","go to sleep","sleep jarvis","shut down jarvis"]):
-            speak("Going offline. Double clap when you need me.")
+            speak('Going offline. Say "Jarvis" when you need me.')
             visual.clear_news_cards()
             active = False; visual_state = "idle"; break
 
@@ -2169,9 +2182,9 @@ def main():
     print(f"  News feed      : {'BBC RSS' if HAS_FEEDPARSER else 'unavailable'}")
     print(f"  Weather        : {'wttr.in' if HAS_REQUESTS else 'unavailable'}")
     print(f"  Song path      : {SONG_PATH or 'NOT FOUND'}")
-    print("  Double clap → wake  |  ESC → exit")
+    print('  Say "Jarvis" → wake  |  ESC → exit')
 
-    threading.Thread(target=clap_listener, daemon=True).start()
+    threading.Thread(target=wake_word_listener, daemon=True).start()
     visual.run()
 
 if __name__ == "__main__":
