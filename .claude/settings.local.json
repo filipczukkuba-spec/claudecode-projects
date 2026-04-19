@@ -22,7 +22,8 @@
       "WebSearch",
       "Skill(claude-api)",
       "Bash(pip install *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git checkout *)"
     ]
   }
 }
