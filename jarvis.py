@@ -740,6 +740,22 @@ class JarvisVisual:
             "ENC.AES-256", "TELEMETRY.LIVE", "RELAY.HUB", "WATCH.ACTIVE",
         ]
         self._orbit_surfs   = []
+        # cinematic enhancements
+        self.data_streams   = []
+        self._ds_font       = None
+        self._ds_char_head  = {}
+        self._ds_char_body  = {}
+        self._grid_surf     = None
+        self._grid_y0       = 0
+        self._grid_h        = 0
+        self._scanline_surf = None
+        self.reticules      = []
+        self._reticule_cd   = 2.5
+        self.power_arcs     = []
+        self._arc_cd        = 4.0
+        self.diag_bars      = []
+        self._bloom_small   = None
+        self._bloom_tiny    = None
 
     def setup(self):
         pygame.display.init(); pygame.font.init()
@@ -763,10 +779,72 @@ class JarvisVisual:
                                  for lbl in self._orbit_labels]
         except Exception:
             self._orbit_surfs = []
+        self._init_cinematic()
         if HAS_NUMPY:
             self._init_sphere_numpy()
         else:
             self._init_sphere()
+
+    def _init_cinematic(self):
+        """Pre-build grid, scanlines, data-stream glyph surfs, diagnostic bars."""
+        import random as _r
+        # ── Scanline overlay (subtle) ─────────────────────────────────────────
+        sl = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
+        for y in range(0, self.H, 3):
+            pygame.draw.line(sl, (0, 15, 30, 22), (0, y), (self.W, y), 1)
+        self._scanline_surf = sl
+
+        # ── Perspective grid (vertical converging lines, pre-rendered) ────────
+        cx = self.W // 2
+        self._grid_h  = int(self.H * 0.36)
+        self._grid_y0 = self.H - self._grid_h
+        g = pygame.Surface((self.W, self._grid_h), pygame.SRCALPHA)
+        for vx in range(-9, 10):
+            if vx == 0: continue
+            bot_x = cx + vx * (self.W // 11)
+            a = max(18, 55 - abs(vx) * 4)
+            pygame.draw.line(g, (0, 110, 210, a), (cx, 0), (bot_x, self._grid_h), 1)
+        self._grid_surf = g
+
+        # ── Data-stream glyphs (pre-rendered for speed) ───────────────────────
+        try:
+            self._ds_font = pygame.font.SysFont("consolas", 12, bold=True)
+        except Exception:
+            self._ds_font = pygame.font.Font(None, 14)
+        chars = "0123456789ABCDEF#$%&@*+-=/█▓▒░"
+        self._ds_chars = list(chars)
+        self._ds_char_head = {c: self._ds_font.render(c, True, (225, 250, 255)) for c in chars}
+        self._ds_char_body = {c: self._ds_font.render(c, True, (60, 140, 220))  for c in chars}
+        self.data_streams  = []
+        # left + right edge columns
+        for side, base_x in [("L", 14), ("R", self.W - 14 - 12)]:
+            for col_i in range(5):
+                stream_len = _r.randint(18, 28)
+                x = base_x + (col_i * 16 if side == "L" else -col_i * 16)
+                self.data_streams.append({
+                    "x": x,
+                    "y": _r.uniform(-400, self.H),
+                    "speed": _r.uniform(55, 120),
+                    "chars": [_r.choice(chars) for _ in range(stream_len)],
+                    "swap_t": 0.0,
+                    "len": stream_len,
+                })
+
+        # ── Bloom scratch surfaces (allocated once) ───────────────────────────
+        self._bloom_small = pygame.Surface((self.W // 4, self.H // 4))
+        self._bloom_tiny  = pygame.Surface((self.W // 10, self.H // 10))
+
+        # ── Diagnostic bars ───────────────────────────────────────────────────
+        import random as _rr
+        self.diag_bars = [
+            {"label": "CORE PWR",  "value": 0.82, "target": 0.82, "col": (0, 200, 255)},
+            {"label": "NEURAL NET","value": 0.91, "target": 0.91, "col": (0, 220, 220)},
+            {"label": "UPLINK",    "value": 0.67, "target": 0.67, "col": (100, 180, 255)},
+            {"label": "PROCESS",   "value": 0.55, "target": 0.55, "col": (80, 200, 255)},
+            {"label": "BIO SCAN",  "value": 0.98, "target": 0.98, "col": (0, 240, 200)},
+            {"label": "ENCRYPT",   "value": 0.88, "target": 0.88, "col": (130, 200, 255)},
+        ]
+        self._diag_t = 0.0
 
     def _col(self, state):
         return {
@@ -1060,6 +1138,256 @@ class JarvisVisual:
             pygame.draw.lines(self.screen,c,False,
                               [(x0+dx*sz,y0),(x0,y0),(x0,y0+dy*sz)],1)
 
+    def _draw_grid_floor(self, t):
+        """Scrolling perspective grid at bottom — the Iron Man floor."""
+        if self._grid_surf is None: return
+        self.screen.blit(self._grid_surf, (0, self._grid_y0))
+        num = 14
+        for i in range(num):
+            tl = ((i / num) + t * 0.06) % 1.0
+            y_rel = (tl ** 1.9) * self._grid_h
+            y = int(self._grid_y0 + y_rel)
+            alpha = int(20 + 85 * tl)
+            ls = pygame.Surface((self.W, 1), pygame.SRCALPHA)
+            ls.fill((0, 110, 210, alpha))
+            self.screen.blit(ls, (0, y))
+
+    def _draw_data_streams(self, dt):
+        """Matrix-style glyph columns on left + right edges."""
+        import random as _r
+        if not self.data_streams or self._ds_font is None: return
+        for s in self.data_streams:
+            s["y"] += s["speed"] * dt
+            s["swap_t"] -= dt
+            if s["swap_t"] <= 0:
+                idx = _r.randrange(s["len"])
+                s["chars"][idx] = _r.choice(self._ds_chars)
+                s["swap_t"] = _r.uniform(0.05, 0.22)
+            if s["y"] > self.H + 100:
+                s["y"] = -s["len"] * 14 - _r.uniform(0, 300)
+                s["chars"] = [_r.choice(self._ds_chars) for _ in range(s["len"])]
+            head_y = s["y"]
+            for i, ch in enumerate(s["chars"]):
+                y = int(head_y - i * 14)
+                if y < -16 or y > self.H: continue
+                if i == 0:
+                    surf = self._ds_char_head.get(ch)
+                    a = 235
+                else:
+                    surf = self._ds_char_body.get(ch)
+                    fade = max(0.0, 1.0 - i / s["len"])
+                    a = int(18 + 180 * fade)
+                if surf is None: continue
+                surf.set_alpha(a)
+                self.screen.blit(surf, (s["x"], y))
+
+    def _spawn_reticule(self):
+        import random as _r
+        # avoid sphere center area
+        while True:
+            x = _r.randint(80, self.W - 80)
+            y = _r.randint(80, self.H - 120)
+            if abs(x - self.cx) > 260 or abs(y - self.cy) > 260:
+                break
+        self.reticules.append({
+            "x": x, "y": y, "age": 0.0, "life": 2.4,
+            "rot": _r.uniform(0, 6.283),
+            "size": _r.randint(34, 58),
+            "label": _r.choice(["TARGET","SCAN","TRACE","LOCK","OBJ.ID"]),
+            "code":  f"{_r.randint(100,999)}-{_r.choice('ABCDEFGH')}{_r.randint(10,99)}",
+        })
+
+    def _update_reticules(self, dt):
+        self._reticule_cd -= dt
+        if self._reticule_cd <= 0:
+            self._spawn_reticule()
+            import random as _r
+            self._reticule_cd = _r.uniform(2.8, 5.5)
+        for r in self.reticules[:]:
+            r["age"] += dt
+            r["rot"] += dt * 1.2
+            if r["age"] >= r["life"]:
+                self.reticules.remove(r)
+
+    def _draw_reticules(self):
+        import math as _m
+        for r in self.reticules:
+            a_norm = r["age"] / r["life"]
+            if a_norm < 0.15:
+                alpha = a_norm / 0.15
+            elif a_norm > 0.75:
+                alpha = max(0.0, 1.0 - (a_norm - 0.75) / 0.25)
+            else:
+                alpha = 1.0
+            A = int(alpha * 220)
+            if A <= 4: continue
+            cx, cy = r["x"], r["y"]
+            sz = r["size"]
+            # expanding grow-in
+            grow = min(1.0, r["age"] * 2.5)
+            sz = int(sz * (0.6 + 0.4 * grow))
+            col = (0, 230, 255, A)
+
+            # rotating outer square-ring
+            pts = []
+            for k in range(4):
+                ang = r["rot"] + k * _m.pi / 2
+                pts.append((cx + int(_m.cos(ang) * sz),
+                            cy + int(_m.sin(ang) * sz)))
+            ov = pygame.Surface((sz*2+12, sz*2+12), pygame.SRCALPHA)
+            ox, oy = cx - sz - 6, cy - sz - 6
+            for i in range(4):
+                x1, y1 = pts[i][0] - ox, pts[i][1] - oy
+                x2, y2 = pts[(i+1)%4][0] - ox, pts[(i+1)%4][1] - oy
+                pygame.draw.line(ov, col, (x1, y1), (x2, y2), 1)
+            # inner cross
+            pygame.draw.line(ov, col, (sz+6, sz-int(sz*0.6)+6), (sz+6, sz+int(sz*0.6)+6), 1)
+            pygame.draw.line(ov, col, (sz-int(sz*0.6)+6, sz+6), (sz+int(sz*0.6)+6, sz+6), 1)
+            # center dot
+            pygame.draw.circle(ov, col, (sz+6, sz+6), 2)
+            self.screen.blit(ov, (ox, oy))
+            # label
+            lbl = self.font_data.render(f"{r['label']}  {r['code']}", True, (0, 230, 255))
+            lbl.set_alpha(A)
+            self.screen.blit(lbl, (cx - lbl.get_width() // 2, cy + sz + 8))
+
+    def _spawn_power_arc(self):
+        import random as _r, math as _m
+        # arc from sphere surface to random edge point
+        R = (self._sp_R if HAS_NUMPY else 195)
+        ang = _r.uniform(0, _m.tau)
+        start = (int(self.cx + _m.cos(ang) * R), int(self.cy + _m.sin(ang) * R))
+        # end: random edge
+        edge_choice = _r.choice(["top","bot","left","right"])
+        if edge_choice == "top":
+            end = (_r.randint(80, self.W-80), _r.randint(20, 180))
+        elif edge_choice == "bot":
+            end = (_r.randint(80, self.W-80), _r.randint(self.H-240, self.H-60))
+        elif edge_choice == "left":
+            end = (_r.randint(40, 220), _r.randint(120, self.H-180))
+        else:
+            end = (_r.randint(self.W-220, self.W-40), _r.randint(120, self.H-180))
+        # jagged midpoints
+        segs = 10
+        pts = []
+        for i in range(segs + 1):
+            t = i / segs
+            x = start[0] + (end[0] - start[0]) * t
+            y = start[1] + (end[1] - start[1]) * t
+            if 0 < i < segs:
+                jitter = 28 * (1 - abs(t - 0.5) * 2)
+                x += _r.uniform(-jitter, jitter)
+                y += _r.uniform(-jitter, jitter)
+            pts.append((int(x), int(y)))
+        self.power_arcs.append({"pts": pts, "age": 0.0, "life": 0.38})
+
+    def _update_power_arcs(self, dt, state):
+        self._arc_cd -= dt
+        threshold = (1.6 if state == "speaking"
+                     else 3.0 if state == "waking"
+                     else 6.0)
+        if self._arc_cd <= 0:
+            self._spawn_power_arc()
+            import random as _r
+            self._arc_cd = _r.uniform(threshold * 0.6, threshold * 1.2)
+        for a in self.power_arcs[:]:
+            a["age"] += dt
+            if a["age"] >= a["life"]:
+                self.power_arcs.remove(a)
+
+    def _draw_power_arcs(self):
+        for a in self.power_arcs:
+            prog = a["age"] / a["life"]
+            alpha = int(255 * (1.0 - prog))
+            if alpha <= 4: continue
+            pts = a["pts"]
+            # outer glow
+            gs = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
+            pygame.draw.lines(gs, (0, 180, 255, alpha // 3), False, pts, 5)
+            pygame.draw.lines(gs, (120, 220, 255, alpha // 2), False, pts, 3)
+            pygame.draw.lines(gs, (230, 250, 255, alpha), False, pts, 1)
+            self.screen.blit(gs, (0, 0))
+
+    def _draw_diag_panels(self, t, dt):
+        """Live animated bars in top-left and top-right corners."""
+        import math as _m, random as _r
+        self._diag_t += dt
+        if self._diag_t > 0.35:
+            self._diag_t = 0.0
+            for b in self.diag_bars:
+                b["target"] = max(0.15, min(1.0, b["target"] + _r.uniform(-0.08, 0.08)))
+        for b in self.diag_bars:
+            b["value"] += (b["target"] - b["value"]) * 0.10
+
+        panel_w = 180; bar_h = 9; row_h = 22
+        # Left panel — first 3 bars
+        lx, ly = 18, 18
+        header = self.font_data.render("▌ SYSTEM DIAGNOSTIC", True, (80, 180, 255))
+        header.set_alpha(180)
+        self.screen.blit(header, (lx, ly))
+        for i, b in enumerate(self.diag_bars[:3]):
+            by = ly + 20 + i * row_h
+            lbl = self.font_data.render(b["label"], True, (100, 170, 230))
+            lbl.set_alpha(180)
+            self.screen.blit(lbl, (lx, by))
+            pct = self.font_data.render(f"{int(b['value']*100):>3}%", True, (180, 220, 255))
+            pct.set_alpha(200)
+            self.screen.blit(pct, (lx + panel_w - 28, by))
+            # bar
+            bx, bby = lx, by + 13
+            s_bg = pygame.Surface((panel_w, bar_h), pygame.SRCALPHA)
+            s_bg.fill((0, 30, 70, 140))
+            self.screen.blit(s_bg, (bx, bby))
+            fill_w = int(panel_w * b["value"])
+            s_fg = pygame.Surface((max(1, fill_w), bar_h), pygame.SRCALPHA)
+            pulse = int(40 * _m.sin(t * 2.5 + i))
+            col = (min(255, b["col"][0] + pulse), min(255, b["col"][1] + pulse), b["col"][2], 220)
+            s_fg.fill(col)
+            self.screen.blit(s_fg, (bx, bby))
+            pygame.draw.rect(self.screen, (0, 80, 170), (bx, bby, panel_w, bar_h), 1)
+
+        # Right panel — last 3 bars
+        rx = self.W - 18 - panel_w
+        ry = 18
+        header_r = self.font_data.render("ANALYSIS ▌", True, (80, 180, 255))
+        header_r.set_alpha(180)
+        self.screen.blit(header_r, (rx + panel_w - header_r.get_width(), ry))
+        for i, b in enumerate(self.diag_bars[3:6]):
+            by = ry + 20 + i * row_h
+            lbl = self.font_data.render(b["label"], True, (100, 170, 230))
+            lbl.set_alpha(180)
+            self.screen.blit(lbl, (rx, by))
+            pct = self.font_data.render(f"{int(b['value']*100):>3}%", True, (180, 220, 255))
+            pct.set_alpha(200)
+            self.screen.blit(pct, (rx + panel_w - 28, by))
+            bx, bby = rx, by + 13
+            s_bg = pygame.Surface((panel_w, bar_h), pygame.SRCALPHA)
+            s_bg.fill((0, 30, 70, 140))
+            self.screen.blit(s_bg, (bx, bby))
+            fill_w = int(panel_w * b["value"])
+            s_fg = pygame.Surface((max(1, fill_w), bar_h), pygame.SRCALPHA)
+            pulse = int(40 * _m.sin(t * 2.5 + i + 2))
+            col = (min(255, b["col"][0] + pulse), min(255, b["col"][1] + pulse), b["col"][2], 220)
+            s_fg.fill(col)
+            self.screen.blit(s_fg, (bx, bby))
+            pygame.draw.rect(self.screen, (0, 80, 170), (bx, bby, panel_w, bar_h), 1)
+
+    def _apply_bloom(self):
+        """Cheap full-scene bloom: downscale → blur → dim → additive back."""
+        try:
+            sw, sh = self.W // 5, self.H // 5
+            small = pygame.transform.smoothscale(self.screen, (sw, sh))
+            tiny  = pygame.transform.smoothscale(small, (sw // 3, sh // 3))
+            blur  = pygame.transform.smoothscale(tiny, (self.W, self.H))
+            blur.fill((80, 80, 80), special_flags=pygame.BLEND_MULT)
+            self.screen.blit(blur, (0, 0), special_flags=pygame.BLEND_ADD)
+        except Exception as e:
+            pass
+
+    def _draw_scanlines(self):
+        if self._scanline_surf is not None:
+            self.screen.blit(self._scanline_surf, (0, 0))
+
     def _draw_hud(self, state, t):
         labels={"idle":"STANDBY","waking":"ACTIVATING","listening":"LISTENING","speaking":"SPEAKING"}
         colors={"idle":(35,70,155),"waking":(100,100,255),"listening":(0,195,215),"speaking":(0,180,255)}
@@ -1088,12 +1416,26 @@ class JarvisVisual:
                     pygame.quit(); return
             state=visual_state
             self.screen.fill((0,2,12))
+            # --- bottom background layer ---
+            self._draw_grid_floor(self.t)
+            self._draw_data_streams(dt)
+            # --- core scene ---
             self._draw_particles(state,self.t)
             self._draw_reactor(self.cx,self.cy,state,self.t)
+            # --- overlays that bloom together ---
+            self._update_reticules(dt)
+            self._draw_reticules()
+            self._update_power_arcs(dt, state)
+            self._draw_power_arcs()
+            # --- bloom post-process (before cards/HUD so text stays crisp) ---
+            self._apply_bloom()
+            # --- foreground UI (post-bloom = crisp) ---
+            self._draw_scanlines()
             for card in self.news_cards[:]:
                 card.update(dt)
                 card.draw(self.screen,self.font_data,self.font_card_body)
                 if not card.alive: self.news_cards.remove(card)
+            self._draw_diag_panels(self.t, dt)
             self._draw_corners()
             self._draw_hud(state,self.t)
             fps=self.clock.get_fps()
