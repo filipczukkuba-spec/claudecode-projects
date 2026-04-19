@@ -96,96 +96,217 @@ def fetch_weather():
         return r.text.strip()
     except Exception: return None
 
-def fetch_headlines(count=5):
+def fetch_headlines(count=6):
     if not HAS_FEEDPARSER: return []
     try:
-        feed = feedparser.parse("https://feeds.bbci.co.uk/news/world/rss.xml")
-        return [e.title for e in feed.entries[:count]]
+        feed = feedparser.parse('https://feeds.bbci.co.uk/news/world/rss.xml')
+        out  = []
+        for e in feed.entries[:count]:
+            img = None
+            for attr in ('media_thumbnail', 'media_content'):
+                val = getattr(e, attr, None)
+                if val and isinstance(val, list) and val[0].get('url'):
+                    img = val[0]['url']; break
+            if not img and getattr(e, 'enclosures', None):
+                for enc in e.enclosures:
+                    if 'image' in enc.get('type',''):
+                        img = enc.get('href') or enc.get('url'); break
+            out.append({'title': e.title, 'img': img})
+        return out
     except Exception: return []
 
-# ─── Floating News Cards ──────────────────────────────────────────────────────
 class NewsCard:
-    def __init__(self, text, target_x, target_y, delay=0.0, tag="NEWS"):
-        self.text     = text
-        self.tag      = tag
-        self.tx, self.ty = target_x, target_y
-        self.x = target_x
-        self.y = target_y + 60
-        self.alpha    = 0.0
-        self.phase    = random.uniform(0, math.tau)
-        self.delay    = delay
-        self.age      = 0.0
-        self.alive    = True
-        self.lifetime = 28.0
+    IMG_W, IMG_H = 158, 102
+    CARD_W, CARD_H = 475, 120
+
+    def __init__(self, title, tx, ty, delay=0.0, tag="NEWS",
+                 img_url=None, side="left"):
+        import random as _r
+        self.title   = title
+        self.tag     = tag
+        self.side    = side
+        self.tx, self.ty = tx, ty
+        self.x = tx - 300 if side == "left" else tx + 300
+        self.y = ty + 60
+        self.alpha   = 0.0
+        self.phase   = _r.uniform(0, 6.283)
+        self.delay   = delay
+        self.age     = 0.0
+        self.alive   = True
+        self.lifetime = 30.0
+        self.img_surf    = None
+        self._img_bytes  = None
+        self._dl_done    = False
+        self._surf_built = False
+        self._glitch_t   = _r.uniform(4, 9)
+        self._glitch_on  = False
+        self._glitch_dur = 0.0
+        if img_url and HAS_REQUESTS:
+            import threading
+            threading.Thread(target=self._download, args=(img_url,), daemon=True).start()
+        else:
+            self._dl_done = True
+
+    def _download(self, url):
+        try:
+            r = _requests.get(url, timeout=6)
+            self._img_bytes = r.content
+        except Exception:
+            pass
+        self._dl_done = True
+
+    def _build_surf(self):
+        if self._img_bytes:
+            try:
+                import io as _io
+                raw = pygame.image.load(_io.BytesIO(self._img_bytes), "img.jpg")
+                raw = pygame.transform.smoothscale(raw, (self.IMG_W, self.IMG_H))
+                raw = raw.convert()
+                # holographic blue tint
+                tint = pygame.Surface((self.IMG_W, self.IMG_H), pygame.SRCALPHA)
+                tint.fill((0, 30, 115, 95))
+                raw.blit(tint, (0, 0))
+                # horizontal scanlines
+                sl = pygame.Surface((self.IMG_W, self.IMG_H), pygame.SRCALPHA)
+                for sy in range(0, self.IMG_H, 2):
+                    pygame.draw.line(sl, (0, 0, 0, 72), (0, sy), (self.IMG_W, sy))
+                raw.blit(sl, (0, 0))
+                # edge vignette
+                vg = pygame.Surface((self.IMG_W, self.IMG_H), pygame.SRCALPHA)
+                for edge in range(14):
+                    pygame.draw.rect(vg, (0, 0, 0, int(88*(1-edge/14))),
+                                     (edge, edge, self.IMG_W-edge*2, self.IMG_H-edge*2), 1)
+                raw.blit(vg, (0, 0))
+                self.img_surf = raw
+            except Exception as ex:
+                print(f"[card img] {ex}")
+        self._surf_built = True
 
     def update(self, dt):
+        import math as _m, random as _r
         self.age += dt
-        if self.age < self.delay: return
+        if self.age < self.delay:
+            return
         a = self.age - self.delay
-        if a < 1.2:
-            self.alpha = min(1.0, a / 1.2)
-            self.y += (self.ty - self.y) * 0.12
-        elif a > self.lifetime - 1.5:
-            self.alpha = max(0.0, 1.0 - (a - (self.lifetime - 1.5)) / 1.5)
+        if self._dl_done and not self._surf_built:
+            self._build_surf()
+        if a < 1.0:
+            self.alpha = min(1.0, a)
+            self.x += (self.tx - self.x) * 0.15
+            self.y += (self.ty - self.y) * 0.15
+        elif a > self.lifetime - 1.2:
+            self.alpha = max(0.0, 1.0 - (a - (self.lifetime - 1.2)) / 1.2)
         else:
-            self.y = self.ty + 6 * math.sin(self.phase + a * 1.1)
+            self.y = self.ty + 7 * _m.sin(self.phase + a * 1.05)
+        self._glitch_t -= dt
+        if self._glitch_t <= 0 and a > 2.0:
+            self._glitch_on  = True
+            self._glitch_dur = 0.14
+            self._glitch_t   = _r.uniform(5, 11)
+        if self._glitch_on:
+            self._glitch_dur -= dt
+            if self._glitch_dur <= 0:
+                self._glitch_on = False
         if self.age > self.lifetime + self.delay:
             self.alive = False
 
-    def draw(self, screen, font_title, font_body):
-        if self.alpha <= 0: return
-        a = int(self.alpha * 255)
-        W, H = 360, 75
-        x, y = int(self.x) - W // 2, int(self.y) - H // 2
+    def draw(self, screen, font_tag, font_body):
+        import math as _m
+        if self.alpha <= 0:
+            return
+        a   = int(self.alpha * 255)
+        W, H = self.CARD_W, self.CARD_H
+        x   = int(self.x) - W // 2
+        y   = int(self.y) - H // 2
 
-        # Panel background
-        panel = pygame.Surface((W, H), pygame.SRCALPHA)
-        panel.fill((0, 8, 30, int(a * 0.82)))
-        screen.blit(panel, (x, y))
+        # dark panel
+        bg = pygame.Surface((W, H), pygame.SRCALPHA)
+        bg.fill((0, 5, 20, int(a * 0.90)))
+        screen.blit(bg, (x, y))
 
-        # Glowing border
-        border_surf = pygame.Surface((W, H), pygame.SRCALPHA)
-        pygame.draw.rect(border_surf, (0, 160, 255, a), (0, 0, W, H), 1)
-        pygame.draw.rect(border_surf, (0, 100, 200, int(a * 0.4)), (1, 1, W-2, H-2), 1)
-        screen.blit(border_surf, (x, y))
-
-        # Tag strip (top-left corner)
-        tag_surf = pygame.Surface((65, 16), pygame.SRCALPHA)
-        tag_surf.fill((0, 120, 220, int(a * 0.9)))
-        screen.blit(tag_surf, (x + 8, y + 8))
-        tag_txt = font_body.render(self.tag, True, (200, 230, 255, a))
-        screen.blit(tag_txt, (x + 12, y + 9))
-
-        # Headline text (word-wrap simple)
-        words = self.text.split()
-        lines, line = [], ""
-        for w in words:
-            test = (line + " " + w).strip()
-            if font_body.size(test)[0] < W - 20:
-                line = test
+        # image section
+        ix, iy = x + 8, y + 9
+        if self.img_surf:
+            ic = self.img_surf.copy()
+            ic.set_alpha(a)
+            if self._glitch_on:
+                off = 3
+                for dx2, dy2 in [(-off, 0), (off, 0), (0, -off)]:
+                    screen.blit(ic, (ix+dx2, iy+dy2), special_flags=pygame.BLEND_ADD)
             else:
-                lines.append(line); line = w
-        lines.append(line)
-        for i, ln in enumerate(lines[:2]):
-            col = (220, 235, 255) if i == 0 else (160, 185, 220)
-            t = font_body.render(ln, True, col)
-            t.set_alpha(a)
-            screen.blit(t, (x + 10, y + 30 + i * 18))
+                screen.blit(ic, (ix, iy))
+            pygame.draw.rect(screen, (0, 150, 255, int(a*0.65)),
+                             (ix-1, iy-1, self.IMG_W+2, self.IMG_H+2), 1)
+        else:
+            # animated grid placeholder
+            pg = pygame.Surface((self.IMG_W, self.IMG_H), pygame.SRCALPHA)
+            pg.fill((0, 10, 38, int(a*0.75)))
+            ta = self.age * 1.4
+            for gi in range(6):
+                for gj in range(4):
+                    ga = int(25 + 18*_m.sin(ta + gi*0.9 + gj*1.3))
+                    gx2 = gi*(self.IMG_W//6); gy2 = gj*(self.IMG_H//4)
+                    pygame.draw.rect(pg, (0, 80, 210, ga),
+                                     (gx2+2, gy2+2, self.IMG_W//6-4, self.IMG_H//4-4), 1)
+            if not self._dl_done:
+                dots = "." * (int(self.age*3) % 4)
+                lt = font_tag.render("LOADING" + dots, True, (0, 130, 220))
+                lt.set_alpha(a // 2)
+                pg.blit(lt, (self.IMG_W//2 - lt.get_width()//2, self.IMG_H//2 - 6))
+            screen.blit(pg, (ix, iy))
+            pygame.draw.rect(screen, (0, 80, 180, int(a*0.5)),
+                             (ix-1, iy-1, self.IMG_W+2, self.IMG_H+2), 1)
 
-        # Corner tick marks
-        tc = (0, 160, 255, a)
-        for cx2, cy2 in [(x, y), (x+W, y), (x, y+H), (x+W, y+H)]:
-            sx = 1 if cx2 == x else -1
-            sy = 1 if cy2 == y else -1
-            cs = pygame.Surface((14, 14), pygame.SRCALPHA)
-            pygame.draw.line(cs, tc, (0 if sx>0 else 13, 0 if sy>0 else 13),
-                             (8 if sx>0 else 5, 0 if sy>0 else 13), 1)
-            pygame.draw.line(cs, tc, (0 if sx>0 else 13, 0 if sy>0 else 13),
-                             (0 if sx>0 else 13, 8 if sy>0 else 5), 1)
-            screen.blit(cs, (cx2 - (0 if sx>0 else 14), cy2 - (0 if sy>0 else 14)))
+        # vertical divider
+        div_x = ix + self.IMG_W + 6
+        pygame.draw.line(screen, (0, 90, 200, int(a*0.45)),
+                         (div_x, y+7), (div_x, y+H-7), 1)
 
+        # text section
+        tx2 = div_x + 10
+        tw  = W - (self.IMG_W + 34)
 
-# ─── Visual Engine ────────────────────────────────────────────────────────────
+        # tag label
+        ts = font_tag.render(">> " + self.tag, True, (0, 210, 255))
+        ts.set_alpha(a)
+        screen.blit(ts, (tx2, y+9))
+        pygame.draw.line(screen, (0, 140, 255, int(a*0.35)),
+                         (tx2, y+22), (tx2+tw-4, y+22), 1)
+
+        # word-wrapped headline
+        words = self.title.split()
+        lines2 = []; line2 = ""
+        for w in words:
+            test = (line2 + " " + w).strip()
+            if font_body.size(test)[0] < tw - 4:
+                line2 = test
+            else:
+                lines2.append(line2); line2 = w
+        lines2.append(line2)
+        for i2, ln in enumerate(lines2[:3]):
+            col = (235, 242, 255) if i2 == 0 else (165, 188, 220)
+            hs  = font_body.render(ln, True, col)
+            hs.set_alpha(a)
+            screen.blit(hs, (tx2, y+28 + i2*17))
+
+        # lifetime progress bar
+        prog = max(0.0, 1.0 - max(0.0, self.age - self.delay) / self.lifetime)
+        bx2 = tx2; by2 = y+H-11; bw2 = tw-4
+        pygame.draw.rect(screen, (0, 35, 90,  int(a*0.5)),   (bx2, by2, bw2, 3))
+        pygame.draw.rect(screen, (0, 170, 255, int(a*0.85)), (bx2, by2, int(bw2*prog), 3))
+
+        # outer border (glows bright during glitch)
+        bd = pygame.Surface((W, H), pygame.SRCALPHA)
+        bc = (0, 220, 255, int(a*0.9)) if self._glitch_on else (0, 120, 255, int(a*0.55))
+        pygame.draw.rect(bd, bc, (0, 0, W, H), 1)
+        screen.blit(bd, (x, y))
+
+        # corner ticks
+        tc = (0, 200, 255, a)
+        for cx2, cy2, sx, sy in [(x,y,1,1),(x+W,y,-1,1),(x,y+H,1,-1),(x+W,y+H,-1,-1)]:
+            pygame.draw.lines(screen, tc, False,
+                              [(cx2+sx*13, cy2),(cx2, cy2),(cx2, cy2+sy*13)], 1)
+
 class JarvisVisual:
     def __init__(self):
         self.W = self.H = self.cx = self.cy = 0
@@ -409,8 +530,8 @@ class JarvisVisual:
         hint=self.font_data.render("ESC · exit   DOUBLE CLAP · wake",True,(20,45,100))
         self.screen.blit(hint,(self.W//2-hint.get_width()//2,self.H-27))
 
-    def add_news_card(self, text, tx, ty, delay=0.0, tag="NEWS"):
-        self.news_cards.append(NewsCard(text, tx, ty, delay=delay, tag=tag))
+    def add_news_card(self, text, tx, ty, delay=0.0, tag="NEWS", img_url=None, side="left"):
+        self.news_cards.append(NewsCard(text, tx, ty, delay=delay, tag=tag, img_url=img_url, side=side))
 
     def clear_news_cards(self):
         self.news_cards.clear()
@@ -762,18 +883,22 @@ def wake_up():
     W, H = visual.W, visual.H
     cx, cy = visual.cx, visual.cy
 
-    card_positions_left  = [(cx - 480, cy - 160), (cx - 480, cy), (cx - 480, cy + 160)]
-    card_positions_right = [(cx + 480, cy - 120), (cx + 480, cy + 60), (cx + 480, cy + 240)]
+    card_positions_left  = [(cx - 510, cy - 175), (cx - 510, cy + 5), (cx - 510, cy + 185)]
+    card_positions_right = [(cx + 510, cy - 175), (cx + 510, cy + 5), (cx + 510, cy + 185)]
 
     if weather:
-        visual.add_news_card(weather, cx - 480, cy - 280, delay=0.3, tag="WEATHER")
+        visual.add_news_card(weather, cx, cy - 345, delay=0.2, tag="WEATHER",
+                             img_url=None, side="left")
 
-    for i, hl in enumerate(headlines[:5]):
+    for i, art in enumerate(headlines[:6]):
         if i < 3:
-            tx, ty = card_positions_left[i]
+            tx, ty = card_positions_left[i]; side = "left"
         else:
-            tx, ty = card_positions_right[i - 3]
-        visual.add_news_card(hl, tx, ty, delay=0.4 + i * 0.5, tag="NEWS")
+            tx, ty = card_positions_right[i - 3]; side = "right"
+        title   = art["title"] if isinstance(art, dict) else art
+        img_url = art.get("img") if isinstance(art, dict) else None
+        visual.add_news_card(title, tx, ty, delay=0.5 + i * 0.45,
+                             tag="WORLD NEWS", img_url=img_url, side=side)
 
     # Build spoken greeting
     time_hour = time.localtime().tm_hour
@@ -782,7 +907,8 @@ def wake_up():
     if weather:
         parts.append(f"Current conditions: {weather}.")
     if headlines:
-        parts.append("Breaking news: " + ". ".join(headlines[:3]) + ".")
+        titles = [(h["title"] if isinstance(h, dict) else h) for h in headlines[:3]]
+        parts.append("Breaking news: " + ". ".join(titles) + ".")
     parts.append("How may I assist you?")
 
     speak(" ".join(parts))
