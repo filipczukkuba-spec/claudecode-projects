@@ -19,15 +19,24 @@
     {
       "text": "could you open Spotify for me and play something chill like jazz or something like that",
       "time": 1776611229.3850029
+    },
+    {
+      "text": "can you show me the week ahead",
+      "time": 1776612710.7073903
+    },
+    {
+      "text": "thank you",
+      "time": 1776612732.3636205
     }
   ],
   "habits": {
-    "h17": 5
+    "h17": 7
   },
   "birthdays": [],
-  "wake_count": 1,
-  "last_wake": 1776611056.7254186,
+  "wake_count": 2,
+  "last_wake": 1776612656.0121784,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
+  "gcal_birthdays_ics_url": "",
   "librus_user": "",
   "librus_pass": ""
 }
