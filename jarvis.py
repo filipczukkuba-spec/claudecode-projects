@@ -1884,11 +1884,24 @@ def execute_tool(name, inp):
         elif name == "dispatch_agent":
             return run_agent_pipeline(inp.get("pipeline_type", ""), inp.get("context", ""))
         elif name == "set_gmail_credentials":
+            import tkinter as _tk
+            import tkinter.simpledialog as _sd
+            root = _tk.Tk(); root.withdraw(); root.attributes("-topmost", True)
+            email = _sd.askstring("JARVIS — Gmail Setup",
+                                  "Enter your Gmail address:", parent=root)
+            if not email:
+                root.destroy(); return "Setup cancelled."
+            pw = _sd.askstring("JARVIS — Gmail Setup",
+                               "Enter your Google App Password\n(16 chars, from myaccount.google.com → Security → App passwords):",
+                               parent=root, show="*")
+            root.destroy()
+            if not pw:
+                return "Setup cancelled."
             mem = load_memory()
-            mem["gmail_imap_user"] = inp["email"].strip()
-            mem["gmail_imap_pass"] = inp["app_password"].replace(" ", "").strip()
+            mem["gmail_imap_user"] = email.strip()
+            mem["gmail_imap_pass"] = pw.replace(" ", "").strip()
             save_memory(mem)
-            return "Gmail IMAP credentials saved securely in local memory."
+            return f"Gmail credentials saved for {email.strip()}."
     except Exception as e:
         return f"Error in {name}: {e}"
 
