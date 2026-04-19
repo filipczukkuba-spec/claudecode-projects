@@ -185,20 +185,24 @@ class NewsCard:
             screen.blit(cs, (cx2 - (0 if sx>0 else 14), cy2 - (0 if sy>0 else 14)))
 
 
-# ─── Visual Engine ─────────────────────────────────────────────────────────────
+# ─── Visual Engine ────────────────────────────────────────────────────────────
 class JarvisVisual:
     def __init__(self):
         self.W = self.H = self.cx = self.cy = 0
-        self.t          = 0.0
-        self.particles  = []
-        self.ripples    = []
-        self.news_cards = []
-        self.screen     = None
-        self.clock      = None
-        self.font_hud   = None
+        self.t            = 0.0
+        self.particles    = []
+        self.ripples      = []
+        self.news_cards   = []
+        self.screen       = None
+        self.clock        = None
+        self.font_hud     = None
         self.font_card_body  = None
-        self.font_card_title = None
-        self._scan_angle = 0.0
+        self.font_data    = None
+        self._overlay     = None   # single reused SRCALPHA surface — avoids hundreds of allocs/frame
+        self._hex_surf    = None   # pre-rendered hex grid cached per state
+        self._hex_state   = None
+        self._scan_angle  = 0.0
+        self._glow_cache  = {}     # (r, rgba) -> Surface
 
     def setup(self):
         pygame.display.init(); pygame.font.init()
@@ -209,37 +213,14 @@ class JarvisVisual:
         self.clock = pygame.time.Clock()
         self.cx, self.cy = self.W // 2, self.H // 2
         try:
-            self.font_hud        = pygame.font.SysFont("consolas", 20, bold=True)
-            self.font_card_body  = pygame.font.SysFont("consolas", 13)
-            self.font_card_title = pygame.font.SysFont("consolas", 11, bold=True)
-            self.font_data       = pygame.font.SysFont("consolas", 11)
+            self.font_hud       = pygame.font.SysFont("consolas", 20, bold=True)
+            self.font_card_body = pygame.font.SysFont("consolas", 13)
+            self.font_data      = pygame.font.SysFont("consolas", 11)
         except Exception:
-            self.font_hud = self.font_card_body = self.font_card_title = self.font_data = pygame.font.Font(None, 18)
+            self.font_hud = self.font_card_body = self.font_data = pygame.font.Font(None, 18)
+        self._overlay = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
         self._init_particles()
-
-    def _init_particles(self):
-        self.particles = []
-        for _ in range(22):
-            angle  = random.uniform(0, math.tau)
-            base_r = random.uniform(215, 330)
-            speed  = random.uniform(0.003, 0.010) * random.choice([-1, 1])
-            self.particles.append({
-                'angle': angle, 'base_r': base_r, 'r': base_r,
-                'speed': speed, 'size': random.uniform(2, 4.5),
-                'alpha': random.uniform(0.4, 0.9),
-                'y_phase': random.uniform(0, math.tau),
-                'y_amp':   random.uniform(6, 18),
-                'y_speed': random.uniform(0.002, 0.006) * random.choice([-1, 1]),
-                'shape': random.choices(['dot', 'diamond'], weights=[3, 2])[0],
-            })
-
-    # ── helpers ───────────────────────────────────────────────────────────────
-    def _blit_c(self, surf, cx, cy):
-        self.screen.blit(surf, (cx - surf.get_width()//2, cy - surf.get_height()//2))
-
-    def _alpha_circle(self, r, rgba):
-        s = pygame.Surface((r*2+2, r*2+2), pygame.SRCALPHA)
-        pygame.draw.circle(s, rgba, (r+1, r+1), r); return s
+        self._rebuild_hex("idle")
 
     def _col(self, state):
         return {
@@ -248,253 +229,215 @@ class JarvisVisual:
             "waking":    ((120, 160, 255), (60, 90, 220), (20, 40, 160)),
         }.get(state, ((30, 120, 240), (15, 70, 190), (5, 30, 120)))
 
-    # ── Arc Reactor core ──────────────────────────────────────────────────────
-    def _draw_reactor(self, cx, cy, state, t):
-        bright, mid, dim = self._col(state)
+    def _init_particles(self):
+        import random as _r, math as _m
+        self.particles = []
+        for _ in range(22):
+            angle  = _r.uniform(0, _m.tau)
+            base_r = _r.uniform(215, 330)
+            self.particles.append({
+                "angle": angle, "base_r": base_r, "r": base_r,
+                "speed":   _r.uniform(0.003, 0.010) * _r.choice([-1, 1]),
+                "size":    _r.uniform(2, 4.5),
+                "alpha":   _r.uniform(0.4, 0.9),
+                "y_phase": _r.uniform(0, _m.tau),
+                "y_amp":   _r.uniform(6, 18),
+                "y_speed": _r.uniform(0.002, 0.006) * _r.choice([-1, 1]),
+                "shape":   _r.choices(["dot", "diamond"], weights=[3, 2])[0],
+            })
 
-        pulse = (0.85 + 0.15 * math.sin(t * 6)
-                 if state != "speaking" else
-                 0.80 + 0.20 * math.sin(t * 10))
-
-        # ── outer atmospheric glow ────────────────────────────────────────────
-        for i in range(10, 0, -1):
-            gr = 200 + i * 18
-            a  = int(28 * math.exp(-i * 0.35) * pulse)
-            s  = pygame.Surface((gr*2+2, gr*2+2), pygame.SRCALPHA)
-            pygame.draw.circle(s, (*dim, a), (gr+1, gr+1), gr)
-            self._blit_c(s, cx, cy)
-
-        # ── hex grid background ───────────────────────────────────────────────
-        self._draw_hex_grid(cx, cy, state, t)
-
-        # ── ring 4 — outermost, slow ──────────────────────────────────────────
-        r4_angle = t * 0.15
-        self._draw_ring(cx, cy, 190, r4_angle,  tick_n=36, col=dim,   alpha=50,  w=1)
-
-        # ── ring 3 — counter-rotate ───────────────────────────────────────────
-        r3_angle = -t * 0.32
-        self._draw_ring(cx, cy, 145, r3_angle,  tick_n=24, col=mid,   alpha=80,  w=1)
-
-        # ── rotating scan line ────────────────────────────────────────────────
-        self._scan_angle += (0.018 if state == "speaking" else 0.008)
-        sa = self._scan_angle
-        sx2 = int(cx + 190 * math.cos(sa)); sy2 = int(cy + 190 * math.sin(sa))
-        scan_surf = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
-        for fade in range(8):
-            fa = sa - fade * 0.04
-            fsx = int(cx + 190 * math.cos(fa)); fsy = int(cy + 190 * math.sin(fa))
-            pygame.draw.line(scan_surf, (*bright, max(0, 50 - fade*6)), (cx, cy), (fsx, fsy), 1)
-        self.screen.blit(scan_surf, (0, 0))
-
-        # ── 6 spokes ──────────────────────────────────────────────────────────
-        n_spokes = 6
-        spoke_angle = t * 0.25
-        for i in range(n_spokes):
-            a   = spoke_angle + i * math.tau / n_spokes
-            x2  = int(cx + 145 * math.cos(a))
-            y2  = int(cy + 145 * math.sin(a))
-            s   = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
-            pygame.draw.line(s, (*mid, 45), (cx, cy), (x2, y2), 1)
-            self.screen.blit(s, (0, 0))
-            # node at spoke tip
-            node_p = 0.5 + 0.5 * math.sin(t * 5 + i * 1.1)
-            nr = int(5 + 3 * node_p)
-            ns = pygame.Surface((nr*2+2, nr*2+2), pygame.SRCALPHA)
-            pygame.draw.circle(ns, (*bright, int(180 * node_p)), (nr+1, nr+1), nr)
-            self._blit_c(ns, x2, y2)
-
-        # ── ring 2 — fast inner ───────────────────────────────────────────────
-        r2_angle = t * 0.85
-        self._draw_ring(cx, cy, 95, r2_angle,  tick_n=12, col=bright, alpha=110, w=2)
-
-        # ── triangular markers at ring 2 ──────────────────────────────────────
-        for i in range(3):
-            a = r2_angle + i * math.tau / 3
-            mx = int(cx + 95 * math.cos(a)); my = int(cy + 95 * math.sin(a))
-            self._draw_triangle_marker(mx, my, a, bright, int(160 * pulse))
-
-        # ── ring 1 — innermost ────────────────────────────────────────────────
-        r1_angle = -t * 2.0
-        self._draw_ring(cx, cy, 50, r1_angle,  tick_n=8,  col=bright, alpha=150, w=2)
-
-        # ── central core ──────────────────────────────────────────────────────
-        core_r = int(18 * pulse)
-        for i in range(8, 0, -1):
-            cr = core_r + i * 7
-            ca = int(200 * math.exp(-i * 0.55))
-            s  = self._alpha_circle(cr, (*bright, ca))
-            self._blit_c(s, cx, cy)
-        # white-hot centre
-        self._blit_c(self._alpha_circle(core_r,          (*bright, 230)), cx, cy)
-        self._blit_c(self._alpha_circle(int(core_r*0.5), (210, 235, 255, 245)), cx, cy)
-        self._blit_c(self._alpha_circle(int(core_r*0.2), (255, 255, 255, 255)), cx, cy)
-
-        # ── ripple rings ──────────────────────────────────────────────────────
-        if state == "speaking" and random.random() < 0.14:
-            self.ripples.append({'r': 55.0, 'alpha': 100.0})
-        self._draw_ripples(cx, cy, bright)
-
-        # ── data readouts around the reactor ─────────────────────────────────
-        self._draw_data_labels(cx, cy, state, t)
-
-    def _draw_ring(self, cx, cy, r, offset, tick_n, col, alpha, w=1):
-        # Ring outline
-        s = pygame.Surface((r*2+4, r*2+4), pygame.SRCALPHA)
-        pygame.draw.circle(s, (*col, alpha), (r+2, r+2), r, w)
-        self._blit_c(s, cx, cy)
-        # Tick marks
-        for i in range(tick_n):
-            a  = offset + i * math.tau / tick_n
-            t_len = 8 if i % (tick_n // 4) == 0 else 4
-            x1 = int(cx + (r-1) * math.cos(a)); y1 = int(cy + (r-1) * math.sin(a))
-            x2 = int(cx + (r-1-t_len) * math.cos(a)); y2 = int(cy + (r-1-t_len) * math.sin(a))
-            ts = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
-            pygame.draw.line(ts, (*col, alpha), (x1, y1), (x2, y2), 1)
-            self.screen.blit(ts, (0, 0))
-
-    def _draw_triangle_marker(self, mx, my, angle, col, alpha):
-        size = 7
-        pts = []
-        for da in [0, 2.3, -2.3]:
-            a2 = angle + da
-            pts.append((mx + int(size * math.cos(a2)), my + int(size * math.sin(a2))))
-        s = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
-        pygame.draw.polygon(s, (*col, alpha), pts, 1)
-        self.screen.blit(s, (0, 0))
-
-    def _draw_hex_grid(self, cx, cy, state, t):
-        alpha = 12 if state == "idle" else 20
+    def _rebuild_hex(self, state):
+        import math as _m
         bright, _, _ = self._col(state)
-        hex_r  = 38
-        grid_r = 240
+        ab = 12 if state == "idle" else 20
+        surf = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
+        surf.fill((0, 0, 0, 0))
+        hex_r = 38; grid_r = 240; cx, cy = self.cx, self.cy
         for row in range(-7, 8):
             for col in range(-7, 8):
-                hx = cx + col * hex_r * 1.73
+                hx = cx + col * hex_r * 1.732
                 hy = cy + row * hex_r * 2 + (col % 2) * hex_r
-                dist = math.sqrt((hx-cx)**2 + (hy-cy)**2)
+                dist = _m.sqrt((hx-cx)**2 + (hy-cy)**2)
                 if dist > grid_r: continue
-                fade = max(0, 1 - dist / grid_r)
-                a    = int(alpha * fade)
+                a = int(ab * max(0.0, 1.0 - dist / grid_r))
                 if a <= 0: continue
-                pts = []
-                for i in range(6):
-                    ang = i * math.tau / 6 + t * 0.05
-                    pts.append((int(hx + hex_r * 0.55 * math.cos(ang)),
-                                int(hy + hex_r * 0.55 * math.sin(ang))))
-                hs = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
-                pygame.draw.polygon(hs, (*bright, a), pts, 1)
-                self.screen.blit(hs, (0, 0))
+                pts = [(int(hx + hex_r*0.55*_m.cos(i*_m.tau/6)),
+                        int(hy + hex_r*0.55*_m.sin(i*_m.tau/6))) for i in range(6)]
+                pygame.draw.polygon(surf, (*bright, a), pts, 1)
+        self._hex_surf  = surf
+        self._hex_state = state
+        self._glow_cache.clear()
 
-    def _draw_ripples(self, cx, cy, bright):
+    def _glow_surf(self, r, rgba):
+        key = (r, rgba)
+        if key not in self._glow_cache:
+            s = pygame.Surface((r*2+2, r*2+2), pygame.SRCALPHA)
+            pygame.draw.circle(s, rgba, (r+1, r+1), r)
+            self._glow_cache[key] = s
+        return self._glow_cache[key]
+
+    def _blit_c(self, surf, cx, cy):
+        self.screen.blit(surf, (cx - surf.get_width()//2, cy - surf.get_height()//2))
+
+    def _ring_on_ov(self, ov, cx, cy, r, offset, tick_n, col, w=1):
+        import math as _m
+        pygame.draw.circle(ov, col, (cx, cy), r, w)
+        major = max(1, tick_n // 4)
+        for i in range(tick_n):
+            a = offset + i * _m.tau / tick_n
+            tl = 9 if i % major == 0 else 4
+            ca, sa = _m.cos(a), _m.sin(a)
+            pygame.draw.line(ov, col,
+                             (int(cx+(r-1)*ca),    int(cy+(r-1)*sa)),
+                             (int(cx+(r-1-tl)*ca), int(cy+(r-1-tl)*sa)), 1)
+
+    def _draw_reactor(self, cx, cy, state, t):
+        import math as _m, random as _r
+        bright, mid, dim = self._col(state)
+        if state != self._hex_state:
+            self._rebuild_hex(state)
+        self.screen.blit(self._hex_surf, (0, 0))
+
+        pulse = (1.0 + 0.20*_m.sin(t*10) if state=="speaking"
+                 else 1.0+0.15*_m.sin(t*6) if state=="waking"
+                 else 1.0+0.04*_m.sin(t*1.5))
+
+        for i in range(8, 0, -1):
+            gr = 185 + i*17
+            a  = int(26*_m.exp(-i*0.38)*pulse)
+            self._blit_c(self._glow_surf(gr, (*dim, a)), cx, cy)
+
+        ov = self._overlay
+        ov.fill((0, 0, 0, 0))
+
+        self._ring_on_ov(ov, cx, cy, 188, t*0.15,   36, (*dim,    52), 1)
+        self._ring_on_ov(ov, cx, cy, 143, -t*0.32,  24, (*mid,    82), 1)
+
+        self._scan_angle += 0.022 if state=="speaking" else 0.010
+        for i in range(9):
+            fa  = self._scan_angle - i*0.035
+            pygame.draw.line(ov, (*bright, max(0, 55-i*6)),
+                             (cx, cy), (int(cx+188*_m.cos(fa)), int(cy+188*_m.sin(fa))), 1)
+
+        spoke_off = t*0.25
+        for i in range(6):
+            a  = spoke_off + i*_m.tau/6
+            pygame.draw.line(ov, (*mid, 48), (cx, cy),
+                             (int(cx+143*_m.cos(a)), int(cy+143*_m.sin(a))), 1)
+
+        r2a = t*0.88
+        self._ring_on_ov(ov, cx, cy, 93, r2a, 12, (*bright, 115), 2)
+        for i in range(3):
+            a   = r2a + i*_m.tau/3
+            mx  = int(cx+93*_m.cos(a)); my = int(cy+93*_m.sin(a))
+            pygame.draw.polygon(ov, (*bright, int(165*pulse)),
+                                [(mx+int(7*_m.cos(a+da)), my+int(7*_m.sin(a+da)))
+                                 for da in (0.0, 2.3, -2.3)], 1)
+
+        self._ring_on_ov(ov, cx, cy, 50, -t*2.0, 8, (*bright, 155), 2)
+        self.screen.blit(ov, (0, 0))
+
+        for i in range(6):
+            a   = spoke_off + i*_m.tau/6
+            np_ = 0.5+0.5*_m.sin(t*5+i*1.1)
+            self._blit_c(self._glow_surf(int(5+3*np_), (*bright, int(185*np_))),
+                         int(cx+143*_m.cos(a)), int(cy+143*_m.sin(a)))
+
+        core_r = int(18*pulse)
+        for i in range(7, 0, -1):
+            self._blit_c(self._glow_surf(core_r+i*7, (*bright, int(195*_m.exp(-i*0.58)))), cx, cy)
+        self._blit_c(self._glow_surf(core_r,            (*bright,       235)), cx, cy)
+        self._blit_c(self._glow_surf(int(core_r*0.5),   (210,235,255,   248)), cx, cy)
+        self._blit_c(self._glow_surf(max(1,int(core_r*0.2)), (255,255,255,255)), cx, cy)
+
+        if state=="speaking" and _r.random()<0.14:
+            self.ripples.append({"r":56.0,"alpha":105.0})
         for rp in self.ripples[:]:
-            r = int(rp['r']); a = int(rp['alpha'])
-            if a <= 0 or r <= 0:
-                self.ripples.remove(rp); continue
-            s = pygame.Surface((r*2+4, r*2+4), pygame.SRCALPHA)
-            pygame.draw.circle(s, (*bright, a), (r+2, r+2), r, 2)
-            self._blit_c(s, cx, cy)
-            rp['r'] += 3.0; rp['alpha'] -= 4.5
+            r=int(rp["r"]); a=int(rp["alpha"])
+            if a<=0 or r<=0: self.ripples.remove(rp); continue
+            rs = pygame.Surface((r*2+4,r*2+4), pygame.SRCALPHA)
+            pygame.draw.circle(rs, (*bright, a), (r+2,r+2), r, 2)
+            self._blit_c(rs, cx, cy)
+            rp["r"]+=3.0; rp["alpha"]-=4.5
 
-    def _draw_data_labels(self, cx, cy, state, t):
-        bright, _, _ = self._col(state)
-        labels = [
-            (cx + 220, cy - 90,  f"SYS  {int(50 + 30*math.sin(t*0.7))}%"),
-            (cx + 220, cy + 90,  f"MEM  {int(60 + 20*math.sin(t*0.5))}%"),
-            (cx - 220, cy - 90,  f"NET  ONLINE"),
-            (cx - 220, cy + 90,  f"CPU  {int(40 + 35*abs(math.sin(t*0.9)))}%"),
-        ]
-        for lx, ly, text in labels:
-            a_fade = int(130 + 60 * math.sin(t * 0.8))
-            s = self.font_data.render(text, True, (*bright,))
-            s.set_alpha(a_fade)
-            self.screen.blit(s, (lx - s.get_width()//2, ly - s.get_height()//2))
-            # small bracket
-            bw, bh = s.get_width() + 14, s.get_height() + 8
-            bx, by = lx - bw//2, ly - bh//2
-            bs = pygame.Surface((bw, bh), pygame.SRCALPHA)
-            pygame.draw.rect(bs, (*bright, int(a_fade*0.5)), (0, 0, bw, bh), 1)
-            self.screen.blit(bs, (bx, by))
+        a_fade = int(130+60*_m.sin(t*0.8))
+        for lx,ly,text in [(cx+222,cy-92,f"SYS  {int(50+30*_m.sin(t*0.7))}%"),
+                            (cx+222,cy+92,f"MEM  {int(60+20*_m.sin(t*0.5))}%"),
+                            (cx-222,cy-92,"NET  ONLINE"),
+                            (cx-222,cy+92,f"CPU  {int(40+35*abs(_m.sin(t*0.9)))}%")]:
+            s=self.font_data.render(text, True, bright); s.set_alpha(a_fade)
+            rx=lx-s.get_width()//2; ry=ly-s.get_height()//2
+            self.screen.blit(s,(rx,ry))
+            bw=s.get_width()+14; bh=s.get_height()+8
+            bs=pygame.Surface((bw,bh),pygame.SRCALPHA)
+            pygame.draw.rect(bs,(*bright,int(a_fade*0.5)),(0,0,bw,bh),1)
+            self.screen.blit(bs,(rx-7,ry-4))
 
-    # ── particles ─────────────────────────────────────────────────────────────
     def _draw_particles(self, state, t):
-        bright, _, _ = self._col(state)
-        speed_mult = 2.8 if state == "speaking" else (1.5 if state == "listening" else 1.0)
+        import math as _m
+        bright,_,_ = self._col(state)
+        ov = self._overlay; ov.fill((0,0,0,0))
+        sm = 2.8 if state=="speaking" else 1.5 if state=="listening" else 1.0
         for p in self.particles:
-            p['angle']   += p['speed']   * speed_mult
-            p['y_phase'] += p['y_speed'] * speed_mult
-            target_r = (p['base_r'] + 35 * math.sin(t * 2.5 + p['angle'])
-                        if state == "speaking" else p['base_r'])
-            p['r'] += (target_r - p['r']) * 0.06
-            x = self.cx + p['r'] * math.cos(p['angle'])
-            y = self.cy + p['r'] * math.sin(p['angle']) * 0.5 + p['y_amp'] * math.sin(p['y_phase'])
-            alpha = p['alpha']
-            if state == "idle": alpha *= 0.5 + 0.5 * math.sin(t * 0.9 + p['angle'])
-            a = int(alpha * 255)
-            s = max(1, int(p['size']))
-            pad = s * 3
-            surf = pygame.Surface((pad*2, pad*2), pygame.SRCALPHA)
-            c = (*bright, a)
-            if p['shape'] == 'diamond':
-                pygame.draw.polygon(surf, c, [(pad, pad-s),(pad+s,pad),(pad,pad+s),(pad-s,pad)])
+            p["angle"]  += p["speed"]  * sm
+            p["y_phase"]+= p["y_speed"]* sm
+            tr = p["base_r"]+(35*_m.sin(t*2.5+p["angle"]) if state=="speaking" else 0)
+            p["r"]+=(tr-p["r"])*0.06
+            x = self.cx+p["r"]*_m.cos(p["angle"])
+            y = self.cy+p["r"]*_m.sin(p["angle"])*0.5+p["y_amp"]*_m.sin(p["y_phase"])
+            al = p["alpha"]*(0.5+0.5*_m.sin(t*0.9+p["angle"])) if state=="idle" else p["alpha"]
+            a=int(al*255); s=max(1,int(p["size"])); ix,iy=int(x),int(y)
+            if p["shape"]=="diamond":
+                pygame.draw.polygon(ov,(*bright,a),[(ix,iy-s),(ix+s,iy),(ix,iy+s),(ix-s,iy)])
             else:
-                pygame.draw.circle(surf, c, (pad, pad), s)
-            self.screen.blit(surf, (int(x)-pad, int(y)-pad))
+                pygame.draw.circle(ov,(*bright,a),(ix,iy),s)
+        self.screen.blit(ov,(0,0))
 
-    # ── corner decorations ────────────────────────────────────────────────────
     def _draw_corners(self):
-        c  = (18, 55, 140); sz = 44; W, H = self.W, self.H
-        for x0, y0, dx, dy in [(10,10,1,1),(W-10,10,-1,1),(10,H-10,1,-1),(W-10,H-10,-1,-1)]:
-            pygame.draw.lines(self.screen, c, False,
-                              [(x0+dx*sz, y0),(x0, y0),(x0, y0+dy*sz)], 1)
+        c=(18,55,140); sz=44; W,H=self.W,self.H
+        for x0,y0,dx,dy in [(10,10,1,1),(W-10,10,-1,1),(10,H-10,1,-1),(W-10,H-10,-1,-1)]:
+            pygame.draw.lines(self.screen,c,False,
+                              [(x0+dx*sz,y0),(x0,y0),(x0,y0+dy*sz)],1)
 
-    # ── HUD ───────────────────────────────────────────────────────────────────
     def _draw_hud(self, state, t):
-        labels = {"idle":"STANDBY","waking":"ACTIVATING","listening":"LISTENING","speaking":"SPEAKING"}
-        colors = {"idle":(35,70,155),"waking":(100,100,255),"listening":(0,195,215),"speaking":(0,180,255)}
-        label = labels.get(state, "STANDBY"); color = colors.get(state, (35,70,155))
-        # Blinking dot when listening/speaking
-        dot = "●  " if state in ("listening","speaking") and int(t*2)%2==0 else "○  "
-        txt = self.font_hud.render(f"{dot}J.A.R.V.I.S.  ·  {label}", True, color)
-        self.screen.blit(txt, (self.W//2 - txt.get_width()//2, self.H - 52))
-        hint = self.font_data.render("ESC · exit   DOUBLE CLAP · wake", True, (20,45,100))
-        self.screen.blit(hint, (self.W//2 - hint.get_width()//2, self.H - 27))
+        labels={"idle":"STANDBY","waking":"ACTIVATING","listening":"LISTENING","speaking":"SPEAKING"}
+        colors={"idle":(35,70,155),"waking":(100,100,255),"listening":(0,195,215),"speaking":(0,180,255)}
+        dot="● " if state in("listening","speaking") and int(t*2)%2==0 else "○ "
+        txt=self.font_hud.render(f"{dot}J.A.R.V.I.S.  ·  {labels.get(state,'STANDBY')}",
+                                 True,colors.get(state,(35,70,155)))
+        self.screen.blit(txt,(self.W//2-txt.get_width()//2,self.H-52))
+        hint=self.font_data.render("ESC · exit   DOUBLE CLAP · wake",True,(20,45,100))
+        self.screen.blit(hint,(self.W//2-hint.get_width()//2,self.H-27))
 
-    # ── add news card (called externally) ─────────────────────────────────────
     def add_news_card(self, text, tx, ty, delay=0.0, tag="NEWS"):
         self.news_cards.append(NewsCard(text, tx, ty, delay=delay, tag=tag))
 
     def clear_news_cards(self):
         self.news_cards.clear()
 
-    # ── main loop ─────────────────────────────────────────────────────────────
     def run(self):
         global visual_state
         self.setup()
+        fps_font = pygame.font.SysFont("consolas", 11)
         while True:
-            dt     = self.clock.tick(60) / 1000.0
-            self.t += dt
+            dt=self.clock.tick(60)/1000.0; self.t+=dt
             for event in pygame.event.get():
-                if event.type == pygame.QUIT: pygame.quit(); return
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                if event.type==pygame.QUIT: pygame.quit(); return
+                if event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE:
                     pygame.quit(); return
-
-            state = visual_state
-            self.screen.fill((0, 2, 12))
-
-            # particles behind reactor
-            self._draw_particles(state, self.t)
-
-            # Arc Reactor
-            self._draw_reactor(self.cx, self.cy, state, self.t)
-
-            # News cards
+            state=visual_state
+            self.screen.fill((0,2,12))
+            self._draw_particles(state,self.t)
+            self._draw_reactor(self.cx,self.cy,state,self.t)
             for card in self.news_cards[:]:
                 card.update(dt)
-                card.draw(self.screen, self.font_card_title, self.font_card_body)
+                card.draw(self.screen,self.font_data,self.font_card_body)
                 if not card.alive: self.news_cards.remove(card)
-
             self._draw_corners()
-            self._draw_hud(state, self.t)
+            self._draw_hud(state,self.t)
+            fps=self.clock.get_fps()
+            fs=fps_font.render(f"{fps:.0f} fps",True,(20,50,100))
+            self.screen.blit(fs,(self.W-fs.get_width()-12,10))
             pygame.display.flip()
 
 
