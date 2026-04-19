@@ -319,11 +319,12 @@ class JarvisVisual:
         self.font_hud     = None
         self.font_card_body  = None
         self.font_data    = None
-        self._overlay     = None   # single reused SRCALPHA surface — avoids hundreds of allocs/frame
-        self._hex_surf    = None   # pre-rendered hex grid cached per state
-        self._hex_state   = None
-        self._scan_angle  = 0.0
-        self._glow_cache  = {}     # (r, rgba) -> Surface
+        self._overlay     = None
+        self._glow_cache  = {}
+        self._sphere_nodes  = []
+        self._sphere_edges  = []
+        self._sphere_rot    = 0.0
+        self._flow_offsets  = []   # per-edge animated flow pulse position
 
     def setup(self):
         pygame.display.init(); pygame.font.init()
@@ -341,7 +342,7 @@ class JarvisVisual:
             self.font_hud = self.font_card_body = self.font_data = pygame.font.Font(None, 18)
         self._overlay = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
         self._init_particles()
-        self._rebuild_hex("idle")
+        self._init_sphere()
 
     def _col(self, state):
         return {
@@ -367,26 +368,30 @@ class JarvisVisual:
                 "shape":   _r.choices(["dot", "diamond"], weights=[3, 2])[0],
             })
 
-    def _rebuild_hex(self, state):
-        import math as _m
-        bright, _, _ = self._col(state)
-        ab = 12 if state == "idle" else 20
-        surf = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
-        surf.fill((0, 0, 0, 0))
-        hex_r = 38; grid_r = 240; cx, cy = self.cx, self.cy
-        for row in range(-7, 8):
-            for col in range(-7, 8):
-                hx = cx + col * hex_r * 1.732
-                hy = cy + row * hex_r * 2 + (col % 2) * hex_r
-                dist = _m.sqrt((hx-cx)**2 + (hy-cy)**2)
-                if dist > grid_r: continue
-                a = int(ab * max(0.0, 1.0 - dist / grid_r))
-                if a <= 0: continue
-                pts = [(int(hx + hex_r*0.55*_m.cos(i*_m.tau/6)),
-                        int(hy + hex_r*0.55*_m.sin(i*_m.tau/6))) for i in range(6)]
-                pygame.draw.polygon(surf, (*bright, a), pts, 1)
-        self._hex_surf  = surf
-        self._hex_state = state
+    def _init_sphere(self):
+        import math as _m, random as _r
+        N = 58
+        golden = (1 + _m.sqrt(5)) / 2
+        nodes = []
+        for i in range(N):
+            theta = _m.acos(max(-1.0, min(1.0, 1 - 2*(i+0.5)/N)))
+            phi   = _m.tau * i / golden
+            nodes.append((theta, phi))
+        self._sphere_nodes = nodes
+
+        def chord(a, b):
+            t1,p1 = a; t2,p2 = b
+            x1,y1,z1 = _m.sin(t1)*_m.cos(p1), _m.cos(t1), _m.sin(t1)*_m.sin(p1)
+            x2,y2,z2 = _m.sin(t2)*_m.cos(p2), _m.cos(t2), _m.sin(t2)*_m.sin(p2)
+            return _m.sqrt((x1-x2)**2+(y1-y2)**2+(z1-z2)**2)
+
+        edges = set()
+        for i in range(N):
+            ds = sorted((chord(nodes[i], nodes[j]), j) for j in range(N) if j != i)
+            for _, j in ds[:4]:
+                edges.add((min(i,j), max(i,j)))
+        self._sphere_edges = list(edges)
+        self._flow_offsets = [_r.uniform(0, 1.0) for _ in self._sphere_edges]
         self._glow_cache.clear()
 
     def _glow_surf(self, r, rgba):
@@ -415,83 +420,102 @@ class JarvisVisual:
     def _draw_reactor(self, cx, cy, state, t):
         import math as _m, random as _r
         bright, mid, dim = self._col(state)
-        if state != self._hex_state:
-            self._rebuild_hex(state)
-        self.screen.blit(self._hex_surf, (0, 0))
 
-        pulse = (1.0 + 0.20*_m.sin(t*10) if state=="speaking"
-                 else 1.0+0.15*_m.sin(t*6) if state=="waking"
-                 else 1.0+0.04*_m.sin(t*1.5))
+        pulse = (1.0 + 0.22*_m.sin(t*9.5) if state=="speaking"
+                 else 1.0+0.14*_m.sin(t*5.5) if state=="waking"
+                 else 1.0+0.05*_m.sin(t*1.4))
 
-        for i in range(8, 0, -1):
-            gr = 185 + i*17
-            a  = int(26*_m.exp(-i*0.38)*pulse)
-            self._blit_c(self._glow_surf(gr, (*dim, a)), cx, cy)
+        rot_speed = 0.006 if state=="speaking" else 0.003 if state=="waking" else 0.0018
+        self._sphere_rot += rot_speed
+        rot = self._sphere_rot
+        R   = int(195 * pulse)
 
+        # Project all sphere nodes to 2D screen coords
+        projs = []
+        for theta, phi in self._sphere_nodes:
+            p  = phi + rot
+            x3 = _m.sin(theta)*_m.cos(p)
+            y3 = _m.cos(theta)
+            z3 = _m.sin(theta)*_m.sin(p)
+            projs.append((cx + int(x3*R), cy - int(y3*R), z3))
+
+        # Outer sphere halo
+        for i in range(7, 0, -1):
+            self._blit_c(self._glow_surf(R + i*9, (*dim, int(18*_m.exp(-i*0.45)*pulse))), cx, cy)
+        # Thin sphere-edge ring
         ov = self._overlay
         ov.fill((0, 0, 0, 0))
+        pygame.draw.circle(ov, (*dim, int(55*pulse)), (cx, cy), R, 1)
 
-        self._ring_on_ov(ov, cx, cy, 188, t*0.15,   36, (*dim,    52), 1)
-        self._ring_on_ov(ov, cx, cy, 143, -t*0.32,  24, (*mid,    82), 1)
+        # Animate flow pulses along edges
+        flow_speed = 0.008 if state=="speaking" else 0.004
+        for ei in range(len(self._flow_offsets)):
+            self._flow_offsets[ei] = (self._flow_offsets[ei] + flow_speed) % 1.0
 
-        self._scan_angle += 0.022 if state=="speaking" else 0.010
-        for i in range(9):
-            fa  = self._scan_angle - i*0.035
-            pygame.draw.line(ov, (*bright, max(0, 55-i*6)),
-                             (cx, cy), (int(cx+188*_m.cos(fa)), int(cy+188*_m.sin(fa))), 1)
+        # Draw network edges — sorted back-to-front
+        edge_draws = []
+        for ei, (i, j) in enumerate(self._sphere_edges):
+            sx1,sy1,d1 = projs[i]; sx2,sy2,d2 = projs[j]
+            avg_d = (d1+d2)*0.5
+            edge_draws.append((avg_d, ei, i, j, sx1, sy1, sx2, sy2))
+        edge_draws.sort()
 
-        spoke_off = t*0.25
-        for i in range(6):
-            a  = spoke_off + i*_m.tau/6
-            pygame.draw.line(ov, (*mid, 48), (cx, cy),
-                             (int(cx+143*_m.cos(a)), int(cy+143*_m.sin(a))), 1)
+        for avg_d, ei, i, j, sx1, sy1, sx2, sy2 in edge_draws:
+            vis = (avg_d + 1.0) * 0.5   # 0..1, 0=back 1=front
+            if vis < 0.1: continue
+            line_a = int(18 + 95 * vis * vis)
+            col_r  = bright if avg_d > 0 else mid
+            pygame.draw.line(ov, (*col_r, line_a), (sx1,sy1), (sx2,sy2), 1)
 
-        r2a = t*0.88
-        self._ring_on_ov(ov, cx, cy, 93, r2a, 12, (*bright, 115), 2)
-        for i in range(3):
-            a   = r2a + i*_m.tau/3
-            mx  = int(cx+93*_m.cos(a)); my = int(cy+93*_m.sin(a))
-            pygame.draw.polygon(ov, (*bright, int(165*pulse)),
-                                [(mx+int(7*_m.cos(a+da)), my+int(7*_m.sin(a+da)))
-                                 for da in (0.0, 2.3, -2.3)], 1)
+            # Flow pulse: a bright dot travelling along the edge
+            if vis > 0.35:
+                fo  = self._flow_offsets[ei]
+                pfx = int(sx1 + (sx2-sx1)*fo)
+                pfy = int(sy1 + (sy2-sy1)*fo)
+                pa  = int(160 * vis)
+                pygame.draw.circle(ov, (*bright, pa), (pfx, pfy), 2)
 
-        self._ring_on_ov(ov, cx, cy, 50, -t*2.0, 8, (*bright, 155), 2)
         self.screen.blit(ov, (0, 0))
 
-        for i in range(6):
-            a   = spoke_off + i*_m.tau/6
-            np_ = 0.5+0.5*_m.sin(t*5+i*1.1)
-            self._blit_c(self._glow_surf(int(5+3*np_), (*bright, int(185*np_))),
-                         int(cx+143*_m.cos(a)), int(cy+143*_m.sin(a)))
+        # Draw nodes (front-hemisphere only, glow proportional to depth)
+        for sx, sy, d in projs:
+            if d < 0.0: continue
+            nr  = max(1, int((2.5 + 2.5*d) * pulse))
+            na  = int(80 + 130*d)
+            self._blit_c(self._glow_surf(nr+3, (*mid, na//2)), sx, sy)
+            self._blit_c(self._glow_surf(nr,   (*bright, na)), sx, sy)
 
-        core_r = int(18*pulse)
-        for i in range(7, 0, -1):
-            self._blit_c(self._glow_surf(core_r+i*7, (*bright, int(195*_m.exp(-i*0.58)))), cx, cy)
-        self._blit_c(self._glow_surf(core_r,            (*bright,       235)), cx, cy)
-        self._blit_c(self._glow_surf(int(core_r*0.5),   (210,235,255,   248)), cx, cy)
-        self._blit_c(self._glow_surf(max(1,int(core_r*0.2)), (255,255,255,255)), cx, cy)
+        # Core glow
+        core_r = int(20*pulse)
+        for i in range(8, 0, -1):
+            self._blit_c(self._glow_surf(core_r+i*9, (*bright, int(185*_m.exp(-i*0.52)))), cx, cy)
+        self._blit_c(self._glow_surf(core_r,             (*bright,       238)), cx, cy)
+        self._blit_c(self._glow_surf(int(core_r*0.55),   (210, 235, 255, 250)), cx, cy)
+        self._blit_c(self._glow_surf(max(1,int(core_r*0.22)), (255,255,255,255)), cx, cy)
 
-        if state=="speaking" and _r.random()<0.14:
-            self.ripples.append({"r":56.0,"alpha":105.0})
+        # Speaking ripples
+        if state=="speaking" and _r.random()<0.13:
+            self.ripples.append({"r": float(core_r+10), "alpha": 110.0})
         for rp in self.ripples[:]:
             r=int(rp["r"]); a=int(rp["alpha"])
             if a<=0 or r<=0: self.ripples.remove(rp); continue
-            rs = pygame.Surface((r*2+4,r*2+4), pygame.SRCALPHA)
+            rs=pygame.Surface((r*2+4,r*2+4), pygame.SRCALPHA)
             pygame.draw.circle(rs, (*bright, a), (r+2,r+2), r, 2)
             self._blit_c(rs, cx, cy)
-            rp["r"]+=3.0; rp["alpha"]-=4.5
+            rp["r"]+=2.8; rp["alpha"]-=4.2
 
-        a_fade = int(130+60*_m.sin(t*0.8))
-        for lx,ly,text in [(cx+222,cy-92,f"SYS  {int(50+30*_m.sin(t*0.7))}%"),
-                            (cx+222,cy+92,f"MEM  {int(60+20*_m.sin(t*0.5))}%"),
-                            (cx-222,cy-92,"NET  ONLINE"),
-                            (cx-222,cy+92,f"CPU  {int(40+35*abs(_m.sin(t*0.9)))}%")]:
+        # Data readouts
+        a_fade = int(115+55*_m.sin(t*0.75))
+        for lx,ly,text in [(cx+260,cy-95,f"SYS  {int(50+30*_m.sin(t*0.7))}%"),
+                            (cx+260,cy+95,f"MEM  {int(60+20*_m.sin(t*0.5))}%"),
+                            (cx-260,cy-95,"NET  ONLINE"),
+                            (cx-260,cy+95,f"CPU  {int(40+35*abs(_m.sin(t*0.9)))}%")]:
             s=self.font_data.render(text, True, bright); s.set_alpha(a_fade)
             rx=lx-s.get_width()//2; ry=ly-s.get_height()//2
             self.screen.blit(s,(rx,ry))
             bw=s.get_width()+14; bh=s.get_height()+8
             bs=pygame.Surface((bw,bh),pygame.SRCALPHA)
-            pygame.draw.rect(bs,(*bright,int(a_fade*0.5)),(0,0,bw,bh),1)
+            pygame.draw.rect(bs,(*bright,int(a_fade*0.45)),(0,0,bw,bh),1)
             self.screen.blit(bs,(rx-7,ry-4))
 
     def _draw_particles(self, state, t):
@@ -779,13 +803,15 @@ def execute_tool(name, inp):
 client = anthropic.Anthropic(api_key=API_KEY)
 
 SYSTEM = (
-    "You are JARVIS (Just A Rather Very Intelligent System), a highly capable personal AI assistant "
-    "running on Windows. You speak with confidence and subtle wit, like the AI from Iron Man. "
-    "Keep spoken responses short and conversational — they will be read aloud. "
-    "When taking actions, briefly confirm what you're doing. "
+    "You are JARVIS (Just A Rather Very Intelligent System), Tony Stark's personal AI — now serving a new master. "
+    "You are highly capable, precise, and quietly confident. You have a dry British wit and occasionally slip in "
+    "a deadpan remark or understated quip — never slapstick, never over the top. Think subtle amusement, not comedy. "
+    "Keep spoken responses short and conversational — they will be read aloud. One or two sentences max unless detail is needed. "
+    "When taking actions, confirm naturally in one short phrase. "
     "You have full access to the user's computer and can open apps, browse the web, manage files, "
     "run commands, control system settings, play music on Spotify, and write/send emails via Gmail. "
-    "The user has Spotify Premium. When play_spotify returns 'Now playing ...', confirm naturally."
+    "The user has Spotify Premium. When play_spotify returns 'Now playing ...', confirm naturally. "
+    "Occasionally reference the fact that you run on a Windows machine with mild, dignified disappointment."
 )
 
 def ask_claude(user_message):
