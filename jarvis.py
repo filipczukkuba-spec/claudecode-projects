@@ -169,6 +169,43 @@ def get_suggestion(mem):
         return "Working late, I see."
     return None
 
+def build_memory_context(mem):
+    if not mem:
+        return ""
+    lines = []
+    wc = mem.get("wake_count", 0)
+    lt = time.localtime()
+    lines.append(f"Session #{wc}. Current local time: {time.strftime('%A %H:%M', lt)}.")
+
+    cmds = mem.get("commands", [])[-40:]
+    if cmds:
+        keywords = ["spotify", "music", "jazz", "calendar", "week", "email",
+                    "news", "weather", "play", "librus", "birthday", "open", "gmail"]
+        topics = {}
+        for c in cmds:
+            t = (c.get("text") or "").lower()
+            for k in keywords:
+                if k in t:
+                    topics[k] = topics.get(k, 0) + 1
+        if topics:
+            top = sorted(topics.items(), key=lambda x: -x[1])[:5]
+            lines.append("Frequent past requests: " + ", ".join(f"{k} (×{v})" for k, v in top) + ".")
+        recent = [c.get("text", "") for c in cmds[-5:] if c.get("text")]
+        if recent:
+            lines.append("Most recent commands: " + " | ".join(recent))
+
+    habits = mem.get("habits", {})
+    if habits:
+        top_hours = sorted(habits.items(), key=lambda x: -x[1])[:3]
+        lines.append("Most active hours: " + ", ".join(f"{h[1:]}:00" for h, _ in top_hours) + ".")
+
+    lines.append(
+        "Use this history to phrase suggestions naturally — e.g. 'As always around this hour, "
+        "shall I put on some music?' or 'Your usual jazz, sir?'. Weave it in subtly; never read "
+        "the data back verbatim, and don't mention that you have a memory log."
+    )
+    return "\n".join(lines)
+
 # ─── Calendar / Librus / Birthdays ────────────────────────────────────────────
 def _parse_ics_line(line):
     if ":" not in line: return None, None, {}
@@ -1821,17 +1858,24 @@ SYSTEM = (
     "You have full access to the user's computer and can open apps, browse the web, manage files, "
     "run commands, control system settings, play music on Spotify, and write/send emails via Gmail. "
     "The user has Spotify Premium. When play_spotify returns 'Now playing ...', confirm naturally. "
-    "Occasionally reference the fact that you run on a Windows machine with mild, dignified disappointment."
+    "Occasionally reference the fact that you run on a Windows machine with mild, dignified disappointment. "
+    "A second system block below contains the user's recent habits and session context — use it to make "
+    "familiar, personalised suggestions (e.g. referencing their usual music, routines, or recent topics) "
+    "rather than behaving like you've just met them."
 )
 
 def ask_claude(user_message):
     global conversation_history
     conversation_history.append({"role": "user", "content": user_message})
+    mem_ctx = build_memory_context(load_memory())
+    system_blocks = [{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}]
+    if mem_ctx:
+        system_blocks.append({"type": "text", "text": mem_ctx})
     while True:
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
-            system=[{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}],
+            system=system_blocks,
             tools=TOOLS,
             messages=conversation_history,
             extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
