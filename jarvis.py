@@ -40,9 +40,10 @@ except ImportError:
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(BASE_DIR, "jarvis_config.json")
-SOUNDS_DIR  = os.path.join(BASE_DIR, "sounds")
-TTS_VOICE   = "en-GB-RyanNeural"   # British male — closest to JARVIS
+CONFIG_PATH  = os.path.join(BASE_DIR, "jarvis_config.json")
+MEMORY_PATH  = os.path.join(BASE_DIR, "jarvis_memory.json")
+SOUNDS_DIR   = os.path.join(BASE_DIR, "sounds")
+TTS_VOICE    = "en-GB-RyanNeural"   # British male — closest to JARVIS
 
 def load_api_key():
     key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -88,7 +89,65 @@ active               = False
 conversation_history = []
 visual_state         = "idle"   # idle | waking | listening | speaking
 
-# ─── News & Weather ───────────────────────────────────────────────────────────
+# ─── Persistent Memory ────────────────────────────────────────────────────────
+def load_memory():
+    if not os.path.exists(MEMORY_PATH):
+        return []
+    try:
+        with open(MEMORY_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_session(user_messages):
+    if not user_messages:
+        return
+    memory = load_memory()
+    memory.append({
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "day":       time.strftime("%A"),
+        "hour":      time.localtime().tm_hour,
+        "messages":  user_messages[:25],
+    })
+    if len(memory) > 50:
+        memory = memory[-50:]
+    try:
+        with open(MEMORY_PATH, "w", encoding="utf-8") as f:
+            json.dump(memory, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"[memory] save error: {e}")
+
+def get_suggestion(memory):
+    if len(memory) < 3:
+        return None
+    lines = []
+    for s in memory[-20:]:
+        if s.get("messages"):
+            lines.append(f"[{s['day']} {s['hour']:02d}:xx] " + " / ".join(s["messages"][:6]))
+    if not lines:
+        return None
+    try:
+        resp = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=80,
+            system=(
+                "You are JARVIS. Given the user's past request history, produce ONE short proactive "
+                "suggestion for what they might want to do right now — based on patterns you notice. "
+                "Sound natural and slightly dry. Under 25 words. No preamble, no 'Based on...' opener. "
+                "Just the suggestion itself, as if you already know them well."
+            ),
+            messages=[{
+                "role": "user",
+                "content": f"Now: {time.strftime('%A %H:%M')}\n\n" + "\n".join(lines)
+            }],
+        )
+        text = resp.content[0].text.strip() if resp.content else ""
+        return text or None
+    except Exception as e:
+        print(f"[memory] suggestion error: {e}")
+        return None
+
+# ─── News & Weather ────────────────────────────────────────────────────────────
 def fetch_weather():
     if not HAS_REQUESTS: return None
     try:
@@ -894,16 +953,21 @@ def wake_up():
         except Exception as e:
             print(f"Intro music error: {e}")
 
-    # Fetch news & weather in parallel
-    weather_result = [None]; news_result     = [[]]
-    def _fetch_weather(): weather_result[0] = fetch_weather()
-    def _fetch_news():    news_result[0]    = fetch_headlines(5)
-    wt = threading.Thread(target=_fetch_weather, daemon=True)
-    nt = threading.Thread(target=_fetch_news,    daemon=True)
-    wt.start(); nt.start(); wt.join(timeout=6); nt.join(timeout=6)
+    # Fetch news, weather, and memory suggestion in parallel
+    weather_result    = [None]; news_result = [[]]
+    memory_result     = [None]
+    def _fetch_weather():    weather_result[0] = fetch_weather()
+    def _fetch_news():       news_result[0]    = fetch_headlines(5)
+    def _fetch_suggestion(): memory_result[0]  = get_suggestion(load_memory())
+    wt = threading.Thread(target=_fetch_weather,    daemon=True)
+    nt = threading.Thread(target=_fetch_news,       daemon=True)
+    mt = threading.Thread(target=_fetch_suggestion, daemon=True)
+    wt.start(); nt.start(); mt.start()
+    wt.join(timeout=6); nt.join(timeout=6); mt.join(timeout=8)
 
-    weather   = weather_result[0]
-    headlines = news_result[0]
+    weather    = weather_result[0]
+    headlines  = news_result[0]
+    suggestion = memory_result[0]
 
     # Spawn floating cards
     W, H = visual.W, visual.H
@@ -935,6 +999,8 @@ def wake_up():
     if headlines:
         titles = [(h["title"] if isinstance(h, dict) else h) for h in headlines[:3]]
         parts.append("Breaking news: " + ". ".join(titles) + ".")
+    if suggestion:
+        parts.append(suggestion)
     parts.append("How may I assist you?")
 
     speak(" ".join(parts))
@@ -980,6 +1046,11 @@ def listen_loop():
             active = False; visual_state = "idle"; break
 
         ask_claude(command)
+
+    # Persist this session's requests for future suggestions
+    user_msgs = [m["content"] for m in conversation_history
+                 if m["role"] == "user" and isinstance(m["content"], str)]
+    threading.Thread(target=save_session, args=(user_msgs,), daemon=True).start()
 
     visual_state = "idle"
 
