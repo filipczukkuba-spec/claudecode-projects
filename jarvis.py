@@ -138,7 +138,7 @@ class NewsCard:
         self.delay   = delay
         self.age     = 0.0
         self.alive   = True
-        self.lifetime = 30.0
+        self.lifetime = 45.0
         self.img_surf    = None
         self._img_bytes  = None
         self._dl_done    = False
@@ -1013,7 +1013,7 @@ def wake_up():
         tx, ty, odx, ody = slots[i]
         title   = art["title"] if isinstance(art, dict) else art
         img_url = art.get("img")  if isinstance(art, dict) else None
-        visual.add_news_card(title, tx, ty, delay=0.15 + i * 0.35,
+        visual.add_news_card(title, tx, ty, delay=9.0 + i * 0.4,
                              tag="WORLD NEWS", img_url=img_url,
                              fly_dx=odx, fly_dy=ody)
 
