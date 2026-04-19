@@ -1529,7 +1529,7 @@ def wake_up():
 
     speak(" ".join(parts))
 
-    # ── Week ahead (calendar + librus) ────────────────────────────────────────
+    # ── Week ahead (Google Calendar) ──────────────────────────────────────────
     want_week = listen_yes_no()
     if want_week:
         cur_mem = load_memory()
@@ -1537,19 +1537,10 @@ def wake_up():
         buckets = group_events_by_day(cal_events, 7) if cal_events else [[] for _ in range(7)]
         show_week_view(buckets)
 
-        librus_events = fetch_librus_events(days=7)
-
-        msg = []
         if not cur_mem.get("gcal_ics_url"):
-            msg.append("Your Google Calendar isn't linked yet. Say, set calendar URL, when ready.")
+            speak("Your Google Calendar isn't linked yet. Say, set calendar URL, when ready.")
         elif not cal_events:
-            msg.append("Your Google Calendar looks clear this week.")
-        if librus_events:
-            msg.append("From Librus: " + ", ".join(librus_events[:8]) + ".")
-        elif cur_mem.get("librus_user"):
-            msg.append("Librus shows nothing scheduled.")
-        if msg:
-            speak(" ".join(msg))
+            speak("Your calendar looks clear this week.")
         time.sleep(0.3)
 
     # ── Birthdays (next 30 days) ──────────────────────────────────────────────
