@@ -4,6 +4,12 @@
 import os, sys, time, math, random, struct, threading, subprocess, webbrowser, json, asyncio, tempfile
 
 try:
+    import numpy as _np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+
+try:
     import anthropic
     import pyaudio
     import pygame
@@ -40,10 +46,9 @@ except ImportError:
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH  = os.path.join(BASE_DIR, "jarvis_config.json")
-MEMORY_PATH  = os.path.join(BASE_DIR, "jarvis_memory.json")
-SOUNDS_DIR   = os.path.join(BASE_DIR, "sounds")
-TTS_VOICE    = "en-GB-RyanNeural"   # British male — closest to JARVIS
+CONFIG_PATH = os.path.join(BASE_DIR, "jarvis_config.json")
+SOUNDS_DIR  = os.path.join(BASE_DIR, "sounds")
+TTS_VOICE   = "en-GB-RyanNeural"   # British male — closest to JARVIS
 
 def load_api_key():
     key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -89,65 +94,7 @@ active               = False
 conversation_history = []
 visual_state         = "idle"   # idle | waking | listening | speaking
 
-# ─── Persistent Memory ────────────────────────────────────────────────────────
-def load_memory():
-    if not os.path.exists(MEMORY_PATH):
-        return []
-    try:
-        with open(MEMORY_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
-
-def save_session(user_messages):
-    if not user_messages:
-        return
-    memory = load_memory()
-    memory.append({
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "day":       time.strftime("%A"),
-        "hour":      time.localtime().tm_hour,
-        "messages":  user_messages[:25],
-    })
-    if len(memory) > 50:
-        memory = memory[-50:]
-    try:
-        with open(MEMORY_PATH, "w", encoding="utf-8") as f:
-            json.dump(memory, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"[memory] save error: {e}")
-
-def get_suggestion(memory):
-    if len(memory) < 3:
-        return None
-    lines = []
-    for s in memory[-20:]:
-        if s.get("messages"):
-            lines.append(f"[{s['day']} {s['hour']:02d}:xx] " + " / ".join(s["messages"][:6]))
-    if not lines:
-        return None
-    try:
-        resp = client.messages.create(
-            model="claude-haiku-4-5",
-            max_tokens=80,
-            system=(
-                "You are JARVIS. Given the user's past request history, produce ONE short proactive "
-                "suggestion for what they might want to do right now — based on patterns you notice. "
-                "Sound natural and slightly dry. Under 25 words. No preamble, no 'Based on...' opener. "
-                "Just the suggestion itself, as if you already know them well."
-            ),
-            messages=[{
-                "role": "user",
-                "content": f"Now: {time.strftime('%A %H:%M')}\n\n" + "\n".join(lines)
-            }],
-        )
-        text = resp.content[0].text.strip() if resp.content else ""
-        return text or None
-    except Exception as e:
-        print(f"[memory] suggestion error: {e}")
-        return None
-
-# ─── News & Weather ────────────────────────────────────────────────────────────
+# ─── News & Weather ───────────────────────────────────────────────────────────
 def fetch_weather():
     if not HAS_REQUESTS: return None
     try:
@@ -179,14 +126,13 @@ class NewsCard:
     CARD_W, CARD_H = 475, 120
 
     def __init__(self, title, tx, ty, delay=0.0, tag="NEWS",
-                 img_url=None, side="left"):
+                 img_url=None, fly_dx=-500, fly_dy=0):
         import random as _r
         self.title   = title
         self.tag     = tag
-        self.side    = side
         self.tx, self.ty = tx, ty
-        self.x = tx - 300 if side == "left" else tx + 300
-        self.y = ty + 60
+        self.x = tx + fly_dx
+        self.y = ty + fly_dy
         self.alpha   = 0.0
         self.phase   = _r.uniform(0, 6.283)
         self.delay   = delay
@@ -401,7 +347,10 @@ class JarvisVisual:
             self.font_hud = self.font_card_body = self.font_data = pygame.font.Font(None, 18)
         self._overlay = pygame.Surface((self.W, self.H), pygame.SRCALPHA)
         self._init_particles()
-        self._init_sphere()
+        if HAS_NUMPY:
+            self._init_sphere_numpy()
+        else:
+            self._init_sphere()
 
     def _col(self, state):
         return {
@@ -428,6 +377,7 @@ class JarvisVisual:
             })
 
     def _init_sphere(self):
+        """Fallback wireframe sphere (no numpy)."""
         import math as _m, random as _r
         N = 58
         golden = (1 + _m.sqrt(5)) / 2
@@ -437,13 +387,11 @@ class JarvisVisual:
             phi   = _m.tau * i / golden
             nodes.append((theta, phi))
         self._sphere_nodes = nodes
-
         def chord(a, b):
             t1,p1 = a; t2,p2 = b
             x1,y1,z1 = _m.sin(t1)*_m.cos(p1), _m.cos(t1), _m.sin(t1)*_m.sin(p1)
             x2,y2,z2 = _m.sin(t2)*_m.cos(p2), _m.cos(t2), _m.sin(t2)*_m.sin(p2)
             return _m.sqrt((x1-x2)**2+(y1-y2)**2+(z1-z2)**2)
-
         edges = set()
         for i in range(N):
             ds = sorted((chord(nodes[i], nodes[j]), j) for j in range(N) if j != i)
@@ -452,6 +400,98 @@ class JarvisVisual:
         self._sphere_edges = list(edges)
         self._flow_offsets = [_r.uniform(0, 1.0) for _ in self._sphere_edges]
         self._glow_cache.clear()
+
+    def _init_sphere_numpy(self):
+        """Pre-compute geometry for per-pixel Phong+energy-web sphere."""
+        np = _np
+        R = 195
+        size = R * 2 + 6
+        Y, X = np.mgrid[0:size, 0:size]
+        c = R + 3
+        dx = (X - c).astype(np.float32)
+        dy = (Y - c).astype(np.float32)
+        r2 = dx**2 + dy**2
+        mask = r2 <= float(R * R)
+        inv_R = 1.0 / R
+        nx = np.where(mask, dx * inv_R, 0.0).astype(np.float32)
+        ny = np.where(mask, dy * inv_R, 0.0).astype(np.float32)
+        nz = np.where(mask, np.sqrt(np.maximum(0.0, 1.0 - nx**2 - ny**2)), 0.0).astype(np.float32)
+        theta = np.arccos(np.clip(ny, -1.0, 1.0)).astype(np.float32)
+        phi   = np.arctan2(nx, nz).astype(np.float32)
+        # Precompute theta-dependent web envelopes (constant)
+        self._sp_sin_t7 = np.sin(theta * 7.0).astype(np.float32)
+        self._sp_cos_t5 = np.cos(theta * 5.0).astype(np.float32)
+        self._sp_sin_t4 = np.sin(theta * 4.0).astype(np.float32)
+        self._sp_mask = mask
+        self._sp_nx, self._sp_ny, self._sp_nz = nx, ny, nz
+        self._sp_phi  = phi
+        self._sp_R    = R
+        self._sp_size = size
+        self._sp_surf = pygame.Surface((size, size))
+        self._sp_surf.set_colorkey((0, 0, 0))
+        self._sp_rings = []   # rotating outer ring angles
+        self._glow_cache.clear()
+
+    def _render_sphere(self, state, t):
+        """Render the numpy Phong+energy-web sphere; return Surface."""
+        np = _np
+        bright, mid, dim = self._col(state)
+        mask = self._sp_mask
+        nx, ny, nz = self._sp_nx, self._sp_ny, self._sp_nz
+        phi = self._sp_phi
+
+        # Rotating key light
+        la  = t * 0.42
+        lx_ = math.cos(la) * 0.70
+        ly_ = -0.40
+        lz_ = math.sin(la) * 0.70 + 0.65
+        ln  = math.sqrt(lx_**2 + ly_**2 + lz_**2)
+        lx_, ly_, lz_ = lx_/ln, ly_/ln, lz_/ln
+        lx = np.float32(lx_); ly = np.float32(ly_); lz = np.float32(lz_)
+
+        diff = np.maximum(0.0, nx*lx + ny*ly + nz*lz)
+
+        # Blinn-Phong specular
+        hx_ = lx_; hy_ = ly_; hz_ = lz_ + 1.0
+        hn  = math.sqrt(hx_**2 + hy_**2 + hz_**2)
+        hx  = np.float32(hx_/hn); hy = np.float32(hy_/hn); hz = np.float32(hz_/hn)
+        spec = np.where(mask, np.maximum(0.0, nx*hx + ny*hy + nz*hz)**72, 0.0)
+
+        # Fresnel rim
+        fresnel = np.where(mask, (1.0 - nz)**3.5, 0.0)
+
+        # Inner-core glow (center = high nz)
+        core_glow = np.where(mask, nz**2 * 0.35, 0.0)
+
+        # Animated energy web — two crossing sine-wave families
+        phi_rot = phi + np.float32(t * 0.28)
+        web_a = self._sp_sin_t7 * np.cos(phi_rot * np.float32(5.0) + np.float32(t * 0.18))
+        web_b = self._sp_cos_t5 * np.sin(phi_rot * np.float32(7.0) + np.float32(t * 0.22))
+        web_c = self._sp_sin_t4 * np.cos(phi_rot * np.float32(3.0) - np.float32(t * 0.12))
+        web   = np.where(mask, np.exp(-np.abs(web_a + web_b + web_c * 0.5) * 5.0) * 0.85, 0.0)
+
+        pulse = np.float32(1.0 + 0.13 * math.sin(t * (9.5 if state=="speaking" else 2.2)))
+
+        br, bg, bb = bright[0]/255.0, bright[1]/255.0, bright[2]/255.0
+        mr, mg, mb = mid[0]/255.0,   mid[1]/255.0,   mid[2]/255.0
+        dr, dg, db = dim[0]/255.0,   dim[1]/255.0,   dim[2]/255.0
+
+        r_f = np.where(mask, np.clip((
+            dr * 0.08 + mr * diff * 0.45 + br * web * 0.75 +
+            br * fresnel * 0.55 + br * core_glow + spec * 0.85) * pulse, 0.0, 1.0), 0.0)
+        g_f = np.where(mask, np.clip((
+            dg * 0.08 + mg * diff * 0.45 + bg * web * 0.75 +
+            bg * fresnel * 0.60 + bg * core_glow + spec * 0.90) * pulse, 0.0, 1.0), 0.0)
+        b_f = np.where(mask, np.clip((
+            db * 0.12 + mb * diff * 0.50 + bb * web * 0.80 +
+            bb * fresnel * 0.80 + bb * core_glow + spec * 1.00) * pulse, 0.0, 1.0), 0.0)
+
+        arr = np.stack([(r_f * 255).astype(np.uint8),
+                        (g_f * 255).astype(np.uint8),
+                        (b_f * 255).astype(np.uint8)], axis=2)
+        pygame.surfarray.blit_array(self._sp_surf,
+                                    _np.ascontiguousarray(arr.transpose(1, 0, 2)))
+        return self._sp_surf
 
     def _glow_surf(self, r, rgba):
         key = (r, rgba)
@@ -479,102 +519,80 @@ class JarvisVisual:
     def _draw_reactor(self, cx, cy, state, t):
         import math as _m, random as _r
         bright, mid, dim = self._col(state)
+        R = self._sp_R if HAS_NUMPY else 195
 
         pulse = (1.0 + 0.22*_m.sin(t*9.5) if state=="speaking"
                  else 1.0+0.14*_m.sin(t*5.5) if state=="waking"
                  else 1.0+0.05*_m.sin(t*1.4))
 
-        rot_speed = 0.006 if state=="speaking" else 0.003 if state=="waking" else 0.0018
-        self._sphere_rot += rot_speed
-        rot = self._sphere_rot
-        R   = int(195 * pulse)
+        # ── Atmospheric halo layers ───────────────────────────────────────────
+        for i in range(9, 0, -1):
+            ga = int(22*_m.exp(-i*0.42)*pulse)
+            self._blit_c(self._glow_surf(R + i*11, (*dim, ga)), cx, cy)
 
-        # Project all sphere nodes to 2D screen coords
-        projs = []
-        for theta, phi in self._sphere_nodes:
-            p  = phi + rot
-            x3 = _m.sin(theta)*_m.cos(p)
-            y3 = _m.cos(theta)
-            z3 = _m.sin(theta)*_m.sin(p)
-            projs.append((cx + int(x3*R), cy - int(y3*R), z3))
+        # ── Numpy pixel-lit sphere ─────────────────────────────────────────────
+        if HAS_NUMPY:
+            sp = self._render_sphere(state, t)
+            self._blit_c(sp, cx, cy)
+        else:
+            # wireframe fallback (no numpy)
+            self._sphere_rot += 0.003
+            rot = self._sphere_rot
+            ov = self._overlay; ov.fill((0,0,0,0))
+            for theta, phi in self._sphere_nodes:
+                p  = phi + rot
+                x3 = _m.sin(theta)*_m.cos(p)
+                y3 = _m.cos(theta)
+                z3 = _m.sin(theta)*_m.sin(p)
+                if z3 > 0:
+                    self._blit_c(self._glow_surf(3, (*bright, int(100*z3))),
+                                 cx+int(x3*R), cy-int(y3*R))
+            self.screen.blit(ov,(0,0))
 
-        # Outer sphere halo
-        for i in range(7, 0, -1):
-            self._blit_c(self._glow_surf(R + i*9, (*dim, int(18*_m.exp(-i*0.45)*pulse))), cx, cy)
-        # Thin sphere-edge ring
-        ov = self._overlay
-        ov.fill((0, 0, 0, 0))
-        pygame.draw.circle(ov, (*dim, int(55*pulse)), (cx, cy), R, 1)
+        # ── Thin rotating outer rings ──────────────────────────────────────────
+        ov = self._overlay; ov.fill((0,0,0,0))
+        for ring_r, speed, alpha in [(R+18, 0.25, 38), (R+34, -0.16, 24), (R+52, 0.10, 16)]:
+            angle = t * speed
+            ring_a = int(alpha * pulse)
+            pygame.draw.circle(ov, (*dim, ring_a), (cx, cy), ring_r, 1)
+            for k in range(8):
+                a = angle + k * _m.tau/8
+                pygame.draw.line(ov, (*bright, ring_a//2),
+                                 (int(cx+(ring_r-5)*_m.cos(a)), int(cy+(ring_r-5)*_m.sin(a))),
+                                 (int(cx+(ring_r+5)*_m.cos(a)), int(cy+(ring_r+5)*_m.sin(a))), 1)
+        self.screen.blit(ov, (0,0))
 
-        # Animate flow pulses along edges
-        flow_speed = 0.008 if state=="speaking" else 0.004
-        for ei in range(len(self._flow_offsets)):
-            self._flow_offsets[ei] = (self._flow_offsets[ei] + flow_speed) % 1.0
+        # ── Core white-hot point ──────────────────────────────────────────────
+        core_r = int(14*pulse)
+        for i in range(6, 0, -1):
+            self._blit_c(self._glow_surf(core_r+i*7, (*bright, int(160*_m.exp(-i*0.6)))), cx, cy)
+        self._blit_c(self._glow_surf(core_r,            (*bright, 230)), cx, cy)
+        self._blit_c(self._glow_surf(int(core_r*0.5),   (210,235,255,250)), cx, cy)
+        self._blit_c(self._glow_surf(max(1,int(core_r*0.2)), (255,255,255,255)), cx, cy)
 
-        # Draw network edges — sorted back-to-front
-        edge_draws = []
-        for ei, (i, j) in enumerate(self._sphere_edges):
-            sx1,sy1,d1 = projs[i]; sx2,sy2,d2 = projs[j]
-            avg_d = (d1+d2)*0.5
-            edge_draws.append((avg_d, ei, i, j, sx1, sy1, sx2, sy2))
-        edge_draws.sort()
-
-        for avg_d, ei, i, j, sx1, sy1, sx2, sy2 in edge_draws:
-            vis = (avg_d + 1.0) * 0.5   # 0..1, 0=back 1=front
-            if vis < 0.1: continue
-            line_a = int(18 + 95 * vis * vis)
-            col_r  = bright if avg_d > 0 else mid
-            pygame.draw.line(ov, (*col_r, line_a), (sx1,sy1), (sx2,sy2), 1)
-
-            # Flow pulse: a bright dot travelling along the edge
-            if vis > 0.35:
-                fo  = self._flow_offsets[ei]
-                pfx = int(sx1 + (sx2-sx1)*fo)
-                pfy = int(sy1 + (sy2-sy1)*fo)
-                pa  = int(160 * vis)
-                pygame.draw.circle(ov, (*bright, pa), (pfx, pfy), 2)
-
-        self.screen.blit(ov, (0, 0))
-
-        # Draw nodes (front-hemisphere only, glow proportional to depth)
-        for sx, sy, d in projs:
-            if d < 0.0: continue
-            nr  = max(1, int((2.5 + 2.5*d) * pulse))
-            na  = int(80 + 130*d)
-            self._blit_c(self._glow_surf(nr+3, (*mid, na//2)), sx, sy)
-            self._blit_c(self._glow_surf(nr,   (*bright, na)), sx, sy)
-
-        # Core glow
-        core_r = int(20*pulse)
-        for i in range(8, 0, -1):
-            self._blit_c(self._glow_surf(core_r+i*9, (*bright, int(185*_m.exp(-i*0.52)))), cx, cy)
-        self._blit_c(self._glow_surf(core_r,             (*bright,       238)), cx, cy)
-        self._blit_c(self._glow_surf(int(core_r*0.55),   (210, 235, 255, 250)), cx, cy)
-        self._blit_c(self._glow_surf(max(1,int(core_r*0.22)), (255,255,255,255)), cx, cy)
-
-        # Speaking ripples
-        if state=="speaking" and _r.random()<0.13:
-            self.ripples.append({"r": float(core_r+10), "alpha": 110.0})
+        # ── Speaking ripples ──────────────────────────────────────────────────
+        if state=="speaking" and _r.random()<0.12:
+            self.ripples.append({"r": float(R-10), "alpha": 100.0})
         for rp in self.ripples[:]:
             r=int(rp["r"]); a=int(rp["alpha"])
-            if a<=0 or r<=0: self.ripples.remove(rp); continue
+            if a<=0 or r>R+160: self.ripples.remove(rp); continue
             rs=pygame.Surface((r*2+4,r*2+4), pygame.SRCALPHA)
             pygame.draw.circle(rs, (*bright, a), (r+2,r+2), r, 2)
             self._blit_c(rs, cx, cy)
-            rp["r"]+=2.8; rp["alpha"]-=4.2
+            rp["r"]+=3.2; rp["alpha"]-=3.8
 
-        # Data readouts
-        a_fade = int(115+55*_m.sin(t*0.75))
-        for lx,ly,text in [(cx+260,cy-95,f"SYS  {int(50+30*_m.sin(t*0.7))}%"),
-                            (cx+260,cy+95,f"MEM  {int(60+20*_m.sin(t*0.5))}%"),
-                            (cx-260,cy-95,"NET  ONLINE"),
-                            (cx-260,cy+95,f"CPU  {int(40+35*abs(_m.sin(t*0.9)))}%")]:
+        # ── Data readouts ─────────────────────────────────────────────────────
+        a_fade = int(110+50*_m.sin(t*0.75))
+        for lx,ly,text in [(cx+270,cy-100,f"SYS  {int(50+30*_m.sin(t*0.7))}%"),
+                            (cx+270,cy+100,f"MEM  {int(60+20*_m.sin(t*0.5))}%"),
+                            (cx-270,cy-100,"NET  ONLINE"),
+                            (cx-270,cy+100,f"CPU  {int(40+35*abs(_m.sin(t*0.9)))}%")]:
             s=self.font_data.render(text, True, bright); s.set_alpha(a_fade)
             rx=lx-s.get_width()//2; ry=ly-s.get_height()//2
             self.screen.blit(s,(rx,ry))
             bw=s.get_width()+14; bh=s.get_height()+8
             bs=pygame.Surface((bw,bh),pygame.SRCALPHA)
-            pygame.draw.rect(bs,(*bright,int(a_fade*0.45)),(0,0,bw,bh),1)
+            pygame.draw.rect(bs,(*bright,int(a_fade*0.40)),(0,0,bw,bh),1)
             self.screen.blit(bs,(rx-7,ry-4))
 
     def _draw_particles(self, state, t):
@@ -613,8 +631,8 @@ class JarvisVisual:
         hint=self.font_data.render("ESC · exit   DOUBLE CLAP · wake",True,(20,45,100))
         self.screen.blit(hint,(self.W//2-hint.get_width()//2,self.H-27))
 
-    def add_news_card(self, text, tx, ty, delay=0.0, tag="NEWS", img_url=None, side="left"):
-        self.news_cards.append(NewsCard(text, tx, ty, delay=delay, tag=tag, img_url=img_url, side=side))
+    def add_news_card(self, text, tx, ty, delay=0.0, tag="NEWS", img_url=None, fly_dx=-500, fly_dy=0):
+        self.news_cards.append(NewsCard(text, tx, ty, delay=delay, tag=tag, img_url=img_url, fly_dx=fly_dx, fly_dy=fly_dy))
 
     def clear_news_cards(self):
         self.news_cards.clear()
@@ -941,56 +959,73 @@ def wake_up():
     print("  ⚡  JARVIS ACTIVATED  ⚡")
     print("=" * 42)
 
-    # Intro music
+    t_start = time.time()
+
+    # Fetch news, weather, suggestion all in parallel — immediately
+    weather_result = [None]; news_result = [[]]; memory_result = [None]
+    def _fw(): weather_result[0] = fetch_weather()
+    def _fn(): news_result[0]    = fetch_headlines(6)
+    def _fm(): memory_result[0]  = get_suggestion(load_memory())
+    for fn in (_fw, _fn, _fm):
+        threading.Thread(target=fn, daemon=True).start()
+
+    # Start intro music
+    music_on = False
     if SONG_PATH:
         try:
             if pygame.mixer.get_init(): pygame.mixer.music.stop()
             pygame.mixer.init()
             pygame.mixer.music.load(SONG_PATH)
             pygame.mixer.music.play(start=3.0)
-            time.sleep(10)
-            pygame.mixer.music.stop()
+            music_on = True
         except Exception as e:
             print(f"Intro music error: {e}")
 
-    # Fetch news, weather, and memory suggestion in parallel
-    weather_result    = [None]; news_result = [[]]
-    memory_result     = [None]
-    def _fetch_weather():    weather_result[0] = fetch_weather()
-    def _fetch_news():       news_result[0]    = fetch_headlines(5)
-    def _fetch_suggestion(): memory_result[0]  = get_suggestion(load_memory())
-    wt = threading.Thread(target=_fetch_weather,    daemon=True)
-    nt = threading.Thread(target=_fetch_news,       daemon=True)
-    mt = threading.Thread(target=_fetch_suggestion, daemon=True)
-    wt.start(); nt.start(); mt.start()
-    wt.join(timeout=6); nt.join(timeout=6); mt.join(timeout=8)
+    # Wait up to 5.5s for data while music plays
+    for _ in range(55):
+        if news_result[0] and weather_result[0] is not None:
+            break
+        time.sleep(0.1)
 
     weather    = weather_result[0]
-    headlines  = news_result[0]
+    headlines  = news_result[0] or []
     suggestion = memory_result[0]
 
-    # Spawn floating cards
-    W, H = visual.W, visual.H
+    # ── Cards fly in from all directions while music plays ────────────────────
     cx, cy = visual.cx, visual.cy
 
-    card_positions_left  = [(cx - 510, cy - 175), (cx - 510, cy + 5), (cx - 510, cy + 185)]
-    card_positions_right = [(cx + 510, cy - 175), (cx + 510, cy + 5), (cx + 510, cy + 185)]
+    # (target_x, target_y, fly_dx, fly_dy)
+    slots = [
+        (cx - 520, cy - 185,  -900, -520),   # left-top    ← NW
+        (cx - 520, cy +   5, -1050,    0),   # left-mid    ← W
+        (cx - 520, cy + 195,  -900,  520),   # left-bottom ← SW
+        (cx + 520, cy - 185,   900, -520),   # right-top   ← NE
+        (cx + 520, cy +   5,  1050,    0),   # right-mid   ← E
+        (cx + 520, cy + 195,   900,  520),   # right-bottom← SE
+    ]
 
     if weather:
-        visual.add_news_card(weather, cx, cy - 345, delay=0.2, tag="WEATHER",
-                             img_url=None, side="left")
+        visual.add_news_card(weather, cx, cy - 340, delay=0.0, tag="WEATHER",
+                             img_url=None, fly_dx=0, fly_dy=-900)
 
     for i, art in enumerate(headlines[:6]):
-        if i < 3:
-            tx, ty = card_positions_left[i]; side = "left"
-        else:
-            tx, ty = card_positions_right[i - 3]; side = "right"
+        if i >= len(slots): break
+        tx, ty, odx, ody = slots[i]
         title   = art["title"] if isinstance(art, dict) else art
-        img_url = art.get("img") if isinstance(art, dict) else None
-        visual.add_news_card(title, tx, ty, delay=0.5 + i * 0.45,
-                             tag="WORLD NEWS", img_url=img_url, side=side)
+        img_url = art.get("img")  if isinstance(art, dict) else None
+        visual.add_news_card(title, tx, ty, delay=0.15 + i * 0.35,
+                             tag="WORLD NEWS", img_url=img_url,
+                             fly_dx=odx, fly_dy=ody)
 
-    # Build spoken greeting
+    # Let cards settle while music finishes (~7s left)
+    elapsed   = time.time() - t_start
+    remaining = max(2.0, 12.5 - elapsed)
+    time.sleep(remaining)
+    if music_on:
+        try: pygame.mixer.music.stop()
+        except: pass
+
+    # ── Speak briefing AFTER music ends ──────────────────────────────────────
     time_hour = time.localtime().tm_hour
     greeting  = "Good morning" if time_hour < 12 else ("Good afternoon" if time_hour < 18 else "Good evening")
     parts     = [f"{greeting}. Systems online."]
@@ -1046,11 +1081,6 @@ def listen_loop():
             active = False; visual_state = "idle"; break
 
         ask_claude(command)
-
-    # Persist this session's requests for future suggestions
-    user_msgs = [m["content"] for m in conversation_history
-                 if m["role"] == "user" and isinstance(m["content"], str)]
-    threading.Thread(target=save_session, args=(user_msgs,), daemon=True).start()
 
     visual_state = "idle"
 
