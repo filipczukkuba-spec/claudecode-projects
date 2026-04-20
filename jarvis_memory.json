@@ -251,22 +251,34 @@
     {
       "text": "display the library schedule",
       "time": 1776705997.3327913
+    },
+    {
+      "text": "display the Libras schedule",
+      "time": 1776706209.798324
+    },
+    {
+      "text": "yes",
+      "time": 1776706230.9012349
+    },
+    {
+      "text": "open open a window for me where I can type it in",
+      "time": 1776706247.7143636
     }
   ],
   "habits": {
     "h17": 10,
     "h18": 32,
     "h22": 17,
-    "h19": 4
+    "h19": 7
   },
   "birthdays": [],
-  "wake_count": 19,
-  "last_wake": 1776705938.0792396,
+  "wake_count": 20,
+  "last_wake": 1776706198.80738,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "1203917u",
   "librus_pass": "Kubbrus2027!",
   "gmail_imap_user": "filipczuk.kuba@gmail.com",
   "gmail_imap_pass": "xjpmxcyuzrinbjap",
-  "skip_intro": true
+  "skip_intro": false
 }

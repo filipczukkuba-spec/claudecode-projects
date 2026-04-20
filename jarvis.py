@@ -293,89 +293,168 @@ def group_events_by_day(events, days=7):
             buckets[delta].append(label)
     return buckets
 
+def _librus_web_session(user, pw):
+    """Log in to Librus Synergia via the web form. Returns a requests.Session or None."""
+    import requests as _req
+    from bs4 import BeautifulSoup as _BS
+    BASE = "https://synergia.librus.pl"
+    s = _req.Session()
+    s.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+    try:
+        r = s.get(BASE + "/logowanie", timeout=15)
+        soup = _BS(r.text, "lxml")
+        form = soup.find("form")
+        hidden = {}
+        action = BASE + "/logowanie"
+        if form:
+            action_path = form.get("action", "/logowanie")
+            action = action_path if action_path.startswith("http") else BASE + action_path
+            for inp in form.find_all("input", type="hidden"):
+                hidden[inp.get("name", "")] = inp.get("value", "")
+        payload = {**hidden, "login": user, "pass": pw}
+        r2 = s.post(action, data=payload, timeout=15, allow_redirects=True)
+        # check we're logged in
+        if "wyloguj" in r2.text.lower() or "/terminarz" in r2.text or "uczen" in r2.url:
+            print("[Librus] web login OK")
+            return s
+        # some accounts redirect through a portal
+        soup2 = _BS(r2.text, "lxml")
+        auto = soup2.find("form")
+        if auto:
+            action2 = auto.get("action", "")
+            hidden2 = {i.get("name",""): i.get("value","") for i in auto.find_all("input", type="hidden")}
+            if action2 and hidden2:
+                r3 = s.post(action2, data=hidden2, timeout=15, allow_redirects=True)
+                if "wyloguj" in r3.text.lower():
+                    print("[Librus] web login OK (via redirect form)")
+                    return s
+        print(f"[Librus] login may have failed — url={r2.url}")
+        return s  # return anyway and let the fetch attempt reveal the truth
+    except Exception as e:
+        print(f"[Librus] web login error: {e}")
+        return None
+
+
+def _librus_parse_terminarz(html, today, days):
+    """Parse terminarz HTML → list of {summary, start, end} dicts."""
+    import datetime as _dt, re as _re
+    from bs4 import BeautifulSoup as _BS
+    out, seen = [], set()
+    soup = _BS(html, "lxml")
+
+    def _add(date_obj, label):
+        label = label.strip()
+        if not label: return
+        key = (date_obj, label)
+        if key in seen: return
+        seen.add(key)
+        dt = _dt.datetime(date_obj.year, date_obj.month, date_obj.day)
+        out.append({"summary": label, "start": dt, "end": dt})
+
+    # ── Strategy 1: classic librus table layout ──────────────────────────────
+    for day_div in soup.find_all("div", class_=_re.compile(r"kalendarz")):
+        num_div = day_div.find("div", class_=_re.compile(r"numer"))
+        if not num_div: continue
+        try: day_num = int(_re.sub(r"\D", "", num_div.get_text()))
+        except: continue
+        try:
+            year  = today.year if not hasattr(today, "_year") else today.year
+            month = today.month
+            event_date = _dt.date(year, month, day_num)
+        except: continue
+        delta = (event_date - today).days
+        if not (0 <= delta < days): continue
+        for td in day_div.find_all("td"):
+            text = td.get_text(" ", strip=True)
+            if text: _add(event_date, text)
+
+    # ── Strategy 2: FullCalendar JSON in <script> ────────────────────────────
+    if not out:
+        for script in soup.find_all("script"):
+            raw = script.string or ""
+            # look for arrays of event objects with date fields
+            for m in _re.finditer(r'\{[^{}]{10,500}\}', raw):
+                try:
+                    import json as _j
+                    obj = _j.loads(m.group())
+                    date_str = obj.get("start") or obj.get("date") or obj.get("data") or ""
+                    title    = obj.get("title") or obj.get("name") or obj.get("tytul") or ""
+                    if not date_str or not title: continue
+                    event_date = _dt.date.fromisoformat(str(date_str)[:10])
+                    delta = (event_date - today).days
+                    if 0 <= delta < days:
+                        _add(event_date, str(title))
+                except: pass
+
+    # ── Strategy 3: any <a> or <td> with a data-date attribute ───────────────
+    if not out:
+        for tag in soup.find_all(True, attrs={"data-date": True}):
+            try: event_date = _dt.date.fromisoformat(tag["data-date"][:10])
+            except: continue
+            delta = (event_date - today).days
+            if not (0 <= delta < days): continue
+            text = tag.get_text(" ", strip=True)
+            if text: _add(event_date, text)
+
+    # ── Strategy 4: table rows that contain a recognisable date ──────────────
+    if not out:
+        date_pat = _re.compile(r'(\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4}|\d{2}-\d{2}-\d{4})')
+        for tr in soup.find_all("tr"):
+            cells = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
+            row_text = " | ".join(cells)
+            m = date_pat.search(row_text)
+            if not m: continue
+            raw = m.group()
+            event_date = None
+            for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d-%m-%Y"):
+                try: event_date = _dt.datetime.strptime(raw, fmt).date(); break
+                except: pass
+            if not event_date: continue
+            delta = (event_date - today).days
+            if not (0 <= delta < days): continue
+            label = row_text.replace(raw, "").strip(" |")
+            if label: _add(event_date, label)
+
+    return out
+
+
 def fetch_librus_events(days=7):
-    mem = load_memory()
+    import datetime as _dt
+    mem  = load_memory()
     user = (mem.get("librus_user") or "").strip()
     pw   = (mem.get("librus_pass") or "").strip()
     if not user or not pw: return []
     try:
-        from librus_apix.client import new_client
-        from librus_apix.schedule import get_schedule
-    except ImportError:
-        print("librus-apix not installed"); return []
-    try:
-        import datetime as _dt
-        cli = new_client()
-        cli.get_token(user, pw)
+        BASE  = "https://synergia.librus.pl"
         today = _dt.date.today()
-        out, seen_months, seen_keys = [], set(), set()
+        sess  = _librus_web_session(user, pw)
+        if sess is None: return []
+
+        out, seen_months = [], set()
         for d in range(days):
             day = today + _dt.timedelta(days=d)
-            mk = (day.month, day.year)
+            mk  = (day.month, day.year)
             if mk in seen_months: continue
             seen_months.add(mk)
             try:
-                sched = get_schedule(cli, str(day.month), str(day.year), True)
-            except Exception as e:
-                print(f"Librus schedule error: {e}"); continue
-            for k, items in (sched or {}).items():
-                try: day_num = int(k)
-                except Exception: continue
-                try: event_date = _dt.date(day.year, day.month, day_num)
-                except Exception: continue
-                delta_d = (event_date - today).days
-                if 0 <= delta_d < days:
-                    for e in items:
-                        subject = str(getattr(e, "subject", "") or "").strip()
-                        ev_title = str(getattr(e, "title", "") or "").strip()
-                        hour    = str(getattr(e, "hour", "") or "").strip()
-                        # build "Subject: Type" label, skip duplicates
-                        if subject and ev_title and subject.lower() != ev_title.lower():
-                            label = f"{subject}: {ev_title}"
-                        elif subject:
-                            label = subject
-                        else:
-                            label = ev_title or str(e)
-                        if hour and hour not in ("unknown", ""):
-                            label = f"{hour} {label}"
-                        label = label.strip()
-                        dedup_key = (event_date, label)
-                        if label and dedup_key not in seen_keys:
-                            seen_keys.add(dedup_key)
-                            dt = _dt.datetime(event_date.year, event_date.month, event_date.day, 0, 0)
-                            out.append({"summary": label, "start": dt, "end": dt})
-        # ── Homework (due dates) ───────────────────────────────────────────────
-        try:
-            from librus_apix.homework import get_homework
-            date_from = today.strftime("%Y-%m-%d")
-            date_to   = (today + _dt.timedelta(days=days - 1)).strftime("%Y-%m-%d")
-            hw_list   = get_homework(cli, date_from, date_to)
-            for hw in hw_list:
-                raw_date = str(getattr(hw, "completion_date", "") or "").strip()
-                # completion_date may be "YYYY-MM-DD" or "DD.MM.YYYY" or "DD-MM-YYYY ..."
-                hw_date = None
-                for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y"):
+                r = sess.post(BASE + "/terminarz/",
+                              data={"rok": str(day.year), "miesiac": str(day.month)},
+                              timeout=15)
+                # save raw HTML for first month so user can inspect if needed
+                if not seen_months - {mk}:
                     try:
-                        hw_date = _dt.datetime.strptime(raw_date[:10], fmt).date()
-                        break
-                    except Exception:
-                        pass
-                if hw_date is None: continue
-                delta_d = (hw_date - today).days
-                if not (0 <= delta_d < days): continue
-                subject  = str(getattr(hw, "subject",  "") or "").strip()
-                category = str(getattr(hw, "category", "") or "").strip()
-                label = f"{subject}: {category}" if subject and category and subject.lower() != category.lower() else (subject or category)
-                label = f"[HW] {label}".strip()
-                dedup_key = (hw_date, label)
-                if label and dedup_key not in seen_keys:
-                    seen_keys.add(dedup_key)
-                    dt = _dt.datetime(hw_date.year, hw_date.month, hw_date.day, 0, 0)
-                    out.append({"summary": label, "start": dt, "end": dt})
-        except Exception as hw_err:
-            print(f"[Librus] homework fetch error: {hw_err}")
+                        with open("terminarz_raw.html", "w", encoding="utf-8") as _f:
+                            _f.write(r.text)
+                    except: pass
+                month_events = _librus_parse_terminarz(r.text, today, days)
+                # only keep events in this month
+                for ev in month_events:
+                    if ev["start"].month == day.month and ev not in out:
+                        out.append(ev)
+            except Exception as e:
+                print(f"[Librus] terminarz fetch error: {e}")
 
-        print(f"[Librus] fetched {len(out)} events (schedule + homework)")
+        print(f"[Librus] fetched {len(out)} events via web scrape")
         return out
     except Exception as e:
         import traceback; traceback.print_exc()
