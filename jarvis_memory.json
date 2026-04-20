@@ -235,21 +235,34 @@
     {
       "text": "show me the libraries only",
       "time": 1776703867.3979585
+    },
+    {
+      "text": "display Library",
+      "time": 1776704686.2144942
+    },
+    {
+      "text": "show me the week ahead on",
+      "time": 1776704721.3155544
+    },
+    {
+      "text": "why is it clear if I checked for it on the Chrome and it's not clear it's like filled with some stuff",
+      "time": 1776704749.515094
     }
   ],
   "habits": {
     "h17": 10,
     "h18": 32,
-    "h22": 17
+    "h22": 17,
+    "h19": 3
   },
   "birthdays": [],
-  "wake_count": 17,
-  "last_wake": 1776704253.6250496,
+  "wake_count": 18,
+  "last_wake": 1776704677.235381,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "1203917u",
   "librus_pass": "Kubbrus2027!",
   "gmail_imap_user": "filipczuk.kuba@gmail.com",
   "gmail_imap_pass": "xjpmxcyuzrinbjap",
-  "skip_intro": true
+  "skip_intro": false
 }

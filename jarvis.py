@@ -344,7 +344,38 @@ def fetch_librus_events(days=7):
                             seen_keys.add(dedup_key)
                             dt = _dt.datetime(event_date.year, event_date.month, event_date.day, 0, 0)
                             out.append({"summary": label, "start": dt, "end": dt})
-        print(f"[Librus] fetched {len(out)} events")
+        # ── Homework (due dates) ───────────────────────────────────────────────
+        try:
+            from librus_apix.homework import get_homework
+            date_from = today.strftime("%Y-%m-%d")
+            date_to   = (today + _dt.timedelta(days=days - 1)).strftime("%Y-%m-%d")
+            hw_list   = get_homework(cli, date_from, date_to)
+            for hw in hw_list:
+                raw_date = str(getattr(hw, "completion_date", "") or "").strip()
+                # completion_date may be "YYYY-MM-DD" or "DD.MM.YYYY" or "DD-MM-YYYY ..."
+                hw_date = None
+                for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d.%m.%Y"):
+                    try:
+                        hw_date = _dt.datetime.strptime(raw_date[:10], fmt).date()
+                        break
+                    except Exception:
+                        pass
+                if hw_date is None: continue
+                delta_d = (hw_date - today).days
+                if not (0 <= delta_d < days): continue
+                subject  = str(getattr(hw, "subject",  "") or "").strip()
+                category = str(getattr(hw, "category", "") or "").strip()
+                label = f"{subject}: {category}" if subject and category and subject.lower() != category.lower() else (subject or category)
+                label = f"[HW] {label}".strip()
+                dedup_key = (hw_date, label)
+                if label and dedup_key not in seen_keys:
+                    seen_keys.add(dedup_key)
+                    dt = _dt.datetime(hw_date.year, hw_date.month, hw_date.day, 0, 0)
+                    out.append({"summary": label, "start": dt, "end": dt})
+        except Exception as hw_err:
+            print(f"[Librus] homework fetch error: {hw_err}")
+
+        print(f"[Librus] fetched {len(out)} events (schedule + homework)")
         return out
     except Exception as e:
         import traceback; traceback.print_exc()
@@ -1941,11 +1972,8 @@ TOOLS = [
                           "app_password": {"type": "string", "description": "16-character Google App Password (spaces are stripped automatically)"},
                       },
                       "required": ["email", "app_password"]}},
-    {"name": "setup_tiktok",
-     "description": "Open TikTok in a browser window so the user can log in. Only needed once — the session is saved after that.",
-     "input_schema": {"type": "object", "properties": {}}},
-    {"name": "run_tiktok_streak_check",
-     "description": "Manually run the TikTok streak keeper right now. Checks all active streaks and sends the 2nd FYP video or 'passa!' as needed.",
+    {"name": "show_librus",
+     "description": "Show only the Librus Synergia schedule for the next 7 days as a holographic panel. Use this when the user asks specifically about Librus, school schedule, tests, homework deadlines, etc.",
      "input_schema": {"type": "object", "properties": {}}},
 ]
 
@@ -2069,20 +2097,17 @@ def execute_tool(name, inp):
             if not bds: return "No birthdays in the next month"
             return ", ".join(f"{b['name']} in {b['days']}d ({b['date']})" for b in bds)
         elif name == "show_week":
-            _sw_mem = load_memory()
             cal = fetch_calendar_events(days=7)
             buckets = group_events_by_day(cal, 7) if cal else [[] for _ in range(7)]
             show_week_view(buckets)
-            if _sw_mem.get("librus_user"):
-                lib = fetch_librus_events(days=7)
-                lib_buckets = group_events_by_day(lib, 7) if lib else [[] for _ in range(7)]
-                show_librus_view(lib_buckets)
-            return "Week overlay displayed"
-        elif name == "setup_tiktok":
-            from tiktok_agent import setup_tiktok_session
-            return setup_tiktok_session()
-        elif name == "run_tiktok_streak_check":
-            from tiktok_agent import run_streak_check
+            return "Google Calendar week overlay displayed"
+        elif name == "show_librus":
+            lib = fetch_librus_events(days=7)
+            lib_buckets = group_events_by_day(lib, 7) if lib else [[] for _ in range(7)]
+            show_librus_view(lib_buckets)
+            if not lib:
+                return "Librus panel displayed — no events found this week (check credentials or there may genuinely be nothing scheduled)"
+            return f"Librus panel displayed — {len(lib)} events this week"
             return run_streak_check()
         elif name == "dispatch_agent":
             return run_agent_pipeline(inp.get("pipeline_type", ""), inp.get("context", ""))
