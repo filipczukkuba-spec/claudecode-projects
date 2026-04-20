@@ -34,20 +34,35 @@ except Exception as e:
     exit(1)
 
 today = datetime.date.today()
-print(f"\nFetching schedule for {today.month}/{today.year} ...")
+print(f"\nFetching raw terminarz HTML for {today.month}/{today.year} ...")
 try:
-    sched = get_schedule(cli, str(today.month), str(today.year), True)
-    print(f"Schedule dict has {len(sched)} day keys: {sorted(sched.keys())}")
-    non_empty = {k: v for k, v in sched.items() if v}
-    print(f"Non-empty days: {sorted(non_empty.keys())}")
-    for day_num, events in sorted(non_empty.items()):
-        d = datetime.date(today.year, today.month, day_num)
-        delta = (d - today).days
-        print(f"\n  {d} (in {delta} days):")
-        for e in events:
-            print(f"    subject={e.subject!r}  title={e.title!r}  hour={e.hour!r}  number={e.number!r}")
+    resp = cli.post(cli.SCHEDULE_URL, data={"rok": str(today.year), "miesiac": str(today.month)})
+    html = resp.text
+    print(f"HTTP status: {resp.status_code}  length: {len(html)} chars")
+
+    # save full HTML so we can inspect it
+    with open("terminarz_raw.html", "w", encoding="utf-8") as fh:
+        fh.write(html)
+    print("Full HTML saved to terminarz_raw.html")
+
+    # show first unique class names to spot the real container
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "lxml")
+    divs = soup.find_all("div", class_=True)
+    classes = []
+    for d in divs:
+        for c in d.get("class", []):
+            if c not in classes:
+                classes.append(c)
+    print(f"\nAll div class names found ({len(classes)}):")
+    for c in classes:
+        print(f"  {c!r}")
+
+    # check what librus-apix expects
+    old_style = soup.find_all("div", attrs={"class": "kalendarz-dzien"})
+    print(f"\nlibrus-apix looks for 'kalendarz-dzien' → found {len(old_style)} divs")
 except Exception as e:
-    print(f"get_schedule FAILED: {e}")
+    print(f"Raw fetch FAILED: {e}")
     traceback.print_exc()
 
 print(f"\nFetching homework {today} → {today + datetime.timedelta(days=7)} ...")
