@@ -308,7 +308,7 @@ def fetch_librus_events(days=7):
         cli = new_client()
         cli.get_token(user, pw)
         today = _dt.date.today()
-        out, seen_months = [], set()
+        out, seen_months, seen_keys = [], set(), set()
         for d in range(days):
             day = today + _dt.timedelta(days=d)
             mk = (day.month, day.year)
@@ -331,8 +331,11 @@ def fetch_librus_events(days=7):
                                  or getattr(e, "subject", None)
                                  or str(e))
                         title = str(title).strip()
-                        if title and title not in out:
-                            out.append(title)
+                        dedup_key = (event_date, title)
+                        if title and dedup_key not in seen_keys:
+                            seen_keys.add(dedup_key)
+                            dt = _dt.datetime(event_date.year, event_date.month, event_date.day, 0, 0)
+                            out.append({"summary": title, "start": dt, "end": dt})
         return out
     except Exception as e:
         print(f"Librus error: {e}")
@@ -1883,9 +1886,15 @@ def execute_tool(name, inp):
             if not bds: return "No birthdays in the next month"
             return ", ".join(f"{b['name']} in {b['days']}d ({b['date']})" for b in bds)
         elif name == "show_week":
+            _sw_mem = load_memory()
             cal = fetch_calendar_events(days=7)
             buckets = group_events_by_day(cal, 7) if cal else [[] for _ in range(7)]
             show_week_view(buckets)
+            if _sw_mem.get("librus_user"):
+                import time as _t; _t.sleep(1.0)
+                lib = fetch_librus_events(days=7)
+                lib_buckets = group_events_by_day(lib, 7) if lib else [[] for _ in range(7)]
+                show_week_view(lib_buckets)
             return "Week overlay displayed"
         elif name == "setup_tiktok":
             from tiktok_agent import setup_tiktok_session
@@ -2299,11 +2308,19 @@ def wake_up():
     visual_state = "waking"
     conversation_history = []
 
-    # Update wake count + last wake timestamp
+    # Update wake count + last wake timestamp; read and clear skip_intro flag
     mem = load_memory()
     mem["wake_count"] = mem.get("wake_count", 0) + 1
     mem["last_wake"]  = time.time()
+    skip_intro = mem.get("skip_intro", False)
+    if skip_intro:
+        mem["skip_intro"] = False
     save_memory(mem)
+
+    if skip_intro:
+        speak("Welcome back. What do you need help with?")
+        listen_loop()
+        return
 
     print("\n" + "=" * 42)
     print("  ⚡  JARVIS ACTIVATED  ⚡")
@@ -2403,8 +2420,8 @@ def wake_up():
     if want_week is None:
         speak("Sorry, shall I show the week ahead? Yes or no.")
         want_week = listen_yes_no()
+    cur_mem = load_memory()
     if want_week:
-        cur_mem = load_memory()
         cal_events = fetch_calendar_events(days=7) if cur_mem.get("gcal_ics_url") else []
         buckets = group_events_by_day(cal_events, 7) if cal_events else [[] for _ in range(7)]
         show_week_view(buckets)
@@ -2414,6 +2431,17 @@ def wake_up():
         elif not cal_events:
             speak("Your calendar looks clear this week.")
         time.sleep(0.3)
+
+    if cur_mem.get("librus_user"):
+        speak("Shall I display your Librus schedule?")
+        want_librus = listen_yes_no()
+        if want_librus:
+            librus_events = fetch_librus_events(days=7)
+            librus_buckets = group_events_by_day(librus_events, 7) if librus_events else [[] for _ in range(7)]
+            show_week_view(librus_buckets)
+            if not librus_events:
+                speak("Librus shows nothing scheduled this week.")
+            time.sleep(0.3)
 
     speak("How may I assist you?")
     listen_loop()
@@ -2453,6 +2481,7 @@ def listen_loop():
         print(f"You: {command}")
         lower = command.lower()
         if any(p in lower for p in ["goodbye jarvis","go to sleep","sleep jarvis","shut down jarvis"]):
+            _gm = load_memory(); _gm["skip_intro"] = True; save_memory(_gm)
             speak('Going offline. Say "Jarvis" when you need me.')
             visual.clear_news_cards()
             active = False; visual_state = "idle"; break

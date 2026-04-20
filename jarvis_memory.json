@@ -143,16 +143,32 @@
     {
       "text": "can you talk to me about a things happening on the hormones Canal like Samurai is it for me",
       "time": 1776631695.123996
+    },
+    {
+      "text": "open Spotify",
+      "time": 1776701579.1836576
+    },
+    {
+      "text": "open libraries come for me in Google",
+      "time": 1776701600.9036744
+    },
+    {
+      "text": "libros in Google",
+      "time": 1776701631.0177965
+    },
+    {
+      "text": "goodbye jar",
+      "time": 1776701659.84815
     }
   ],
   "habits": {
     "h17": 10,
-    "h18": 9,
+    "h18": 13,
     "h22": 17
   },
   "birthdays": [],
-  "wake_count": 14,
-  "last_wake": 1776631364.8939295,
+  "wake_count": 15,
+  "last_wake": 1776701528.9153485,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "",
