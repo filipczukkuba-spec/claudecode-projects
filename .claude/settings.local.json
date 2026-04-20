@@ -34,7 +34,11 @@
       "Bash(powershell.exe -NoProfile -Command '$a = New-ScheduledTaskAction -Execute '\\\\''C:\\\\Users\\\\filip\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\pythonw.exe'\\\\'' -Argument '\\\\''\"C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\jarvis.py\"'\\\\'' -WorkingDirectory '\\\\''C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode'\\\\''; $t = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit 0 -StartWhenAvailable; $p = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited; Register-ScheduledTask -TaskName '\\\\''JarvisLogin'\\\\'' -Action $a -Trigger $t -Settings $s -Principal $p -Force')",
       "Bash(powershell.exe -NoProfile -Command \"Remove-ItemProperty -Path 'HKCU:\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run' -Name 'JARVIS' -ErrorAction SilentlyContinue; Get-ItemProperty 'HKCU:\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run' | Select-Object JARVIS\")",
       "WebFetch(domain:support.tiktok.com)",
-      "WebFetch(domain:www.socialmediatoday.com)"
+      "WebFetch(domain:www.socialmediatoday.com)",
+      "Bash(pip show *)",
+      "Read(//c/Users/filip/**)",
+      "Bash(python3 *)",
+      "Bash(py *)"
     ]
   }
 }

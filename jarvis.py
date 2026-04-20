@@ -326,18 +326,28 @@ def fetch_librus_events(days=7):
                 delta_d = (event_date - today).days
                 if 0 <= delta_d < days:
                     for e in items:
-                        title = (getattr(e, "title", None)
-                                 or getattr(e, "name", None)
-                                 or getattr(e, "subject", None)
-                                 or str(e))
-                        title = str(title).strip()
-                        dedup_key = (event_date, title)
-                        if title and dedup_key not in seen_keys:
+                        subject = str(getattr(e, "subject", "") or "").strip()
+                        ev_title = str(getattr(e, "title", "") or "").strip()
+                        hour    = str(getattr(e, "hour", "") or "").strip()
+                        # build "Subject: Type" label, skip duplicates
+                        if subject and ev_title and subject.lower() != ev_title.lower():
+                            label = f"{subject}: {ev_title}"
+                        elif subject:
+                            label = subject
+                        else:
+                            label = ev_title or str(e)
+                        if hour and hour not in ("unknown", ""):
+                            label = f"{hour} {label}"
+                        label = label.strip()
+                        dedup_key = (event_date, label)
+                        if label and dedup_key not in seen_keys:
                             seen_keys.add(dedup_key)
                             dt = _dt.datetime(event_date.year, event_date.month, event_date.day, 0, 0)
-                            out.append({"summary": title, "start": dt, "end": dt})
+                            out.append({"summary": label, "start": dt, "end": dt})
+        print(f"[Librus] fetched {len(out)} events")
         return out
     except Exception as e:
+        import traceback; traceback.print_exc()
         print(f"Librus error: {e}")
         return []
 

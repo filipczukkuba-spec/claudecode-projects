@@ -243,12 +243,13 @@
     "h22": 17
   },
   "birthdays": [],
-  "wake_count": 16,
-  "last_wake": 1776703422.666372,
+  "wake_count": 17,
+  "last_wake": 1776704253.6250496,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "1203917u",
   "librus_pass": "Kubbrus2027!",
   "gmail_imap_user": "filipczuk.kuba@gmail.com",
-  "gmail_imap_pass": "xjpmxcyuzrinbjap"
+  "gmail_imap_pass": "xjpmxcyuzrinbjap",
+  "skip_intro": true
 }
