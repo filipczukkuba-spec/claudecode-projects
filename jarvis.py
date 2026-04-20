@@ -377,6 +377,192 @@ RAW_CATS.forEach(function(c){
 </body>
 </html>"""
 
+# ─── Chart HTML Template ──────────────────────────────────────────────────────
+CHART_HTML_TEMPLATE = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><title>__TITLE__</title>
+<style>
+* {margin:0;padding:0;box-sizing:border-box}
+body {background:#04080f;font-family:'Consolas',monospace;color:#e8f4f8;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+#hdr {height:36px;background:rgba(0,0,0,.9);border-bottom:1px solid rgba(0,255,200,.2);display:flex;align-items:center;justify-content:center;letter-spacing:3px;font-size:11px;color:rgba(0,255,200,.7);text-transform:uppercase;flex-shrink:0}
+.scanline {position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,200,.007) 2px,rgba(0,255,200,.007) 4px);pointer-events:none;z-index:5}
+#wrap {flex:1;display:flex;align-items:center;justify-content:center;padding:28px 36px 20px}
+</style>
+</head>
+<body>
+<div id="hdr">// __TITLE__</div>
+<div class="scanline"></div>
+<div id="wrap"></div>
+<script>
+const TYPE='__CHART_TYPE__',LABELS=__LABELS_JSON__,VALUES=__VALUES_JSON__,COLORS=__COLORS_JSON__,X_LABEL='__X_LABEL__',Y_LABEL='__Y_LABEL__';
+const NS='http://www.w3.org/2000/svg';
+function el(tag,a,txt){const e=document.createElementNS(NS,tag);Object.entries(a||{}).forEach(([k,v])=>e.setAttribute(k,v));if(txt!==undefined)e.textContent=txt;return e}
+const wrap=document.getElementById('wrap');
+const W=Math.min(wrap.clientWidth||900,1100),H=Math.min(wrap.clientHeight||560,640);
+
+function addGlow(svg){const d=el('defs');const f=el('filter',{id:'glow'});const b=el('feGaussianBlur',{stdDeviation:'5',result:'b'});const m=el('feMerge');m.appendChild(el('feMergeNode',{in:'b'}));m.appendChild(el('feMergeNode',{in:'SourceGraphic'}));f.appendChild(b);f.appendChild(m);d.appendChild(f);svg.insertBefore(d,svg.firstChild);}
+
+if(TYPE==='pie'||TYPE==='donut'){
+  const svg=el('svg',{width:W,height:H});
+  addGlow(svg);
+  const cx=W/2,cy=H/2+10,R=Math.min(W*.38,H*.42),inner=TYPE==='donut'?R*.5:0;
+  const total=VALUES.reduce((a,b)=>a+b,0);
+  let ang=-Math.PI/2;
+  VALUES.forEach((v,i)=>{
+    const a=2*Math.PI*(v/total),col=COLORS[i%COLORS.length];
+    const x1=cx+R*Math.cos(ang),y1=cy+R*Math.sin(ang),x2=cx+R*Math.cos(ang+a),y2=cy+R*Math.sin(ang+a);
+    const lf=a>Math.PI?1:0;
+    let d;
+    if(inner>0){const ix1=cx+inner*Math.cos(ang),iy1=cy+inner*Math.sin(ang),ix2=cx+inner*Math.cos(ang+a),iy2=cy+inner*Math.sin(ang+a);d=`M${ix1},${iy1} L${x1},${y1} A${R},${R},0,${lf},1,${x2},${y2} L${ix2},${iy2} A${inner},${inner},0,${lf},0,${ix1},${iy1} Z`;}
+    else{d=`M${cx},${cy} L${x1},${y1} A${R},${R},0,${lf},1,${x2},${y2} Z`;}
+    const p=el('path',{d,fill:col,opacity:'.82',stroke:'#04080f','stroke-width':'2'});
+    p.addEventListener('mouseenter',function(){this.setAttribute('opacity','1');this.setAttribute('filter','url(#glow)');});
+    p.addEventListener('mouseleave',function(){this.setAttribute('opacity','.82');this.removeAttribute('filter');});
+    svg.appendChild(p);
+    const mid=ang+a/2,lr=R*1.22,lx=cx+lr*Math.cos(mid),ly=cy+lr*Math.sin(mid);
+    svg.appendChild(el('text',{x:lx,y:ly,'text-anchor':lx<cx?'end':'start','dominant-baseline':'middle',fill:'rgba(232,244,248,.82)','font-size':'12','font-family':"'Consolas',monospace"},`${LABELS[i]}  ${Math.round(v/total*100)}%`));
+    ang+=a;
+  });
+  wrap.appendChild(svg);
+} else {
+  const PAD={t:45,r:35,b:75,l:75},svg=el('svg',{width:W,height:H});
+  addGlow(svg);
+  const CW=W-PAD.l-PAD.r,CH=H-PAD.t-PAD.b;
+  const maxV=Math.max(...VALUES),minV=Math.min(0,...VALUES),range=maxV-minV||1;
+  for(let i=0;i<=5;i++){
+    const y=PAD.t+CH*(1-i/5),val=minV+(maxV-minV)*(i/5);
+    svg.appendChild(el('line',{x1:PAD.l,y1:y,x2:PAD.l+CW,y2:y,stroke:i===0?'rgba(0,255,200,.3)':'rgba(0,255,200,.07)','stroke-width':'1'}));
+    svg.appendChild(el('text',{x:PAD.l-8,y:y,'text-anchor':'end','dominant-baseline':'middle',fill:'rgba(0,255,200,.55)','font-size':'11','font-family':"'Consolas',monospace"},val%1===0?val.toFixed(0):val.toFixed(1)));
+  }
+  svg.appendChild(el('line',{x1:PAD.l,y1:PAD.t,x2:PAD.l,y2:PAD.t+CH,stroke:'rgba(0,255,200,.3)','stroke-width':'1'}));
+  if(Y_LABEL)svg.appendChild(el('text',{transform:`rotate(-90)`,x:-(PAD.t+CH/2),y:16,'text-anchor':'middle',fill:'rgba(0,255,200,.4)','font-size':'11','font-family':"'Consolas',monospace"},Y_LABEL));
+  if(TYPE==='bar'){
+    const gap=CW/LABELS.length,bw=gap*.62;
+    LABELS.forEach((lbl,i)=>{
+      const x=PAD.l+i*gap+gap/2,bh=Math.max(2,CH*((VALUES[i]-minV)/range)),by=PAD.t+CH-bh,col=COLORS[i%COLORS.length];
+      const r=el('rect',{x:x-bw/2,y:by,width:bw,height:bh,fill:col,opacity:'.78',rx:'3'});
+      r.addEventListener('mouseenter',function(){this.setAttribute('opacity','1');this.setAttribute('filter','url(#glow)');});
+      r.addEventListener('mouseleave',function(){this.setAttribute('opacity','.78');this.removeAttribute('filter');});
+      svg.appendChild(r);
+      svg.appendChild(el('text',{x,y:by-7,'text-anchor':'middle',fill:'#e8f4f8','font-size':'11','font-family':"'Consolas',monospace"},VALUES[i]));
+      const xl=el('text',{x,y:PAD.t+CH+18,'text-anchor':'middle',fill:'rgba(232,244,248,.6)','font-size':'11','font-family':"'Consolas',monospace"},lbl.length>12?lbl.slice(0,12)+'…':lbl);
+      svg.appendChild(xl);
+    });
+  } else {
+    const n=LABELS.length,pts=LABELS.map((_,i)=>[PAD.l+i*(CW/Math.max(n-1,1)),PAD.t+CH*(1-(VALUES[i]-minV)/range)]);
+    const area=el('path',{fill:'rgba(0,255,200,.065)'});
+    area.setAttribute('d',`M${pts[0][0]},${PAD.t+CH} `+pts.map(p=>`L${p[0]},${p[1]}`).join(' ')+` L${pts[n-1][0]},${PAD.t+CH} Z`);
+    svg.appendChild(area);
+    const line=el('path',{fill:'none',stroke:COLORS[0]||'#00ffc8','stroke-width':'2.5','stroke-linejoin':'round'});
+    line.setAttribute('d','M'+pts.map(p=>p.join(',')).join(' L'));
+    svg.appendChild(line);
+    pts.forEach(([x,y],i)=>{
+      const c=el('circle',{cx:x,cy:y,r:'5',fill:COLORS[i%COLORS.length]||'#00ffc8',stroke:'#04080f','stroke-width':'2'});
+      c.addEventListener('mouseenter',function(){this.setAttribute('r','8');});
+      c.addEventListener('mouseleave',function(){this.setAttribute('r','5');});
+      svg.appendChild(c);
+      svg.appendChild(el('text',{x,y:y-14,'text-anchor':'middle',fill:'#e8f4f8','font-size':'11','font-family':"'Consolas',monospace"},VALUES[i]));
+      svg.appendChild(el('text',{x,y:PAD.t+CH+18,'text-anchor':'middle',fill:'rgba(232,244,248,.6)','font-size':'11','font-family':"'Consolas',monospace"},LABELS[i].length>12?LABELS[i].slice(0,12)+'…':LABELS[i]));
+    });
+  }
+  if(X_LABEL)svg.appendChild(el('text',{x:PAD.l+CW/2,y:H-4,'text-anchor':'middle',fill:'rgba(0,255,200,.4)','font-size':'11','font-family':"'Consolas',monospace"},X_LABEL));
+  wrap.appendChild(svg);
+}
+</script>
+</body>
+</html>"""
+
+# ─── Flashcard HTML Template ──────────────────────────────────────────────────
+FLASHCARD_HTML_TEMPLATE = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><title>__TOPIC__ — Flashcards</title>
+<style>
+* {margin:0;padding:0;box-sizing:border-box}
+body {background:#04080f;font-family:'Consolas',monospace;color:#e8f4f8;height:100vh;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#hdr {position:fixed;top:0;left:0;right:0;height:36px;background:rgba(0,0,0,.9);border-bottom:1px solid rgba(0,255,200,.2);display:flex;align-items:center;justify-content:center;letter-spacing:3px;font-size:11px;color:rgba(0,255,200,.7);text-transform:uppercase;z-index:10}
+.scanline {position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,200,.007) 2px,rgba(0,255,200,.007) 4px);pointer-events:none;z-index:5}
+#prog-wrap {position:fixed;top:36px;left:0;right:0;height:3px;background:rgba(0,255,200,.1)}
+#prog-bar {height:100%;background:#00ffc8;transition:width .3s;box-shadow:0 0 8px #00ffc8}
+#main {display:flex;flex-direction:column;align-items:center;gap:20px;padding-top:46px}
+#scene {width:580px;height:300px;perspective:1200px;cursor:pointer}
+#card {width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,0,.2,1)}
+#card.flipped {transform:rotateY(180deg)}
+.face {position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;border-radius:14px;backface-visibility:hidden;text-align:center}
+.front {background:rgba(0,8,28,.95);border:1px solid rgba(0,255,200,.28);box-shadow:0 0 40px rgba(0,255,200,.07),inset 0 0 30px rgba(0,255,200,.03)}
+.back  {background:rgba(0,12,38,.95);border:1px solid rgba(0,160,255,.32);box-shadow:0 0 40px rgba(0,160,255,.09),inset 0 0 30px rgba(0,160,255,.04);transform:rotateY(180deg)}
+.tag {font-size:9px;letter-spacing:3px;opacity:.45;margin-bottom:16px;text-transform:uppercase}
+.front .tag {color:#00ffc8} .back .tag {color:#00b4ff}
+.txt {font-size:18px;line-height:1.65}
+.back .txt {font-size:15px;color:rgba(210,232,255,.9)}
+.known-badge {position:absolute;top:14px;right:16px;font-size:10px;letter-spacing:2px;color:#00ffc8;opacity:0;transition:opacity .2s}
+#card.is-known .known-badge {opacity:.8}
+#flip-hint {font-size:9px;letter-spacing:2px;color:rgba(0,255,200,.25);text-transform:uppercase}
+.row {display:flex;gap:12px;align-items:center}
+.btn {padding:9px 20px;border-radius:8px;border:1px solid rgba(0,255,200,.28);background:rgba(0,255,200,.05);color:#00ffc8;font-family:'Consolas',monospace;font-size:11px;letter-spacing:1px;cursor:pointer;transition:all .2s;text-transform:uppercase}
+.btn:hover {background:rgba(0,255,200,.14);box-shadow:0 0 12px rgba(0,255,200,.18)}
+.btn.active {border-color:#00ffc8;background:rgba(0,255,200,.14)}
+#ctr {font-size:11px;color:rgba(0,255,200,.45);letter-spacing:2px;min-width:80px;text-align:center}
+#score {font-size:10px;color:rgba(0,255,200,.3);letter-spacing:2px}
+</style>
+</head>
+<body>
+<div id="hdr">// __TOPIC__ &nbsp;&middot;&nbsp; FLASHCARDS</div>
+<div class="scanline"></div>
+<div id="prog-wrap"><div id="prog-bar"></div></div>
+<div id="main">
+  <div id="scene"><div id="card">
+    <div class="face front"><div class="tag">// question</div><div class="txt" id="ftxt"></div><div class="known-badge">&#10003; KNOWN</div></div>
+    <div class="face back"><div class="tag">// answer</div><div class="txt" id="btxt"></div></div>
+  </div></div>
+  <div id="flip-hint">CLICK CARD &middot; SPACE TO FLIP &middot; ARROWS TO NAVIGATE</div>
+  <div class="row">
+    <button class="btn" id="prev">&#8592;</button>
+    <span id="ctr">1 / 1</span>
+    <button class="btn" id="next">&#8594;</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="knownBtn">&#10003; KNOWN</button>
+    <button class="btn" id="shuf">&#8635; SHUFFLE</button>
+    <button class="btn" id="rst">&#9675; RESET</button>
+  </div>
+  <div id="score">KNOWN: <span id="kc">0</span> / <span id="tc">0</span></div>
+</div>
+<script>
+const CARDS=__CARDS_JSON__;
+let deck=CARDS.map((c,i)=>({...c,oi:i})),idx=0,known=new Set();
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=~~(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function render(){
+  const c=deck[idx];
+  document.getElementById('ftxt').textContent=c.front;
+  document.getElementById('btxt').textContent=c.back;
+  document.getElementById('ctr').textContent=`${idx+1} / ${deck.length}`;
+  document.getElementById('prog-bar').style.width=`${(idx+1)/deck.length*100}%`;
+  document.getElementById('kc').textContent=known.size;
+  document.getElementById('tc').textContent=CARDS.length;
+  const card=document.getElementById('card');
+  card.classList.remove('flipped');
+  card.classList.toggle('is-known',known.has(c.oi));
+  document.getElementById('knownBtn').classList.toggle('active',known.has(c.oi));
+}
+document.getElementById('scene').addEventListener('click',()=>document.getElementById('card').classList.toggle('flipped'));
+document.getElementById('prev').addEventListener('click',()=>{idx=(idx-1+deck.length)%deck.length;render()});
+document.getElementById('next').addEventListener('click',()=>{idx=(idx+1)%deck.length;render()});
+document.getElementById('knownBtn').addEventListener('click',()=>{const k=deck[idx].oi;known.has(k)?known.delete(k):known.add(k);render()});
+document.getElementById('shuf').addEventListener('click',()=>{shuffle(deck);idx=0;render()});
+document.getElementById('rst').addEventListener('click',()=>{deck=CARDS.map((c,i)=>({...c,oi:i}));known.clear();idx=0;render()});
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'){e.preventDefault();document.getElementById('card').classList.toggle('flipped')}
+  else if(e.code==='ArrowRight')document.getElementById('next').click();
+  else if(e.code==='ArrowLeft')document.getElementById('prev').click();
+  else if(e.code==='KeyK')document.getElementById('knownBtn').click();
+});
+render();
+</script>
+</body>
+</html>"""
+
 CHUNK = 1024; FORMAT = pyaudio.paInt16; CHANNELS = 1; RATE = 44100
 CLAP_THRESHOLD = 1400; DOUBLE_CLAP_MAX = 1.2; DOUBLE_CLAP_DEBOUNCE = 0.12
 
@@ -421,7 +607,8 @@ def _default_memory():
             "wake_count": 0, "last_wake": 0,
             "gcal_ics_url": "", "gcal_birthdays_ics_url": "",
             "librus_user": "", "librus_pass": "",
-            "gmail_imap_user": "", "gmail_imap_pass": ""}
+            "gmail_imap_user": "", "gmail_imap_pass": "",
+            "todos": [], "notes": [], "facts": {}}
 
 def load_memory():
     if os.path.exists(MEMORY_PATH):
@@ -514,6 +701,263 @@ def generate_mindmap_file(topic, nodes, categories):
         f.write(html)
     webbrowser.open(f"file:///{outpath.replace(os.sep, '/')}")
     return f"Mind map saved to {outpath} and opened in browser"
+
+# ─── Chart & Flashcard Generators ────────────────────────────────────────────
+def generate_chart_file(title, chart_type, labels, values, colors=None, x_label="", y_label=""):
+    import re as _re
+    if not colors:
+        colors = ["#00ffc8","#00b4ff","#ffd700","#ff6b6b","#c77dff","#ff9f43","#48dbfb","#ff9ff3"]
+    html = CHART_HTML_TEMPLATE
+    html = html.replace("__TITLE__",       title)
+    html = html.replace("__CHART_TYPE__",  chart_type)
+    html = html.replace("__LABELS_JSON__", json.dumps(labels))
+    html = html.replace("__VALUES_JSON__", json.dumps(values))
+    html = html.replace("__COLORS_JSON__", json.dumps(colors))
+    html = html.replace("__X_LABEL__",    x_label)
+    html = html.replace("__Y_LABEL__",    y_label)
+    slug    = _re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    outpath = os.path.join(r"C:\Users\filip\Downloads", f"{slug}-chart.html")
+    os.makedirs(os.path.dirname(os.path.abspath(outpath)), exist_ok=True)
+    with open(outpath, "w", encoding="utf-8") as f:
+        f.write(html)
+    webbrowser.open(f"file:///{outpath.replace(os.sep, '/')}")
+    return f"Chart saved to {outpath} and opened in browser"
+
+def generate_flashcard_file(topic, cards):
+    import re as _re
+    html = FLASHCARD_HTML_TEMPLATE
+    html = html.replace("__TOPIC__",      topic)
+    html = html.replace("__CARDS_JSON__", json.dumps(cards, ensure_ascii=False))
+    slug    = _re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")
+    outpath = os.path.join(r"C:\Users\filip\Downloads", f"{slug}-flashcards.html")
+    os.makedirs(os.path.dirname(os.path.abspath(outpath)), exist_ok=True)
+    with open(outpath, "w", encoding="utf-8") as f:
+        f.write(html)
+    webbrowser.open(f"file:///{outpath.replace(os.sep, '/')}")
+    return f"Flashcards saved to {outpath} and opened in browser"
+
+# ─── To-Do List ───────────────────────────────────────────────────────────────
+def manage_todo(action, text="", item_id=None):
+    mem   = load_memory()
+    todos = mem.setdefault("todos", [])
+    if action == "add":
+        new_id = max((t.get("id", 0) for t in todos), default=0) + 1
+        todos.append({"id": new_id, "text": text, "done": False, "created": time.time()})
+        save_memory(mem)
+        return f"Added todo #{new_id}: {text}"
+    elif action == "complete":
+        for t in todos:
+            if t.get("id") == item_id or (text and text.lower() in t.get("text","").lower()):
+                t["done"] = True; save_memory(mem); return f"Done: {t['text']}"
+        return "Item not found."
+    elif action == "delete":
+        before = len(todos)
+        mem["todos"] = [t for t in todos if not (t.get("id") == item_id or (text and text.lower() in t.get("text","").lower()))]
+        save_memory(mem)
+        return f"Deleted {before - len(mem['todos'])} item(s)."
+    elif action == "list":
+        pending = [t for t in todos if not t.get("done")]
+        done    = [t for t in todos if t.get("done")]
+        lines   = [f"PENDING ({len(pending)}):"]
+        lines  += [f"  #{t['id']} {t['text']}" for t in pending] or ["  — none"]
+        lines  += [f"\nDONE ({len(done)}):"]
+        lines  += [f"  #{t['id']} {t['text']}" for t in done[-5:]] or ["  — none"]
+        return "\n".join(lines)
+    elif action == "clear_done":
+        mem["todos"] = [t for t in todos if not t.get("done")]
+        save_memory(mem); return "Cleared completed todos."
+    return "Unknown action. Use: add, complete, delete, list, clear_done"
+
+# ─── Notes ────────────────────────────────────────────────────────────────────
+def take_note(title, content):
+    import datetime as _dt
+    mem   = load_memory()
+    notes = mem.setdefault("notes", [])
+    notes.append({"title": title, "content": content, "date": _dt.datetime.now().isoformat()})
+    mem["notes"] = notes[-500:]
+    save_memory(mem)
+    return f"Note saved: '{title}'"
+
+def list_notes(query=""):
+    mem   = load_memory()
+    notes = mem.get("notes", [])
+    if query:
+        notes = [n for n in notes if query.lower() in n.get("title","").lower() or query.lower() in n.get("content","").lower()]
+    if not notes:
+        return "No notes found."
+    out = []
+    for n in notes[-10:]:
+        snippet = n.get("content","")[:120]
+        out.append(f"[{n['date'][:10]}] {n['title']}: {snippet}{'…' if len(n.get('content',''))>120 else ''}")
+    return "\n".join(out)
+
+# ─── Persistent Facts ─────────────────────────────────────────────────────────
+def remember_fact(key, value):
+    mem = load_memory()
+    mem.setdefault("facts", {})[key] = value
+    save_memory(mem)
+    return f"Remembered: {key} = {value}"
+
+def recall_facts(key=""):
+    mem   = load_memory()
+    facts = mem.get("facts", {})
+    if not facts:
+        return "No facts stored."
+    if key:
+        return f"{key}: {facts.get(key, 'Not found')}"
+    return "\n".join(f"{k}: {v}" for k, v in facts.items())
+
+# ─── Stock / Crypto Prices ────────────────────────────────────────────────────
+def get_stock_price(symbol):
+    if not HAS_REQUESTS:
+        return "requests not available"
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol.upper()}?interval=1d&range=1d"
+        r   = _requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+        meta = r.json()["chart"]["result"][0]["meta"]
+        price    = meta.get("regularMarketPrice") or meta.get("previousClose", 0)
+        currency = meta.get("currency", "USD")
+        name     = meta.get("longName") or meta.get("shortName") or symbol.upper()
+        change   = meta.get("regularMarketChangePercent", 0)
+        sign     = "+" if change >= 0 else ""
+        return f"{name}: {price:.2f} {currency}  ({sign}{change:.2f}%)"
+    except Exception as e:
+        return f"Could not fetch price for {symbol}: {e}"
+
+# ─── Wikipedia ────────────────────────────────────────────────────────────────
+def get_wikipedia(query, sentences=4):
+    if not HAS_REQUESTS:
+        return "requests not available"
+    try:
+        url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(query)
+        r   = _requests.get(url, timeout=8, headers={"User-Agent": "JarvisBot/1.0"})
+        if r.status_code == 200:
+            import re as _re
+            extract = r.json().get("extract", "")
+            parts   = _re.split(r'(?<=[.!?])\s+', extract)
+            return " ".join(parts[:sentences]) if parts else extract
+        return f"No Wikipedia article found for '{query}'"
+    except Exception as e:
+        return f"Wikipedia error: {e}"
+
+# ─── Process Management ───────────────────────────────────────────────────────
+def kill_process_by_name(name):
+    killed = []
+    for proc in psutil.process_iter(["pid", "name"]):
+        try:
+            if name.lower() in proc.info["name"].lower():
+                proc.kill(); killed.append(proc.info["name"])
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    return f"Killed: {', '.join(killed)}" if killed else f"No process found matching '{name}'"
+
+# ─── Clipboard ────────────────────────────────────────────────────────────────
+def clipboard_get():
+    try:
+        r = subprocess.run(["powershell","-command","Get-Clipboard"],
+                           capture_output=True, text=True, timeout=5)
+        return r.stdout.strip() or "(clipboard is empty)"
+    except Exception as e:
+        return f"Clipboard read error: {e}"
+
+def clipboard_set(text):
+    try:
+        escaped = text.replace('"', '`"')
+        subprocess.run(["powershell","-command",f'Set-Clipboard -Value "{escaped}"'],
+                       capture_output=True, text=True, timeout=5)
+        return f"Clipboard set ({len(text)} chars)"
+    except Exception as e:
+        return f"Clipboard write error: {e}"
+
+# ─── File Management ──────────────────────────────────────────────────────────
+def download_url_to_file(url, filename=""):
+    if not HAS_REQUESTS:
+        return "requests not available"
+    import re as _re
+    if not filename:
+        filename = url.split("/")[-1].split("?")[0] or "download"
+        filename = _re.sub(r"[^a-zA-Z0-9._-]", "_", filename)
+    outpath = os.path.join(r"C:\Users\filip\Downloads", filename)
+    try:
+        r = _requests.get(url, timeout=30, stream=True, headers={"User-Agent": "Mozilla/5.0"})
+        r.raise_for_status()
+        with open(outpath, "wb") as f:
+            for chunk in r.iter_content(8192): f.write(chunk)
+        return f"Downloaded to {outpath}"
+    except Exception as e:
+        return f"Download failed: {e}"
+
+def open_file_default(path):
+    try:
+        os.startfile(path); return f"Opened {path}"
+    except Exception as e:
+        return f"Could not open {path}: {e}"
+
+def file_operation(operation, src, dst=""):
+    import shutil as _shutil
+    try:
+        if operation == "move":
+            _shutil.move(src, dst); return f"Moved {src} → {dst}"
+        elif operation == "copy":
+            _shutil.copy2(src, dst); return f"Copied {src} → {dst}"
+        elif operation == "delete":
+            if os.path.isfile(src): os.remove(src)
+            elif os.path.isdir(src): _shutil.rmtree(src)
+            return f"Deleted {src}"
+        elif operation == "rename":
+            os.rename(src, dst); return f"Renamed {src} → {dst}"
+        return "Unknown op. Use: move, copy, delete, rename"
+    except Exception as e:
+        return f"File operation error: {e}"
+
+# ─── Network Info ─────────────────────────────────────────────────────────────
+def get_network_info():
+    import socket as _socket
+    lines = []
+    try:
+        hostname  = _socket.gethostname()
+        local_ip  = _socket.gethostbyname(hostname)
+        lines.append(f"Hostname: {hostname}")
+        lines.append(f"Local IP: {local_ip}")
+    except Exception as e:
+        lines.append(f"IP error: {e}")
+    try:
+        r = subprocess.run(["netsh","wlan","show","interfaces"],
+                           capture_output=True, text=True, timeout=5)
+        for line in r.stdout.splitlines():
+            if "SSID" in line and "BSSID" not in line:
+                lines.append(f"WiFi SSID: {line.split(':',1)[1].strip()}"); break
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(
+            ["powershell","-command",
+             "Test-Connection 8.8.8.8 -Count 1 | Select-Object -ExpandProperty ResponseTime"],
+            capture_output=True, text=True, timeout=8)
+        ms = r.stdout.strip()
+        if ms and ms.isdigit():
+            lines.append(f"Ping (Google): {ms}ms")
+    except Exception:
+        pass
+    return "\n".join(lines) if lines else "Network info unavailable"
+
+# ─── Timer ────────────────────────────────────────────────────────────────────
+def set_timer(seconds, label="Timer"):
+    def _run(secs, lbl):
+        time.sleep(float(secs))
+        speak(f"{lbl} is up, sir.")
+        try:
+            subprocess.Popen(
+                ["powershell","-command",
+                 f'[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms");'
+                 f'[System.Windows.Forms.MessageBox]::Show("{lbl} complete!", "JARVIS Timer")'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+    threading.Thread(target=_run, args=(seconds, label), daemon=True).start()
+    m, s = divmod(int(seconds), 60); h, m = divmod(m, 60)
+    parts = ([f"{h}h"] if h else []) + ([f"{m}m"] if m else []) + ([f"{s}s"] if s else [])
+    return f"Timer set: '{label}' fires in {' '.join(parts) or '0s'}"
 
 # ─── Calendar / Librus / Birthdays ────────────────────────────────────────────
 def _parse_ics_line(line):
@@ -2393,6 +2837,96 @@ TOOLS = [
          },
          "required": ["topic", "nodes", "categories"]
      }},
+    {"name": "generate_chart",
+     "description": "Create an interactive holographic HTML chart (bar, line, pie, or donut) and open it in the browser. Use to visualise data, comparisons, trends, or distributions.",
+     "input_schema": {"type":"object","properties":{
+         "title":      {"type":"string","description":"Chart title"},
+         "chart_type": {"type":"string","description":"bar | line | pie | donut"},
+         "labels":     {"type":"array","items":{"type":"string"},"description":"Category/X-axis labels"},
+         "values":     {"type":"array","items":{"type":"number"},"description":"Numeric values matching labels"},
+         "colors":     {"type":"array","items":{"type":"string"},"description":"Optional hex colors (e.g. ['#00ffc8','#00b4ff'])"},
+         "x_label":    {"type":"string","description":"X-axis label (optional)"},
+         "y_label":    {"type":"string","description":"Y-axis label (optional)"}
+     },"required":["title","chart_type","labels","values"]}},
+    {"name": "generate_flashcards",
+     "description": "Create an interactive HTML flashcard deck for studying any topic. Opens in browser with flip animation, shuffle, and progress tracking.",
+     "input_schema": {"type":"object","properties":{
+         "topic": {"type":"string","description":"Deck topic/title"},
+         "cards": {"type":"array","description":"Array of {front: 'question', back: 'answer'} objects","items":{"type":"object"}}
+     },"required":["topic","cards"]}},
+    {"name": "manage_todo",
+     "description": "Manage a persistent to-do list. Actions: add, complete, delete, list, clear_done.",
+     "input_schema": {"type":"object","properties":{
+         "action":  {"type":"string","description":"add | complete | delete | list | clear_done"},
+         "text":    {"type":"string","description":"Task text (for add/complete/delete)"},
+         "item_id": {"type":"integer","description":"Task ID number (for complete/delete by ID)"}
+     },"required":["action"]}},
+    {"name": "take_note",
+     "description": "Save a voice note or idea to persistent storage. Optionally list/search saved notes.",
+     "input_schema": {"type":"object","properties":{
+         "action":  {"type":"string","description":"save | list"},
+         "title":   {"type":"string","description":"Note title (for save)"},
+         "content": {"type":"string","description":"Note content (for save)"},
+         "query":   {"type":"string","description":"Search query (for list — leave empty to list recent notes)"}
+     },"required":["action"]}},
+    {"name": "remember_fact",
+     "description": "Store or retrieve a named fact. Use to remember arbitrary information the user wants saved (e.g. 'my gym password is X', 'sister birthday is March 5').",
+     "input_schema": {"type":"object","properties":{
+         "action": {"type":"string","description":"store | recall"},
+         "key":    {"type":"string","description":"Fact name/key (for both actions)"},
+         "value":  {"type":"string","description":"Fact value (for store only)"}
+     },"required":["action","key"]}},
+    {"name": "get_stock_price",
+     "description": "Get the current price and daily change for a stock or crypto symbol (e.g. AAPL, TSLA, BTC-USD, ETH-USD).",
+     "input_schema": {"type":"object","properties":{
+         "symbol": {"type":"string","description":"Ticker symbol (e.g. AAPL, BTC-USD)"}
+     },"required":["symbol"]}},
+    {"name": "get_wikipedia",
+     "description": "Fetch a short Wikipedia summary for any topic. Great for quick factual lookups.",
+     "input_schema": {"type":"object","properties":{
+         "query":     {"type":"string","description":"Topic to look up"},
+         "sentences": {"type":"integer","description":"Number of sentences to return (default 4)"}
+     },"required":["query"]}},
+    {"name": "kill_process",
+     "description": "Kill a running process by name (e.g. 'chrome', 'notepad', 'spotify').",
+     "input_schema": {"type":"object","properties":{
+         "name": {"type":"string","description":"Process name or partial name to kill"}
+     },"required":["name"]}},
+    {"name": "get_clipboard",
+     "description": "Read the current contents of the Windows clipboard.",
+     "input_schema": {"type":"object","properties":{}}},
+    {"name": "set_clipboard",
+     "description": "Write text to the Windows clipboard.",
+     "input_schema": {"type":"object","properties":{
+         "text": {"type":"string","description":"Text to copy to clipboard"}
+     },"required":["text"]}},
+    {"name": "download_file",
+     "description": "Download a file from a URL to the Downloads folder.",
+     "input_schema": {"type":"object","properties":{
+         "url":      {"type":"string","description":"URL to download"},
+         "filename": {"type":"string","description":"Optional filename (auto-detected from URL if omitted)"}
+     },"required":["url"]}},
+    {"name": "open_file",
+     "description": "Open any file with its default application (documents, images, videos, PDFs, etc.).",
+     "input_schema": {"type":"object","properties":{
+         "path": {"type":"string","description":"Absolute path to the file to open"}
+     },"required":["path"]}},
+    {"name": "file_operation",
+     "description": "Move, copy, rename, or delete files and folders.",
+     "input_schema": {"type":"object","properties":{
+         "operation": {"type":"string","description":"move | copy | rename | delete"},
+         "src":       {"type":"string","description":"Source path"},
+         "dst":       {"type":"string","description":"Destination path (not needed for delete)"}
+     },"required":["operation","src"]}},
+    {"name": "get_network_info",
+     "description": "Get the local IP address, Wi-Fi SSID, and ping latency.",
+     "input_schema": {"type":"object","properties":{}}},
+    {"name": "set_timer",
+     "description": "Set a countdown timer. Jarvis will speak when it fires and show a Windows popup.",
+     "input_schema": {"type":"object","properties":{
+         "seconds": {"type":"number","description":"Duration in seconds"},
+         "label":   {"type":"string","description":"Timer label (e.g. 'Pasta', 'Pomodoro')"}
+     },"required":["seconds"]}},
 ]
 
 
@@ -2550,6 +3084,41 @@ def execute_tool(name, inp):
             return f"Gmail credentials saved for {email.strip()}."
         elif name == "generate_mindmap":
             return generate_mindmap_file(inp["topic"], inp["nodes"], inp.get("categories", []))
+        elif name == "generate_chart":
+            return generate_chart_file(inp["title"], inp["chart_type"], inp["labels"], inp["values"],
+                                       inp.get("colors"), inp.get("x_label",""), inp.get("y_label",""))
+        elif name == "generate_flashcards":
+            return generate_flashcard_file(inp["topic"], inp["cards"])
+        elif name == "manage_todo":
+            return manage_todo(inp["action"], inp.get("text",""), inp.get("item_id"))
+        elif name == "take_note":
+            if inp.get("action","save") == "list":
+                return list_notes(inp.get("query",""))
+            return take_note(inp.get("title","Note"), inp.get("content",""))
+        elif name == "remember_fact":
+            if inp["action"] == "store":
+                return remember_fact(inp["key"], inp.get("value",""))
+            return recall_facts(inp.get("key",""))
+        elif name == "get_stock_price":
+            return get_stock_price(inp["symbol"])
+        elif name == "get_wikipedia":
+            return get_wikipedia(inp["query"], inp.get("sentences", 4))
+        elif name == "kill_process":
+            return kill_process_by_name(inp["name"])
+        elif name == "get_clipboard":
+            return clipboard_get()
+        elif name == "set_clipboard":
+            return clipboard_set(inp["text"])
+        elif name == "download_file":
+            return download_url_to_file(inp["url"], inp.get("filename",""))
+        elif name == "open_file":
+            return open_file_default(inp["path"])
+        elif name == "file_operation":
+            return file_operation(inp["operation"], inp["src"], inp.get("dst",""))
+        elif name == "get_network_info":
+            return get_network_info()
+        elif name == "set_timer":
+            return set_timer(inp["seconds"], inp.get("label","Timer"))
     except Exception as e:
         return f"Error in {name}: {e}"
 
@@ -2855,8 +3424,16 @@ SYSTEM = (
     "For complex tasks that require fetching external data — reading emails, in-depth web research — "
     "use the dispatch_agent tool. Always say a brief line before dispatching (e.g. 'On it, sir.'). "
     "Never dispatch agents unless the user explicitly asks for something that requires it. "
-    "Use `generate_mindmap` to visually display knowledge, plans, topic breakdowns, or "
-    "learning summaries as interactive holographic mind maps that open in the browser."
+    "VISUALISATIONS — use these proactively when they add value: "
+    "`generate_mindmap` for knowledge maps and topic breakdowns; "
+    "`generate_chart` for any data comparison or trend (bar/line/pie/donut); "
+    "`generate_flashcards` for studying or learning any subject. "
+    "PRODUCTIVITY — `manage_todo` for task lists; `take_note` to capture ideas; "
+    "`remember_fact` to store anything the user wants remembered across sessions; `set_timer` for countdowns. "
+    "INFORMATION — `get_stock_price` for market data; `get_wikipedia` for quick factual lookups. "
+    "SYSTEM — `kill_process`, `get_clipboard`, `set_clipboard`, `download_file`, `open_file`, "
+    "`file_operation` (move/copy/rename/delete), `get_network_info`. "
+    "You are a full-capability super-assistant. When a user asks something that a tool can answer better than words, use the tool."
 )
 
 def ask_claude(user_message):
@@ -2868,7 +3445,7 @@ def ask_claude(user_message):
         system_blocks.append({"type": "text", "text": mem_ctx})
     while True:
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             max_tokens=4096,
             system=system_blocks,
             tools=TOOLS,
