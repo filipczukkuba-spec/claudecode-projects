@@ -38,7 +38,12 @@
       "Bash(pip show *)",
       "Read(//c/Users/filip/**)",
       "Bash(python3 *)",
-      "Bash(py *)"
+      "Bash(py *)",
+      "WebFetch(domain:www.instagram.com)",
+      "WebFetch(domain:cedreo.com)",
+      "WebFetch(domain:www.facebook.com)",
+      "WebFetch(domain:onedesign.pl)",
+      "WebFetch(domain:www.truefuturemedia.com)"
     ]
   }
 }
