@@ -758,6 +758,171 @@ class DayCard:
             pygame.draw.lines(screen, tc, False,
                               [(cx2+sx*10, cy2),(cx2, cy2),(cx2, cy2+sy*10)], 1)
 
+
+class LibrusPanel:
+    """Large holographic Librus schedule panel — looks like a floating sci-fi screen."""
+
+    PANEL_W = 820
+    PANEL_H = 540
+
+    def __init__(self, day_buckets, cx, cy, lifetime=60.0):
+        import random as _r, datetime as _dt
+        self.day_buckets = day_buckets   # list of 7 lists of event strings
+        self.tx = cx
+        self.ty = cy
+        self.x  = cx
+        self.y  = cy - 900          # flies in from above
+        self.alpha   = 0.0
+        self.age     = 0.0
+        self.alive   = True
+        self.lifetime = lifetime
+        self.phase   = _r.uniform(0, 6.283)
+        self._glitch_t   = _r.uniform(5, 11)
+        self._glitch_on  = False
+        self._glitch_dur = 0.0
+        today = _dt.date.today()
+        self._day_names = []
+        for i in range(7):
+            d = today + _dt.timedelta(days=i)
+            self._day_names.append(d.strftime("%a %d/%m"))
+
+    def update(self, dt):
+        import math as _m, random as _r
+        self.age += dt
+        a = self.age
+        if a < 1.2:
+            self.alpha = min(1.0, a / 1.2)
+            self.x += (self.tx - self.x) * 0.12
+            self.y += (self.ty - self.y) * 0.12
+        elif a > self.lifetime - 1.5:
+            self.alpha = max(0.0, 1.0 - (a - (self.lifetime - 1.5)) / 1.5)
+        else:
+            self.y = self.ty + 3 * _m.sin(self.phase + a * 0.9)
+        self._glitch_t -= dt
+        if self._glitch_t <= 0 and a > 2.0:
+            self._glitch_on  = True
+            self._glitch_dur = 0.09
+            self._glitch_t   = _r.uniform(7, 14)
+        if self._glitch_on:
+            self._glitch_dur -= dt
+            if self._glitch_dur <= 0: self._glitch_on = False
+        if self.age > self.lifetime:
+            self.alive = False
+
+    def draw(self, screen, font_tag, font_body):
+        import math as _m
+        if self.alpha <= 0: return
+        a    = int(self.alpha * 255)
+        W, H = self.PANEL_W, self.PANEL_H
+        x    = int(self.x) - W // 2
+        y    = int(self.y) - H // 2
+
+        # ── background panel ──
+        bg = pygame.Surface((W, H), pygame.SRCALPHA)
+        bg.fill((0, 4, 18, int(a * 0.92)))
+        screen.blit(bg, (x, y))
+
+        # ── scanlines ──
+        sl = pygame.Surface((W, H), pygame.SRCALPHA)
+        for sy in range(0, H, 2):
+            pygame.draw.line(sl, (0, 0, 0, 28), (0, sy), (W, sy))
+        screen.blit(sl, (x, y))
+
+        # ── header bar ──
+        hh = 38
+        hdr = pygame.Surface((W, hh), pygame.SRCALPHA)
+        hdr.fill((0, 30, 90, int(a * 0.85)))
+        screen.blit(hdr, (x, y))
+
+        title_s = font_tag.render("LIBRUS  SYNERGIA  ·  TERMINARZ", True, (0, 210, 255))
+        title_s.set_alpha(a)
+        screen.blit(title_s, (x + W // 2 - title_s.get_width() // 2, y + 9))
+
+        # ── divider ──
+        pygame.draw.line(screen, (0, 180, 255, a), (x + 10, y + hh), (x + W - 10, y + hh), 1)
+
+        # ── glitch offset ──
+        gx = 3 if self._glitch_on else 0
+
+        # ── 7-day columns ──
+        col_w    = (W - 20) // 7
+        col_gap  = 6
+        col_x0   = x + 10
+        col_y0   = y + hh + 8
+        col_h    = H - hh - 16
+        line_h   = 16
+
+        for i, events in enumerate(self.day_buckets):
+            cx2 = col_x0 + i * col_w
+            # column background — today highlighted
+            col_bg = pygame.Surface((col_w - col_gap, col_h), pygame.SRCALPHA)
+            if i == 0:
+                col_bg.fill((0, 40, 100, int(a * 0.45)))
+            else:
+                col_bg.fill((0, 10, 40, int(a * 0.30)))
+            screen.blit(col_bg, (cx2 + gx, col_y0))
+
+            # day header
+            day_s = font_tag.render(self._day_names[i], True,
+                                    (255, 220, 60) if i == 0 else (140, 200, 255))
+            day_s.set_alpha(a)
+            screen.blit(day_s, (cx2 + (col_w - col_gap)//2 - day_s.get_width()//2 + gx, col_y0 + 3))
+            pygame.draw.line(screen, (0, 140, 220, int(a * 0.6)),
+                             (cx2 + gx, col_y0 + 20), (cx2 + col_w - col_gap + gx, col_y0 + 20), 1)
+
+            # events
+            ey = col_y0 + 26
+            max_lines = max(1, (col_h - 30) // line_h)
+            shown = 0
+            for ev in events:
+                if shown >= max_lines - 1 and len(events) > max_lines:
+                    more_s = font_body.render(f"+{len(events)-shown} more", True, (80, 150, 200))
+                    more_s.set_alpha(int(a * 0.7))
+                    screen.blit(more_s, (cx2 + 4 + gx, ey))
+                    break
+                # word-wrap to column width
+                words = str(ev).split()
+                line  = ""
+                for w in words:
+                    test = line + (" " if line else "") + w
+                    if font_body.size("• " + test)[0] <= col_w - col_gap - 8:
+                        line = test
+                    else:
+                        if line:
+                            ls = font_body.render("• " + line, True, (180, 230, 255))
+                            ls.set_alpha(a)
+                            screen.blit(ls, (cx2 + 4 + gx, ey))
+                            ey += line_h; shown += 1
+                        line = w
+                if line:
+                    ls = font_body.render("• " + line, True, (180, 230, 255))
+                    ls.set_alpha(a)
+                    screen.blit(ls, (cx2 + 4 + gx, ey))
+                    ey += line_h; shown += 1
+            if not events:
+                cl_s = font_body.render("clear", True, (50, 100, 160))
+                cl_s.set_alpha(int(a * 0.6))
+                screen.blit(cl_s, (cx2 + (col_w - col_gap)//2 - cl_s.get_width()//2 + gx, col_y0 + 32))
+
+        # ── outer border ──
+        border_c = (0, int(180 * self.alpha), int(255 * self.alpha), a)
+        bd = pygame.Surface((W, H), pygame.SRCALPHA)
+        pygame.draw.rect(bd, border_c, (0, 0, W, H), 1)
+        screen.blit(bd, (x, y))
+
+        # ── corner brackets ──
+        tc = (0, 220, 255, a)
+        sz = 16
+        for bx, by, sx, sy in [(x,y,1,1),(x+W,y,-1,1),(x,y+H,1,-1),(x+W,y+H,-1,-1)]:
+            pygame.draw.lines(screen, tc, False,
+                              [(bx+sx*sz, by),(bx, by),(bx, by+sy*sz)], 2)
+
+        # ── top-right source label ──
+        src_s = font_body.render("synergia.librus.pl", True, (40, 100, 160))
+        src_s.set_alpha(int(a * 0.55))
+        screen.blit(src_s, (x + W - src_s.get_width() - 10, y + H - 18))
+
+
 class JarvisVisual:
     def __init__(self):
         self.W = self.H = self.cx = self.cy = 0
@@ -1603,6 +1768,14 @@ def show_week_view(day_buckets):
             fly_dx=900 - i * 40, fly_dy=-700,
             w=card_w, h=card_h, lifetime=55.0))
 
+def show_librus_view(day_buckets):
+    """Show Librus schedule as a single large holographic panel, clearing any existing cards first."""
+    for c in list(visual.news_cards):
+        c.alive = False
+    import time as _t; _t.sleep(1.4)
+    cx, cy = visual.cx, visual.cy
+    visual.news_cards.append(LibrusPanel(day_buckets, cx, cy - 30, lifetime=60.0))
+
 def show_birthday_view(birthdays):
     """Show a single wide card listing upcoming birthdays."""
     cx, cy = visual.cx, visual.cy
@@ -1891,10 +2064,9 @@ def execute_tool(name, inp):
             buckets = group_events_by_day(cal, 7) if cal else [[] for _ in range(7)]
             show_week_view(buckets)
             if _sw_mem.get("librus_user"):
-                import time as _t; _t.sleep(1.0)
                 lib = fetch_librus_events(days=7)
                 lib_buckets = group_events_by_day(lib, 7) if lib else [[] for _ in range(7)]
-                show_week_view(lib_buckets)
+                show_librus_view(lib_buckets)
             return "Week overlay displayed"
         elif name == "setup_tiktok":
             from tiktok_agent import setup_tiktok_session
@@ -2436,11 +2608,12 @@ def wake_up():
         speak("Shall I display your Librus schedule?")
         want_librus = listen_yes_no()
         if want_librus:
+            speak("Fetching Librus schedule.")
             librus_events = fetch_librus_events(days=7)
             librus_buckets = group_events_by_day(librus_events, 7) if librus_events else [[] for _ in range(7)]
-            show_week_view(librus_buckets)
+            show_librus_view(librus_buckets)
             if not librus_events:
-                speak("Librus shows nothing scheduled this week.")
+                speak("Librus schedule loaded but nothing found this week.")
             time.sleep(0.3)
 
     speak("How may I assist you?")
