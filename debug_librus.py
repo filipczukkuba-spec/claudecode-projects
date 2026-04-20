@@ -1,5 +1,6 @@
-"""Run this to diagnose why Librus events aren't showing: py debug_librus.py"""
-import json, datetime, traceback
+"""Run this to diagnose Librus web-form login: py debug_librus.py"""
+import json, datetime, traceback, requests
+from bs4 import BeautifulSoup
 
 MEMORY_PATH = "jarvis_memory.json"
 with open(MEMORY_PATH) as f:
@@ -10,28 +11,54 @@ pw   = (mem.get("librus_pass") or "").strip()
 
 if not user or not pw:
     print("ERROR: No Librus credentials in jarvis_memory.json")
-    print("  Say 'set Librus credentials' to Jarvis first.")
     exit(1)
 
 print(f"Credentials found: user={user!r}  pass={'*'*len(pw)}")
 
-try:
-    from librus_apix.client import new_client
-    from librus_apix.schedule import get_schedule
-    from librus_apix.homework import get_homework
-except ImportError as e:
-    print(f"ERROR: {e}")
-    exit(1)
+BASE = "https://synergia.librus.pl"
+s = requests.Session()
+s.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
 
-print("Logging in...")
-try:
-    cli = new_client()
-    cli.get_token(user, pw)
-    print("Login OK")
-except Exception as e:
-    print(f"LOGIN FAILED: {e}")
-    traceback.print_exc()
-    exit(1)
+print("\nStep 1: GET login page...")
+r = s.get(BASE + "/logowanie", timeout=15)
+print(f"  status={r.status_code}  url={r.url}")
+
+soup = BeautifulSoup(r.text, "lxml")
+# look for any hidden fields / csrf
+form = soup.find("form")
+hidden = {}
+if form:
+    for inp in form.find_all("input", type="hidden"):
+        hidden[inp.get("name")] = inp.get("value", "")
+    print(f"  form action={form.get('action')!r}  hidden fields={list(hidden.keys())}")
+
+print("\nStep 2: POST credentials...")
+payload = {**hidden, "login": user, "pass": pw}
+r2 = s.post(BASE + "/logowanie", data=payload, timeout=15, allow_redirects=True)
+print(f"  status={r2.status_code}  final_url={r2.url}")
+
+logged_in = "terminarz" in r2.text or "wyloguj" in r2.text.lower() or r2.url != BASE + "/logowanie"
+print(f"  looks logged in: {logged_in}")
+
+print("\nStep 3: GET terminarz...")
+today = datetime.date.today()
+r3 = s.post(BASE + "/terminarz/", data={"rok": str(today.year), "miesiac": str(today.month)}, timeout=15)
+print(f"  status={r3.status_code}  length={len(r3.text)}")
+
+with open("terminarz_raw.html", "w", encoding="utf-8") as fh:
+    fh.write(r3.text)
+print("  saved terminarz_raw.html")
+
+soup3 = BeautifulSoup(r3.text, "lxml")
+divs = soup3.find_all("div", class_=True)
+classes = []
+for d in divs:
+    for c in d.get("class", []):
+        if c not in classes:
+            classes.append(c)
+print(f"\nDiv classes on terminarz page ({len(classes)}):")
+for c in classes:
+    print(f"  {c!r}")
 
 today = datetime.date.today()
 print(f"\nFetching raw terminarz HTML for {today.month}/{today.year} ...")
