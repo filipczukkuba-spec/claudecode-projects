@@ -263,17 +263,29 @@
     {
       "text": "open open a window for me where I can type it in",
       "time": 1776706247.7143636
+    },
+    {
+      "text": "I did it",
+      "time": 1776706303.7364826
+    },
+    {
+      "text": "I pasted it in in notepad can you check it",
+      "time": 1776706320.776515
+    },
+    {
+      "text": "display the library schedule",
+      "time": 1776706480.270048
     }
   ],
   "habits": {
     "h17": 10,
     "h18": 32,
     "h22": 17,
-    "h19": 7
+    "h19": 10
   },
   "birthdays": [],
-  "wake_count": 20,
-  "last_wake": 1776706198.80738,
+  "wake_count": 21,
+  "last_wake": 1776706411.6069443,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "1203917u",
