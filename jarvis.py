@@ -2748,24 +2748,6 @@ def main():
 
     threading.Thread(target=wake_word_listener, daemon=True).start()
 
-    def _tiktok_scheduler():
-        import datetime as _dt
-        check_hour = 23  # 11 PM — change this to adjust timing
-        while True:
-            now    = _dt.datetime.now()
-            target = now.replace(hour=check_hour, minute=0, second=0, microsecond=0)
-            if target <= now:
-                target += _dt.timedelta(days=1)
-            time.sleep((target - now).total_seconds())
-            try:
-                from tiktok_agent import run_streak_check
-                result = run_streak_check()
-                speak(f"TikTok streak check complete, sir. {result}")
-            except Exception as e:
-                print(f"[tiktok scheduler] {e}")
-
-    threading.Thread(target=_tiktok_scheduler, daemon=True).start()
-
     visual.run()
 
 if __name__ == "__main__":
