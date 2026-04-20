@@ -1,0 +1,2227 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="OneDesign – pracownia projektowania wnętrz w Warszawie. Projektujemy przestrzenie, które opowiadają Twoją historię. Od 2008 roku.">
+  <title>OneDesign — Projektowanie Wnętrz Warszawa</title>
+  <style>
+    /* =============================================
+       CSS CUSTOM PROPERTIES
+    ============================================= */
+    :root {
+      --c-cream:      #FAFAF8;
+      --c-charcoal:   #1C1C1A;
+      --c-beige:      #E8E0D5;
+      --c-gold:       #C9A96E;
+      --c-gold-light: #DFC090;
+      --c-sage:       #8A9E8A;
+      --c-text:       #3A3A38;
+      --c-text-muted: #7A7A72;
+      --c-white:      #FFFFFF;
+      --c-border:     rgba(28, 28, 26, 0.1);
+
+      --font-serif: Georgia, 'Palatino Linotype', Palatino, 'Book Antiqua', serif;
+      --font-sans:  'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+      --space-xs: 0.5rem;
+      --space-sm: 1rem;
+      --space-md: 2rem;
+      --space-lg: 4rem;
+      --space-xl: 8rem;
+
+      --ease-luxury: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --ease-snap:   cubic-bezier(0.16, 1, 0.3, 1);
+
+      --max-width: 1280px;
+      --nav-height: 80px;
+    }
+
+    /* =============================================
+       RESET & BASE
+    ============================================= */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--c-cream);
+      color: var(--c-text);
+      line-height: 1.7;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    body.no-scroll { overflow: hidden; }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img { display: block; max-width: 100%; }
+
+    ul { list-style: none; }
+
+    section {
+      scroll-margin-top: var(--nav-height);
+    }
+
+    /* =============================================
+       ANIMATIONS
+    ============================================= */
+    @keyframes gradientDrift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes grainShift {
+      0%   { transform: translate(0,0); }
+      20%  { transform: translate(-2%, -3%); }
+      40%  { transform: translate(3%, 1%); }
+      60%  { transform: translate(-1%, 3%); }
+      80%  { transform: translate(2%, -2%); }
+      100% { transform: translate(0,0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(40px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes lineExpand {
+      from { transform: scaleX(0); }
+      to   { transform: scaleX(1); }
+    }
+
+    @keyframes dotPop {
+      0%   { transform: scale(0); opacity: 0; }
+      70%  { transform: scale(1.4); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes scrollLine {
+      0%   { transform: scaleY(0); transform-origin: top; }
+      50%  { transform: scaleY(1); transform-origin: top; }
+      50.001% { transform: scaleY(1); transform-origin: bottom; }
+      100% { transform: scaleY(0); transform-origin: bottom; }
+    }
+
+    @keyframes navFadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* =============================================
+       REVEAL SYSTEM
+    ============================================= */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.9s var(--ease-luxury), transform 0.9s var(--ease-luxury);
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .reveal-children > * {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.7s var(--ease-luxury), transform 0.7s var(--ease-luxury);
+    }
+
+    .reveal-children.visible > *:nth-child(1) { transition-delay: 0s;    opacity: 1; transform: translateY(0); }
+    .reveal-children.visible > *:nth-child(2) { transition-delay: 0.1s;  opacity: 1; transform: translateY(0); }
+    .reveal-children.visible > *:nth-child(3) { transition-delay: 0.2s;  opacity: 1; transform: translateY(0); }
+    .reveal-children.visible > *:nth-child(4) { transition-delay: 0.3s;  opacity: 1; transform: translateY(0); }
+    .reveal-children.visible > *:nth-child(5) { transition-delay: 0.4s;  opacity: 1; transform: translateY(0); }
+    .reveal-children.visible > *:nth-child(6) { transition-delay: 0.5s;  opacity: 1; transform: translateY(0); }
+
+    /* =============================================
+       LAYOUT UTILITIES
+    ============================================= */
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--space-md);
+    }
+
+    .section {
+      padding: var(--space-xl) 0;
+      overflow: hidden;
+    }
+
+    .section--dark {
+      background: var(--c-charcoal);
+      color: var(--c-cream);
+    }
+
+    .section--dark .section-title { color: var(--c-cream); }
+    .section--dark p { color: rgba(250,250,248,0.75); }
+
+    .section--beige {
+      background: var(--c-beige);
+    }
+
+    .section-header { margin-bottom: var(--space-lg); }
+    .section-header.centered { text-align: center; }
+
+    .section-eyebrow {
+      font-family: var(--font-sans);
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--c-gold);
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      font-weight: 400;
+      line-height: 1.2;
+      color: var(--c-charcoal);
+    }
+
+    .gold-rule {
+      width: 56px;
+      height: 2px;
+      background: var(--c-gold);
+      margin: 1.5rem 0;
+      transform-origin: left center;
+      transform: scaleX(0);
+      transition: transform 0.8s var(--ease-snap);
+    }
+
+    .gold-rule.centered {
+      margin: 1.5rem auto;
+      transform-origin: center center;
+    }
+
+    .gold-rule.visible { transform: scaleX(1); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 2rem;
+      height: 52px;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.35s var(--ease-luxury);
+      border: none;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--c-gold);
+      color: var(--c-charcoal);
+    }
+
+    .btn-primary:hover {
+      background: var(--c-gold-light);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(201,169,110,0.35);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--c-cream);
+      border: 1px solid rgba(250,250,248,0.4);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--c-gold);
+      color: var(--c-gold);
+      transform: translateY(-2px);
+    }
+
+    .btn--full { width: 100%; }
+
+    /* =============================================
+       NAVIGATION
+    ============================================= */
+    #nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      padding: 24px 0;
+      transition: padding 0.5s var(--ease-luxury), background 0.5s var(--ease-luxury),
+                  box-shadow 0.5s var(--ease-luxury), transform 0.4s var(--ease-luxury);
+      animation: navFadeDown 0.8s var(--ease-luxury) both;
+    }
+
+    #nav.nav-scrolled {
+      background: rgba(28, 28, 26, 0.96);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      padding: 14px 0;
+      box-shadow: 0 1px 0 rgba(201,169,110,0.15);
+    }
+
+    #nav.nav-hidden {
+      transform: translateY(-100%);
+    }
+
+    .nav-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 var(--space-md);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      font-family: var(--font-serif);
+      font-size: 1.35rem;
+      letter-spacing: 0.08em;
+      text-decoration: none;
+      line-height: 1;
+    }
+
+    .logo-one    { color: var(--c-gold); }
+    .logo-design { color: var(--c-cream); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2.5rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 0.82rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(250,250,248,0.8);
+      text-decoration: none;
+      position: relative;
+      padding-bottom: 3px;
+      transition: color 0.3s;
+    }
+
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--c-gold);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.35s var(--ease-luxury);
+    }
+
+    .nav-links a:hover { color: var(--c-gold); }
+    .nav-links a:hover::after { transform: scaleX(1); }
+
+    .nav-cta {
+      color: var(--c-gold) !important;
+      border: 1px solid rgba(201,169,110,0.5) !important;
+      padding: 8px 20px !important;
+      transition: all 0.35s var(--ease-luxury) !important;
+    }
+
+    .nav-cta:hover {
+      background: var(--c-gold) !important;
+      color: var(--c-charcoal) !important;
+      border-color: var(--c-gold) !important;
+    }
+
+    .nav-cta::after { display: none !important; }
+
+    /* Hamburger */
+    .nav-hamburger {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      width: 36px;
+      height: 36px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .nav-hamburger span {
+      display: block;
+      width: 100%;
+      height: 1.5px;
+      background: var(--c-cream);
+      transition: all 0.35s var(--ease-luxury);
+    }
+
+    .nav-hamburger.open span:nth-child(1) {
+      transform: rotate(45deg) translate(4.5px, 4.5px);
+    }
+
+    .nav-hamburger.open span:nth-child(2) {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+
+    .nav-hamburger.open span:nth-child(3) {
+      transform: rotate(-45deg) translate(4.5px, -4.5px);
+    }
+
+    /* Mobile Nav Overlay */
+    .nav-mobile-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--c-charcoal);
+      z-index: 999;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 2.5rem;
+      opacity: 0;
+      transition: opacity 0.4s var(--ease-luxury);
+    }
+
+    .nav-mobile-overlay.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .nav-mobile-overlay a {
+      font-family: var(--font-serif);
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      color: var(--c-cream);
+      text-decoration: none;
+      transition: color 0.3s;
+      letter-spacing: 0.05em;
+    }
+
+    .nav-mobile-overlay a:hover { color: var(--c-gold); }
+
+    /* =============================================
+       HERO
+    ============================================= */
+    #hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg,
+        #1C1C1A 0%,
+        #2A2018 25%,
+        #3A2E20 50%,
+        #2C2418 75%,
+        #1C1C1A 100%
+      );
+      background-size: 400% 400%;
+      animation: gradientDrift 20s ease infinite;
+    }
+
+    .hero-grain {
+      position: absolute;
+      inset: -50%;
+      width: 200%;
+      height: 200%;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      background-size: 220px 220px;
+      opacity: 0.055;
+      animation: grainShift 0.9s steps(1) infinite;
+      pointer-events: none;
+    }
+
+    .hero-vignette {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center,
+        transparent 35%,
+        rgba(0,0,0,0.5) 100%
+      );
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 0 var(--space-md);
+      max-width: 900px;
+    }
+
+    .hero-eyebrow {
+      font-family: var(--font-sans);
+      font-size: 0.75rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--c-gold);
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeIn 0.8s var(--ease-luxury) 0.4s both;
+    }
+
+    .hero-title {
+      font-family: var(--font-serif);
+      font-size: clamp(3rem, 8vw, 6.5rem);
+      font-weight: 400;
+      line-height: 1.08;
+      color: var(--c-cream);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-title-line {
+      display: block;
+      opacity: 0;
+    }
+
+    .hero-title-line:nth-child(1) {
+      animation: fadeUp 1s var(--ease-luxury) 0.7s both;
+    }
+
+    .hero-title-line:nth-child(2) {
+      animation: fadeUp 1s var(--ease-luxury) 1s both;
+      color: var(--c-gold);
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: rgba(250,250,248,0.65);
+      max-width: 480px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+      opacity: 0;
+      animation: fadeUp 1s var(--ease-luxury) 1.3s both;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      opacity: 0;
+      animation: fadeUp 1s var(--ease-luxury) 1.6s both;
+    }
+
+    .hero-scroll-hint {
+      position: absolute;
+      bottom: 2.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      z-index: 2;
+      opacity: 0;
+      animation: fadeIn 1s var(--ease-luxury) 2.2s both;
+    }
+
+    .hero-scroll-hint span {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(250,250,248,0.4);
+    }
+
+    .scroll-line {
+      width: 1px;
+      height: 50px;
+      background: linear-gradient(to bottom, rgba(201,169,110,0.6), transparent);
+      animation: scrollLine 2.5s ease-in-out infinite;
+    }
+
+    /* =============================================
+       O NAS (ABOUT)
+    ============================================= */
+    #o-nas {
+      padding: var(--space-xl) 0;
+      background: var(--c-cream);
+    }
+
+    .o-nas-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 6rem;
+      align-items: center;
+    }
+
+    /* Abstract CSS art composition */
+    .visual-frame {
+      position: relative;
+      height: 520px;
+      background: transparent;
+    }
+
+    .visual-block {
+      position: absolute;
+      border-radius: 0;
+    }
+
+    .v1 {
+      top: 0; left: 0;
+      width: 80%; height: 75%;
+      background: linear-gradient(160deg, #E8E0D5 0%, #D0C4B2 100%);
+    }
+
+    .v2 {
+      top: 12%; right: 0;
+      width: 32%; height: 65%;
+      background: linear-gradient(180deg, rgba(201,169,110,0.18) 0%, rgba(201,169,110,0.42) 100%);
+      border-left: 1px solid rgba(201,169,110,0.4);
+    }
+
+    .v3 {
+      bottom: 0; left: 8%;
+      width: 45%; height: 30%;
+      background: linear-gradient(135deg, #2C2420 0%, #3A3028 100%);
+    }
+
+    .v4 {
+      bottom: 4%; right: 6%;
+      width: 26%; height: 22%;
+      background: var(--c-beige);
+      border: 1px solid rgba(201,169,110,0.3);
+    }
+
+    .visual-accent {
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--c-gold), transparent);
+      transform: translateY(-50%);
+      opacity: 0.6;
+    }
+
+    .visual-accent-v {
+      position: absolute;
+      left: 80%; top: 0; bottom: 0;
+      width: 1px;
+      background: linear-gradient(to bottom, transparent, rgba(201,169,110,0.5) 30%, rgba(201,169,110,0.5) 70%, transparent);
+    }
+
+    .o-nas-text p {
+      color: var(--c-text-muted);
+      margin-bottom: 1.2rem;
+      font-size: 1.05rem;
+      line-height: 1.8;
+    }
+
+    .team-cards {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    .team-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.2rem 1.5rem;
+      border: 1px solid var(--c-border);
+      background: var(--c-white);
+      flex: 1;
+      min-width: 220px;
+      transition: all 0.35s var(--ease-luxury);
+    }
+
+    .team-card:hover {
+      border-color: rgba(201,169,110,0.4);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+      transform: translateY(-3px);
+    }
+
+    .team-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--c-gold);
+      color: var(--c-charcoal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-serif);
+      font-size: 0.95rem;
+      font-weight: 400;
+      flex-shrink: 0;
+    }
+
+    .team-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .team-info strong {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--c-charcoal);
+    }
+
+    .team-info span {
+      font-size: 0.8rem;
+      color: var(--c-text-muted);
+    }
+
+    .team-info a {
+      font-size: 0.78rem;
+      color: var(--c-gold);
+      text-decoration: none;
+      transition: opacity 0.3s;
+    }
+
+    .team-info a:hover { opacity: 0.7; }
+
+    /* =============================================
+       STATYSTYKI (STATS)
+    ============================================= */
+    #statystyki {
+      background: var(--c-charcoal);
+      padding: 5rem 0;
+    }
+
+    .stats-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 1.5rem 4rem;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .stat-value {
+      font-family: var(--font-serif);
+      font-size: clamp(2.8rem, 5vw, 4.5rem);
+      color: var(--c-gold);
+      line-height: 1;
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 0.1em;
+    }
+
+    .stat-number { font-family: var(--font-serif); }
+
+    .stat-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(250,250,248,0.45);
+      margin-top: 0.75rem;
+    }
+
+    .stat-divider {
+      width: 1px;
+      height: 60px;
+      background: rgba(201,169,110,0.2);
+      flex-shrink: 0;
+    }
+
+    /* =============================================
+       OFERTA (SERVICES)
+    ============================================= */
+    #oferta {
+      padding: var(--space-xl) 0;
+      background: var(--c-cream);
+    }
+
+    .oferta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      margin-top: 1rem;
+    }
+
+    .oferta-card {
+      padding: 3.5rem;
+      border-top: 3px solid var(--c-gold);
+      background: var(--c-white);
+      transition: all 0.4s var(--ease-luxury);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .oferta-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, transparent 0%, rgba(201,169,110,0.04) 100%);
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    .oferta-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 24px 56px rgba(0,0,0,0.1);
+    }
+
+    .oferta-card:hover::before { opacity: 1; }
+
+    .oferta-card--dark {
+      background: var(--c-charcoal);
+      color: var(--c-cream);
+    }
+
+    .oferta-card--dark h3 { color: var(--c-cream); }
+    .oferta-card--dark p  { color: rgba(250,250,248,0.7); }
+    .oferta-card--dark .oferta-list li { color: rgba(250,250,248,0.7); }
+    .oferta-card--dark .oferta-list li::before { color: var(--c-gold); }
+
+    .oferta-icon {
+      width: 52px;
+      height: 52px;
+      margin-bottom: 1.8rem;
+      color: var(--c-gold);
+    }
+
+    .oferta-card h3 {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 400;
+      color: var(--c-charcoal);
+      margin-bottom: 1rem;
+      line-height: 1.3;
+    }
+
+    .oferta-card p {
+      color: var(--c-text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.75;
+    }
+
+    .oferta-list {
+      margin-bottom: 2rem;
+    }
+
+    .oferta-list li {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      font-size: 0.92rem;
+      color: var(--c-text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .oferta-card--dark .oferta-list li {
+      border-bottom-color: rgba(255,255,255,0.08);
+    }
+
+    .oferta-list li::before {
+      content: '—';
+      color: var(--c-gold);
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+
+    .oferta-link {
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--c-gold);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: gap 0.3s var(--ease-luxury);
+    }
+
+    .oferta-link:hover { gap: 0.85rem; }
+
+    /* =============================================
+       PROCES (PROCESS TIMELINE)
+    ============================================= */
+    #proces {
+      padding: var(--space-xl) 0;
+    }
+
+    .proces-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 4rem;
+      border-bottom: 1px solid rgba(201,169,110,0.25);
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 1rem 2.5rem;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(250,250,248,0.45);
+      cursor: pointer;
+      position: relative;
+      transition: color 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tab-btn span {
+      font-size: 0.68rem;
+      color: var(--c-gold);
+      opacity: 0.6;
+      transition: opacity 0.3s;
+    }
+
+    .tab-btn::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 2px;
+      background: var(--c-gold);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.35s var(--ease-snap);
+    }
+
+    .tab-btn.active {
+      color: var(--c-cream);
+    }
+
+    .tab-btn.active span { opacity: 1; }
+    .tab-btn.active::after { transform: scaleX(1); }
+
+    .timeline {
+      position: relative;
+      padding-left: 80px;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 20px;
+      top: 8px;
+      bottom: 8px;
+      width: 1px;
+      background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        var(--c-gold) 8%,
+        var(--c-gold) 92%,
+        transparent 100%
+      );
+    }
+
+    .timeline.hidden { display: none; }
+
+    .timeline-item {
+      position: relative;
+      padding: 0 0 3rem 0;
+      transition: opacity 0.5s var(--ease-luxury), transform 0.5s var(--ease-luxury);
+    }
+
+    .timeline-item:last-child { padding-bottom: 0; }
+
+    .timeline-dot {
+      position: absolute;
+      left: -67px;
+      top: 5px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--c-gold);
+      border: 3px solid var(--c-charcoal);
+    }
+
+    .timeline-step {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--c-gold);
+      opacity: 0.7;
+      margin-bottom: 0.4rem;
+    }
+
+    .timeline-item h4 {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      font-weight: 400;
+      color: var(--c-cream);
+      margin-bottom: 0.5rem;
+    }
+
+    .timeline-item p {
+      font-size: 0.92rem;
+      color: rgba(250,250,248,0.55);
+      line-height: 1.7;
+      max-width: 560px;
+    }
+
+    /* =============================================
+       PROJEKTY (PORTFOLIO)
+    ============================================= */
+    #projekty {
+      padding: var(--space-xl) 0;
+      background: var(--c-cream);
+    }
+
+    .portfolio-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-auto-rows: 260px;
+      gap: 12px;
+    }
+
+    .portfolio-card {
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .portfolio-card.tall {
+      grid-row: span 2;
+    }
+
+    .portfolio-bg {
+      position: absolute;
+      inset: 0;
+      background: var(--grad, linear-gradient(135deg, #2C2420, #4A3828));
+      transition: transform 0.7s var(--ease-luxury);
+    }
+
+    .portfolio-card:hover .portfolio-bg {
+      transform: scale(1.04);
+    }
+
+    .portfolio-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to top,
+        rgba(10,8,6,0.92) 0%,
+        rgba(10,8,6,0.2) 50%,
+        transparent 100%
+      );
+      opacity: 0;
+      transition: opacity 0.4s var(--ease-luxury);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 2rem;
+    }
+
+    .portfolio-card:hover .portfolio-overlay {
+      opacity: 1;
+    }
+
+    .portfolio-name {
+      font-family: var(--font-serif);
+      font-size: 1.3rem;
+      font-weight: 400;
+      color: var(--c-cream);
+      transform: translateY(12px);
+      transition: transform 0.4s var(--ease-luxury);
+      line-height: 1.3;
+    }
+
+    .portfolio-card:hover .portfolio-name {
+      transform: translateY(0);
+    }
+
+    .portfolio-tag {
+      font-size: 0.68rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--c-gold);
+      margin-top: 0.4rem;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s var(--ease-luxury) 0.05s, transform 0.4s var(--ease-luxury) 0.05s;
+    }
+
+    .portfolio-card:hover .portfolio-tag {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Card number badge (always visible) */
+    .portfolio-badge {
+      position: absolute;
+      top: 1.2rem;
+      left: 1.2rem;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      color: rgba(201,169,110,0.5);
+      font-family: var(--font-serif);
+      transition: color 0.3s;
+    }
+
+    .portfolio-card:hover .portfolio-badge { color: var(--c-gold); }
+
+    /* =============================================
+       FILOZOFIA (PHILOSOPHY)
+    ============================================= */
+    #filozofia {
+      padding: var(--space-xl) 0;
+    }
+
+    .filozofia-layout {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 8rem;
+      align-items: center;
+    }
+
+    .filozofia-quote blockquote p {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 3vw, 2.2rem);
+      font-style: italic;
+      color: var(--c-charcoal);
+      line-height: 1.4;
+      position: relative;
+    }
+
+    .filozofia-quote blockquote p::before {
+      content: '\201C';
+      position: absolute;
+      top: -0.5em;
+      left: -0.15em;
+      font-size: 5em;
+      color: var(--c-gold);
+      opacity: 0.25;
+      font-style: normal;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .filozofia-quote blockquote footer {
+      margin-top: 1.5rem;
+      font-size: 0.78rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--c-text-muted);
+    }
+
+    .filozofia-pillars .section-title {
+      margin-bottom: 0;
+    }
+
+    .pillar {
+      display: flex;
+      gap: 1.5rem;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--c-border);
+      align-items: flex-start;
+    }
+
+    .pillar:last-child { border-bottom: none; }
+
+    .pillar-number {
+      font-family: var(--font-serif);
+      font-size: 1.8rem;
+      color: var(--c-gold);
+      opacity: 0.4;
+      min-width: 44px;
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .pillar-text h4 {
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      font-weight: 400;
+      color: var(--c-charcoal);
+      margin-bottom: 0.35rem;
+    }
+
+    .pillar-text p {
+      font-size: 0.9rem;
+      color: var(--c-text-muted);
+      line-height: 1.7;
+    }
+
+    /* =============================================
+       NADZOR (SUPERVISION)
+    ============================================= */
+    #nadzor {
+      padding: var(--space-xl) 0;
+    }
+
+    .nadzor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6rem;
+      align-items: center;
+    }
+
+    .nadzor-text p {
+      color: rgba(250,250,248,0.7);
+      margin-bottom: 1.2rem;
+      font-size: 1.02rem;
+      line-height: 1.8;
+    }
+
+    .nadzor-stages {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .stage-pill {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.1rem 1.4rem;
+      border: 1px solid rgba(201,169,110,0.22);
+      background: rgba(201,169,110,0.06);
+      transition: all 0.35s var(--ease-luxury);
+      cursor: default;
+    }
+
+    .stage-pill:hover {
+      border-color: rgba(201,169,110,0.55);
+      background: rgba(201,169,110,0.12);
+      transform: translateX(4px);
+    }
+
+    .stage-pill .stage-num {
+      font-family: var(--font-serif);
+      font-size: 1.1rem;
+      color: var(--c-gold);
+      min-width: 28px;
+      opacity: 0.7;
+    }
+
+    .stage-pill .stage-name {
+      font-size: 0.85rem;
+      color: rgba(250,250,248,0.75);
+      line-height: 1.3;
+    }
+
+    /* =============================================
+       KONTAKT (CONTACT)
+    ============================================= */
+    #kontakt {
+      padding: var(--space-xl) 0;
+      background: var(--c-cream);
+    }
+
+    .kontakt-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr;
+      gap: 6rem;
+      align-items: start;
+    }
+
+    .kontakt-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2.2rem;
+    }
+
+    .kontakt-block h4 {
+      font-size: 0.68rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--c-gold);
+      margin-bottom: 0.6rem;
+    }
+
+    .kontakt-block p {
+      font-size: 0.95rem;
+      color: var(--c-text-muted);
+      line-height: 1.8;
+    }
+
+    .kontakt-block a {
+      display: block;
+      font-size: 0.95rem;
+      color: var(--c-text-muted);
+      text-decoration: none;
+      transition: color 0.3s;
+      line-height: 1.8;
+    }
+
+    .kontakt-block a:hover { color: var(--c-charcoal); }
+
+    .social-links {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.3rem;
+    }
+
+    .social-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--c-text-muted) !important;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--c-border);
+      transition: all 0.3s !important;
+    }
+
+    .social-link:hover {
+      color: var(--c-gold) !important;
+      border-bottom-color: var(--c-gold);
+    }
+
+    /* Contact Form */
+    .kontakt-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 2rem;
+    }
+
+    .form-group label {
+      font-size: 0.7rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--c-text-muted);
+      margin-bottom: 0.6rem;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      font-family: var(--font-sans);
+      font-size: 1rem;
+      color: var(--c-charcoal);
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(28,28,26,0.2);
+      padding: 0.6rem 0;
+      outline: none;
+      transition: border-bottom-color 0.35s var(--ease-luxury),
+                  box-shadow 0.35s var(--ease-luxury);
+      resize: none;
+    }
+
+    .form-group textarea { min-height: 120px; resize: vertical; }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      border-bottom-color: var(--c-gold);
+      box-shadow: 0 1px 0 var(--c-gold);
+    }
+
+    .form-group input::placeholder,
+    .form-group textarea::placeholder {
+      color: rgba(28,28,26,0.3);
+      font-size: 0.95rem;
+    }
+
+    .form-success {
+      margin-top: 1rem;
+      padding: 1.2rem 1.5rem;
+      background: rgba(138,158,138,0.12);
+      border-left: 3px solid var(--c-sage);
+      color: var(--c-charcoal);
+      font-size: 0.92rem;
+      animation: fadeUp 0.5s var(--ease-luxury) both;
+    }
+
+    .form-success.hidden { display: none; }
+
+    /* =============================================
+       FOOTER
+    ============================================= */
+    footer {
+      background: var(--c-charcoal);
+      padding: 4rem 0 2.5rem;
+      border-top: 1px solid rgba(201,169,110,0.15);
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .footer-logo p {
+      font-size: 0.75rem;
+      color: rgba(250,250,248,0.35);
+      margin-top: 0.4rem;
+      letter-spacing: 0.1em;
+    }
+
+    .footer-nav {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .footer-nav a {
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(250,250,248,0.45);
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+
+    .footer-nav a:hover { color: var(--c-gold); }
+
+    .footer-copy {
+      font-size: 0.75rem;
+      color: rgba(250,250,248,0.25);
+      text-align: center;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding-top: 2rem;
+      letter-spacing: 0.05em;
+    }
+
+    /* =============================================
+       RESPONSIVE
+    ============================================= */
+    @media (max-width: 1024px) {
+      .o-nas-grid      { grid-template-columns: 1fr; gap: 3rem; }
+      .filozofia-layout { grid-template-columns: 1fr; gap: 3rem; }
+      .nadzor-grid     { grid-template-columns: 1fr; gap: 3rem; }
+      .visual-frame    { height: 320px; }
+      .v1 { width: 70%; height: 70%; }
+    }
+
+    @media (max-width: 768px) {
+      :root {
+        --space-xl: 5rem;
+        --space-lg: 2.5rem;
+      }
+
+      .nav-links { display: none; }
+      .nav-hamburger { display: flex; }
+
+      .portfolio-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: 220px;
+      }
+
+      .portfolio-card.tall { grid-row: span 1; }
+
+      .oferta-grid { grid-template-columns: 1fr; gap: 0; }
+
+      .stats-row { justify-content: flex-start; }
+      .stat-item { min-width: 140px; padding: 1.5rem 2rem; }
+      .stat-divider { height: 40px; }
+
+      .kontakt-grid { grid-template-columns: 1fr; gap: 3rem; }
+
+      .nadzor-stages { grid-template-columns: 1fr; }
+
+      .footer-inner { flex-direction: column; align-items: flex-start; }
+
+      .hero-actions { flex-direction: column; align-items: center; }
+      .hero-actions .btn { width: min(300px, 100%); }
+    }
+
+    @media (max-width: 480px) {
+      :root { --space-xl: 4rem; }
+
+      .portfolio-grid { grid-template-columns: 1fr; }
+      .team-cards     { flex-direction: column; }
+      .stat-divider   { display: none; }
+      .stat-item      { padding: 1.2rem; }
+      .oferta-card    { padding: 2rem; }
+      .timeline       { padding-left: 52px; }
+      .timeline::before { left: 10px; }
+      .timeline-dot   { left: -48px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== MOBILE OVERLAY ==================== -->
+  <div class="nav-mobile-overlay" id="mobileNav">
+    <a href="#o-nas"    onclick="closeMobileNav()">O nas</a>
+    <a href="#oferta"   onclick="closeMobileNav()">Oferta</a>
+    <a href="#projekty" onclick="closeMobileNav()">Projekty</a>
+    <a href="#nadzor"   onclick="closeMobileNav()">Nadzór</a>
+    <a href="#kontakt"  onclick="closeMobileNav()">Kontakt</a>
+  </div>
+
+  <!-- ==================== NAVIGATION ==================== -->
+  <nav id="nav">
+    <div class="nav-inner">
+      <a href="#hero" class="nav-logo">
+        <span class="logo-one">ONE</span><span class="logo-design">DESIGN</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#o-nas">O nas</a></li>
+        <li><a href="#oferta">Oferta</a></li>
+        <li><a href="#projekty">Projekty</a></li>
+        <li><a href="#nadzor">Nadzór inwestorski</a></li>
+        <li><a href="#kontakt" class="nav-cta">Kontakt</a></li>
+      </ul>
+      <button class="nav-hamburger" id="hamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ==================== HERO ==================== -->
+  <section id="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-grain"></div>
+    <div class="hero-vignette"></div>
+
+    <div class="hero-content">
+      <p class="hero-eyebrow">Warszawa &middot; Od 2008</p>
+      <h1 class="hero-title">
+        <span class="hero-title-line">Kiedy wnętrze</span>
+        <span class="hero-title-line">to nie wszystko&hellip;</span>
+      </h1>
+      <p class="hero-subtitle">Projektujemy przestrzenie, które opowiadają Twoją historię — ponadczasowo, empatycznie, bez sztucznego stylizowania.</p>
+      <div class="hero-actions">
+        <a href="#projekty" class="btn btn-primary">Zobacz projekty</a>
+        <a href="#o-nas"    class="btn btn-ghost">O pracowni</a>
+      </div>
+    </div>
+
+    <div class="hero-scroll-hint">
+      <span>Scroll</span>
+      <div class="scroll-line"></div>
+    </div>
+  </section>
+
+  <!-- ==================== O NAS ==================== -->
+  <section id="o-nas" class="section">
+    <div class="container">
+      <div class="o-nas-grid">
+        <div class="o-nas-visual reveal">
+          <div class="visual-frame">
+            <div class="visual-block v1"></div>
+            <div class="visual-block v2"></div>
+            <div class="visual-block v3"></div>
+            <div class="visual-block v4"></div>
+            <div class="visual-accent"></div>
+            <div class="visual-accent-v"></div>
+          </div>
+        </div>
+        <div class="o-nas-text">
+          <span class="section-eyebrow reveal">O pracowni</span>
+          <h2 class="section-title reveal">Projektujemy z empatią,<br>tworzymy z pasją</h2>
+          <div class="gold-rule reveal"></div>
+          <p class="reveal">Od 2008 roku tworzymy wnętrza, które są przedłużeniem osobowości ich właścicieli. Wierzymy, że prawdziwy projekt rodzi się z głębokiego zrozumienia potrzeb, stylu życia i marzeń klienta.</p>
+          <p class="reveal">Unikamy sztucznego stylizowania i schematycznych rozwiązań. Każda przestrzeń, którą projektujemy, jest ponadczasowa, autentyczna i dokładnie taka jak jej mieszkańcy — ludzka, emocjonalna i żywa.</p>
+          <div class="team-cards reveal-children">
+            <div class="team-card">
+              <div class="team-avatar">AF</div>
+              <div class="team-info">
+                <strong>Agata Filipczuk</strong>
+                <span>+48 604 461 809</span>
+                <a href="mailto:a.filipczuk@onedesign.pl">a.filipczuk@onedesign.pl</a>
+              </div>
+            </div>
+            <div class="team-card">
+              <div class="team-avatar">AP</div>
+              <div class="team-info">
+                <strong>Agata Petz</strong>
+                <span>+48 608 822 212</span>
+                <a href="mailto:a.petz@onedesign.pl">a.petz@onedesign.pl</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== STATYSTYKI ==================== -->
+  <section id="statystyki">
+    <div class="container">
+      <div class="stats-row reveal-children">
+        <div class="stat-item">
+          <div class="stat-value">
+            <span class="stat-number" data-count="18">0</span>
+            <span style="font-size:0.45em; opacity:0.6; margin-left:0.2em;">lat</span>
+          </div>
+          <p class="stat-label">doświadczenia</p>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <div class="stat-value">
+            <span class="stat-number" data-count="9">0</span>
+          </div>
+          <p class="stat-label">projektów w portfolio</p>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <div class="stat-value">
+            <span class="stat-number" data-count="2">0</span>
+          </div>
+          <p class="stat-label">projektantki</p>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <div class="stat-value">
+            <span class="stat-number" data-count="2008" data-start="2000">2000</span>
+          </div>
+          <p class="stat-label">rok założenia</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== OFERTA ==================== -->
+  <section id="oferta" class="section">
+    <div class="container">
+      <div class="section-header centered">
+        <span class="section-eyebrow reveal">Oferta</span>
+        <h2 class="section-title reveal">Kompleksowa opieka<br>nad Twoim wnętrzem</h2>
+        <div class="gold-rule centered reveal"></div>
+        <p class="reveal" style="color: var(--c-text-muted); max-width: 520px; margin: 0 auto; font-size: 1.02rem; line-height: 1.8;">
+          Od koncepcji projektowej do ostatniego gwoździa — wszystko pod jednym dachem.
+        </p>
+      </div>
+
+      <div class="oferta-grid reveal-children">
+        <div class="oferta-card">
+          <div class="oferta-icon">
+            <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" width="52" height="52">
+              <rect x="6" y="6" width="40" height="40" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="6" y1="20" x2="46" y2="20" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="20" y1="20" x2="20" y2="46" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="38" cy="13" r="3" stroke="currentColor" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <h3>Projektowanie wnętrz</h3>
+          <p>Kompleksowe projekty od pierwszej koncepcji po szczegółową dokumentację wykonawczą. Mieszkania, domy jednorodzinne i obiekty użyteczności publicznej.</p>
+          <ul class="oferta-list">
+            <li>Mieszkania i apartamenty</li>
+            <li>Domy jednorodzinne i rezydencje</li>
+            <li>Obiekty użyteczności publicznej</li>
+            <li>Wizualizacje 3D i dokumentacja techniczna</li>
+          </ul>
+          <a href="#proces" class="oferta-link">7 etapów projektu →</a>
+        </div>
+
+        <div class="oferta-card oferta-card--dark">
+          <div class="oferta-icon">
+            <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" width="52" height="52">
+              <path d="M10 42 L10 16 L26 8 L42 16 L42 42" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="20" y="28" width="12" height="14" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M16 22 L26 16 L36 22" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="6" y1="42" x2="46" y2="42" stroke="currentColor" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <h3>Wykończenie i realizacja</h3>
+          <p>Koordynacja i nadzór nad kompleksowym wykończeniem wnętrza. Jeden punkt kontaktu, pełna realizacja — od odbioru deweloperskiego do przekazania gotowego mieszkania.</p>
+          <ul class="oferta-list">
+            <li>Dobór i koordynacja wykonawców</li>
+            <li>Nadzór inwestorski na budowie</li>
+            <li>Zamawianie i odbiór materiałów</li>
+            <li>Przekazanie gotowego wnętrza</li>
+          </ul>
+          <a href="#nadzor" class="oferta-link">6 etapów wykończenia →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== PROCES ==================== -->
+  <section id="proces" class="section section--dark">
+    <div class="container">
+      <div class="section-header centered">
+        <span class="section-eyebrow reveal">Jak pracujemy</span>
+        <h2 class="section-title reveal">Nasz proces</h2>
+        <div class="gold-rule centered reveal"></div>
+      </div>
+
+      <div class="proces-tabs reveal">
+        <button class="tab-btn active" data-tab="design">
+          Projektowanie <span>7 etapów</span>
+        </button>
+        <button class="tab-btn" data-tab="finishing">
+          Wykończenie <span>6 etapów</span>
+        </button>
+      </div>
+
+      <div class="timeline" id="tab-design">
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 01</div>
+          <h4>Spotkanie wstępne</h4>
+          <p>Poznajemy Cię, Twój styl życia, potrzeby i marzenia o przestrzeni. To fundament każdego projektu.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 02</div>
+          <h4>Inwentaryzacja i analiza</h4>
+          <p>Pomiar i dokumentacja techniczna istniejącego stanu — rzuty, przekroje, analiza warunków oświetleniowych i przestrzennych.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 03</div>
+          <h4>Projekt koncepcyjny</h4>
+          <p>Propozycja układu funkcjonalnego, wstępny dobór materiałów i klimat wnętrza. Razem wybieramy kierunek.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 04</div>
+          <h4>Wizualizacje 3D</h4>
+          <p>Realistyczne wizualizacje każdego pomieszczenia — zobaczysz swoje wnętrze zanim cokolwiek zostanie zbudowane.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 05</div>
+          <h4>Dokumentacja wykonawcza</h4>
+          <p>Szczegółowe rysunki techniczne, przekroje, detale montażowe i opisy robót dla wykonawców.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 06</div>
+          <h4>Dobór materiałów i harmonogram</h4>
+          <p>Kompletne zestawienie materiałów, mebli i akcesoriów wraz z kosztorysem i harmonogramem realizacji.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 07</div>
+          <h4>Nadzór autorski</h4>
+          <p>Obecność na budowie, odpowiedzi na pytania wykonawców i czuwanie nad wiernością realizacji wobec projektu.</p>
+        </div>
+      </div>
+
+      <div class="timeline hidden" id="tab-finishing">
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 01</div>
+          <h4>Odbiór deweloperski</h4>
+          <p>Asystujemy przy odbiorze mieszkania od dewelopera — sprawdzamy stan techniczny i dokumentujemy uwagi.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 02</div>
+          <h4>Planowanie i harmonogram</h4>
+          <p>Ustalamy kolejność prac, dobieramy ekipy i przygotowujemy szczegółowy harmonogram realizacji.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 03</div>
+          <h4>Koordynacja wykonawców</h4>
+          <p>Zarządzamy wszystkimi ekipami na budowie — instalacje, zabudowy, tynki, podłogi, malarze.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 04</div>
+          <h4>Zamawianie i odbiór materiałów</h4>
+          <p>Zamawiamy w Twoim imieniu wszystkie materiały wykończeniowe, meble i wyposażenie — kontrolujemy dostawy.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 05</div>
+          <h4>Nadzór na budowie</h4>
+          <p>Regularne wizyty na budowie, kontrola jakości i zgodności z projektem na każdym etapie prac.</p>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-step">Etap 06</div>
+          <h4>Odbiór i finalizacja</h4>
+          <p>Montaż mebli, stylizacja wnętrza, odbiór końcowy i przekazanie gotowej przestrzeni.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== PROJEKTY ==================== -->
+  <section id="projekty" class="section">
+    <div class="container">
+      <div class="section-header centered">
+        <span class="section-eyebrow reveal">Portfolio</span>
+        <h2 class="section-title reveal">Nasze projekty</h2>
+        <div class="gold-rule centered reveal"></div>
+        <p class="reveal" style="color: var(--c-text-muted); max-width: 480px; margin: 0 auto; font-size: 1rem; line-height: 1.8;">
+          Każda przestrzeń opowiada unikalną historię. Oto dziewięć z nich.
+        </p>
+      </div>
+
+      <div class="portfolio-grid reveal">
+        <div class="portfolio-card tall" style="--grad: linear-gradient(150deg, #1A100C 0%, #2C1E14 50%, #3A2A1C 100%)">
+          <div class="portfolio-bg"></div>
+          <span class="portfolio-badge">01</span>
+          <div class="portfolio-overlay">
+            <h3 class="portfolio-name">Ciemna strona drewna</h3>
+            <span class="portfolio-tag">Mieszkanie · Warszawa</span>
+          </div>
+        </div>
+
+        <div class="portfolio-card" style="--grad: linear-gradient(135deg, #8B6420 0%, #C9A456 45%, #A67C35 100%)">
+          <div class="portfolio-bg"></div>
+          <span class="portfolio-badge">02</span>
+          <div class="portfolio-overlay">
+            <h3 class="portfolio-name">Wyszukane ciepło</h3>
+            <span class="portfolio-tag">Dom jednorodzinny</span>
+          </div>
+        </div>
+
+        <div class="portfolio-card" style="--grad: linear-gradient(120deg, #C8C4C0 0%, #A8A4A0 50%, #888480 100%)">
+          <div class="portfolio-bg"></div>
+          <span class="portfolio-badge">03</span>
+          <div class="portfolio-overlay">
+            <h3 class="portfolio-name">Stonowana elegancja</h3>
+            <span class="portfolio-tag">Apartament · Centrum</span>
+          </div>
+        </div>
+
+        <div class="portfolio-card" style="--grad: linear-gradient(145deg, #C8B890 0%, #A89060 45%, #8C7050 100%)">
+          <div class="portfolio-bg"></div>
+          <span class="portfolio-badge">04</span>
+          <div class="portfolio-overlay">
+            <h3 class="portfolio-name">Strukturalne beże i brązy</h3>
+            <span class="portfolio-tag">Dom · Mokotów</span>
+          </div>
+        </div>
+
+        <div class="portfolio-card tall" style="--grad: linear-gradient(130deg, #4A5C3A 0%, #6A7C58 40%, #3A4C2A 100%)">
+          <div class="portfolio-bg"></div>
+          <span class="portfolio-badge">05</span>
+          <div class="portfolio-overlay">
+            <h3 class="portfolio-name">W rytmie eko</h3>
+            <span class="portfolio-tag">Apartament · Wilanów</span>
+          </div>
+        </div>
+
+        <div class="portfolio-card" style="--grad: linear-gradient(155deg, #1C1C1A 0%, #3A2A10 50%, #C9A96E 100%)">
+          <div class="portfolio-bg"></div>
+          <span class="portfolio-badge">06</span>
+          <div class="portfolio-overlay">
+            <h3 class="portfolio-name">Ciepło z odrobiną kontrastu</h3>
+            <span class="portfolio-tag">Loft · Żoliborz</span>
+          </div>
+        </div>
+
+        <div class="portfolio-card" style="--grad: linear-gradient(140deg, #A0B098 0%, #7A9070 45%, #506050 100%)">
+          <div class="portfolio-bg"></div>
+          <span class="portfolio-badge">07</span>
+          <div class="portfolio-overlay">
+            <h3 class="portfolio-name">Natura i spokój</h3>
+            <span class="portfolio-tag">Dom · Konstancin</span>
+          </div>
+        </div>
+
+        <div class="portfolio-card tall" style="--grad: linear-gradient(125deg, #E8E0D5 0%, #C9B898 40%, #A89878 100%)">
+          <div class="portfolio-bg"></div>
+          <span class="portfolio-badge">08</span>
+          <div class="portfolio-overlay">
+            <h3 class="portfolio-name">Subtelny luksus w nowoczesnym wydaniu</h3>
+            <span class="portfolio-tag">Penthouse · Śródmieście</span>
+          </div>
+        </div>
+
+        <div class="portfolio-card" style="--grad: linear-gradient(150deg, #141210 0%, #2A2018 50%, #1A1610 100%)">
+          <div class="portfolio-bg"></div>
+          <span class="portfolio-badge">09</span>
+          <div class="portfolio-overlay">
+            <h3 class="portfolio-name">Dojrzała klasyka</h3>
+            <span class="portfolio-tag">Rezydencja · Ursynów</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FILOZOFIA ==================== -->
+  <section id="filozofia" class="section section--beige">
+    <div class="container">
+      <div class="filozofia-layout">
+        <div class="filozofia-quote reveal">
+          <blockquote>
+            <p>"Projektowanie to słuchanie — najpierw ludzi, potem przestrzeni."</p>
+            <footer>— Filozofia OneDesign</footer>
+          </blockquote>
+        </div>
+        <div class="filozofia-pillars">
+          <span class="section-eyebrow reveal">Filozofia</span>
+          <h2 class="section-title reveal">To, w co wierzymy</h2>
+          <div class="gold-rule reveal"></div>
+          <div class="reveal-children">
+            <div class="pillar">
+              <div class="pillar-number">01</div>
+              <div class="pillar-text">
+                <h4>Ponadczasowy styl</h4>
+                <p>Projektujemy wnętrza, które nie starzeją się ze zmianą trendów. Dobre wnętrze służy przez dekady.</p>
+              </div>
+            </div>
+            <div class="pillar">
+              <div class="pillar-number">02</div>
+              <div class="pillar-text">
+                <h4>Empatia i zrozumienie</h4>
+                <p>Słuchamy, zanim zaczniemy rysować. Rozumiemy styl życia — czy lubisz czytać przy lampie, czy potrzebujesz wielu gniazdek.</p>
+              </div>
+            </div>
+            <div class="pillar">
+              <div class="pillar-number">03</div>
+              <div class="pillar-text">
+                <h4>Podejście personalizowane</h4>
+                <p>Żaden projekt nie wygląda tak samo. Każda przestrzeń jest jedyna w swoim rodzaju — jak jej właściciele.</p>
+              </div>
+            </div>
+            <div class="pillar">
+              <div class="pillar-number">04</div>
+              <div class="pillar-text">
+                <h4>Bez sztucznego stylizowania</h4>
+                <p>Prawdziwe materiały, uczciwa estetyka, autentyczne rozwiązania. Wnętrze ma być żywe, nie wystawowe.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== NADZOR ==================== -->
+  <section id="nadzor" class="section section--dark">
+    <div class="container">
+      <div class="nadzor-grid">
+        <div class="nadzor-text">
+          <span class="section-eyebrow reveal">Nadzór inwestorski</span>
+          <h2 class="section-title reveal">Realizacja<br>pod naszą opieką</h2>
+          <div class="gold-rule reveal"></div>
+          <p class="reveal">Oferujemy kompleksową usługę wykończenia „pod klucz". Koordynujemy wszystkich wykonawców, kontrolujemy jakość prac i pilnujemy harmonogramu.</p>
+          <p class="reveal">Dzięki nam masz jeden kontakt zamiast dziesiątek ekip. Ty możesz spokojnie czekać na efekt — my zajmujemy się wszystkim.</p>
+          <div class="reveal" style="margin-top: 2.5rem;">
+            <a href="#kontakt" class="btn btn-primary">Zapytaj o wycenę</a>
+          </div>
+        </div>
+        <div class="nadzor-stages reveal-children">
+          <div class="stage-pill">
+            <span class="stage-num">01</span>
+            <span class="stage-name">Odbiór deweloperski</span>
+          </div>
+          <div class="stage-pill">
+            <span class="stage-num">02</span>
+            <span class="stage-name">Planowanie i harmonogram</span>
+          </div>
+          <div class="stage-pill">
+            <span class="stage-num">03</span>
+            <span class="stage-name">Koordynacja wykonawców</span>
+          </div>
+          <div class="stage-pill">
+            <span class="stage-num">04</span>
+            <span class="stage-name">Zamawianie materiałów</span>
+          </div>
+          <div class="stage-pill">
+            <span class="stage-num">05</span>
+            <span class="stage-name">Nadzór na budowie</span>
+          </div>
+          <div class="stage-pill">
+            <span class="stage-num">06</span>
+            <span class="stage-name">Odbiór i finalizacja</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== KONTAKT ==================== -->
+  <section id="kontakt" class="section">
+    <div class="container">
+      <div class="section-header centered">
+        <span class="section-eyebrow reveal">Kontakt</span>
+        <h2 class="section-title reveal">Zacznijmy rozmawiać</h2>
+        <div class="gold-rule centered reveal"></div>
+        <p class="reveal" style="color: var(--c-text-muted); max-width: 480px; margin: 0 auto; font-size: 1rem; line-height: 1.8;">
+          Opowiedz nam o swojej przestrzeni. Pierwsze spotkanie zawsze bezpłatnie.
+        </p>
+      </div>
+
+      <div class="kontakt-grid">
+        <div class="kontakt-info reveal-children">
+          <div class="kontakt-block">
+            <h4>Studio</h4>
+            <p>ul. Wołodyjowskiego 58<br>02-724 Warszawa</p>
+          </div>
+          <div class="kontakt-block">
+            <h4>E-mail ogólny</h4>
+            <a href="mailto:biuro@onedesign.pl">biuro@onedesign.pl</a>
+          </div>
+          <div class="kontakt-block">
+            <h4>Agata Filipczuk</h4>
+            <a href="tel:+48604461809">+48 604 461 809</a>
+            <a href="mailto:a.filipczuk@onedesign.pl">a.filipczuk@onedesign.pl</a>
+          </div>
+          <div class="kontakt-block">
+            <h4>Agata Petz</h4>
+            <a href="tel:+48608822212">+48 608 822 212</a>
+            <a href="mailto:a.petz@onedesign.pl">a.petz@onedesign.pl</a>
+          </div>
+          <div class="kontakt-block">
+            <h4>Social media</h4>
+            <div class="social-links">
+              <a href="https://instagram.com/onedesignpl" class="social-link" target="_blank" rel="noopener">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                  <circle cx="12" cy="12" r="4"/>
+                  <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/>
+                </svg>
+                Instagram
+              </a>
+              <a href="https://facebook.com/Onedesignpl" class="social-link" target="_blank" rel="noopener">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+                </svg>
+                Facebook
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <form class="kontakt-form reveal" id="kontakt-form" novalidate>
+          <div class="form-group">
+            <label for="imie">Imię i nazwisko</label>
+            <input type="text" id="imie" name="imie" placeholder="Jan Kowalski" required>
+          </div>
+          <div class="form-group">
+            <label for="email">Adres e-mail</label>
+            <input type="email" id="email" name="email" placeholder="jan@example.pl" required>
+          </div>
+          <div class="form-group">
+            <label for="telefon">Telefon (opcjonalnie)</label>
+            <input type="tel" id="telefon" name="telefon" placeholder="+48 000 000 000">
+          </div>
+          <div class="form-group">
+            <label for="wiadomosc">Wiadomość</label>
+            <textarea id="wiadomosc" name="wiadomosc" rows="5" placeholder="Opowiedz nam o swojej przestrzeni — metraż, lokalizacja, styl, który Cię fascynuje…" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn--full" id="submitBtn">Wyślij wiadomość</button>
+          <div class="form-success hidden" id="form-success">
+            Dziękujemy! Odezwiemy się w ciągu 1–2 dni roboczych.
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-logo">
+          <a href="#hero" class="nav-logo">
+            <span class="logo-one">ONE</span><span class="logo-design">DESIGN</span>
+          </a>
+          <p>Warszawa &middot; Od 2008</p>
+        </div>
+        <nav class="footer-nav">
+          <a href="#o-nas">O nas</a>
+          <a href="#oferta">Oferta</a>
+          <a href="#projekty">Projekty</a>
+          <a href="#nadzor">Nadzór inwestorski</a>
+          <a href="#kontakt">Kontakt</a>
+        </nav>
+      </div>
+      <p class="footer-copy">&copy; 2026 OneDesign. Wszelkie prawa zastrzeżone.</p>
+    </div>
+  </footer>
+
+  <!-- ==================== JAVASCRIPT ==================== -->
+  <script>
+    // ── Navigation scroll behavior ──────────────────────────────
+    const nav = document.getElementById('nav');
+    let lastScrollY = 0;
+
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY;
+      nav.classList.toggle('nav-scrolled', y > 60);
+
+      if (y > lastScrollY + 8 && y > 400) {
+        nav.classList.add('nav-hidden');
+      } else if (y < lastScrollY - 8 || y < 100) {
+        nav.classList.remove('nav-hidden');
+      }
+
+      lastScrollY = y;
+    }, { passive: true });
+
+    // ── Hamburger / mobile nav ───────────────────────────────────
+    const hamburger  = document.getElementById('hamburger');
+    const mobileNav  = document.getElementById('mobileNav');
+
+    hamburger.addEventListener('click', () => {
+      const isOpen = mobileNav.classList.toggle('open');
+      hamburger.classList.toggle('open', isOpen);
+      document.body.classList.toggle('no-scroll', isOpen);
+    });
+
+    function closeMobileNav() {
+      mobileNav.classList.remove('open');
+      hamburger.classList.remove('open');
+      document.body.classList.remove('no-scroll');
+    }
+
+    // ── Smooth scroll with nav offset ───────────────────────────
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', e => {
+        const target = document.querySelector(anchor.getAttribute('href'));
+        if (!target) return;
+        e.preventDefault();
+        const offset = target.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({ top: offset, behavior: 'smooth' });
+      });
+    });
+
+    // ── IntersectionObserver: reveal animations ──────────────────
+    const revealObs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('visible');
+        entry.target.querySelectorAll('.gold-rule').forEach(r => r.classList.add('visible'));
+        revealObs.unobserve(entry.target);
+      });
+    }, { threshold: 0.12 });
+
+    document.querySelectorAll('.reveal, .reveal-children').forEach(el => {
+      revealObs.observe(el);
+    });
+
+    // Make standalone gold-rules (not inside .reveal) observable too
+    document.querySelectorAll('.gold-rule').forEach(el => {
+      if (!el.closest('.reveal') && !el.closest('.reveal-children')) {
+        const obs = new IntersectionObserver((entries) => {
+          entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
+        }, { threshold: 0.5 });
+        obs.observe(el);
+      }
+    });
+
+    // ── Animated counters ────────────────────────────────────────
+    function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
+
+    function animateCounter(el, target, startVal, duration) {
+      const start = performance.now();
+      function tick(now) {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased    = easeOutQuart(progress);
+        el.textContent = Math.round(startVal + (target - startVal) * eased);
+        if (progress < 1) requestAnimationFrame(tick);
+        else el.textContent = target;
+      }
+      requestAnimationFrame(tick);
+    }
+
+    const statsObs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.querySelectorAll('[data-count]').forEach(el => {
+          const target   = parseInt(el.dataset.count);
+          const startVal = el.dataset.start ? parseInt(el.dataset.start) : 0;
+          const duration = target > 100 ? 1400 : 1800;
+          animateCounter(el, target, startVal, duration);
+        });
+        statsObs.unobserve(entry.target);
+      });
+    }, { threshold: 0.5 });
+
+    const statsSection = document.getElementById('statystyki');
+    if (statsSection) statsObs.observe(statsSection);
+
+    // ── Process tab switcher ─────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.timeline').forEach(t => t.classList.add('hidden'));
+
+        btn.classList.add('active');
+        const panel = document.getElementById('tab-' + btn.dataset.tab);
+        panel.classList.remove('hidden');
+
+        panel.querySelectorAll('.timeline-item').forEach((item, i) => {
+          item.style.opacity = '0';
+          item.style.transform = 'translateX(-20px)';
+          item.style.transition = 'none';
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              item.style.transition = `opacity 0.5s ${i * 0.08}s ease, transform 0.5s ${i * 0.08}s ease`;
+              item.style.opacity   = '1';
+              item.style.transform = 'translateX(0)';
+            });
+          });
+        });
+      });
+    });
+
+    // Initial stagger for the design tab (already visible)
+    document.querySelectorAll('#tab-design .timeline-item').forEach((item, i) => {
+      item.style.opacity   = '0';
+      item.style.transform = 'translateX(-20px)';
+
+      const timelineObs = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          setTimeout(() => {
+            entry.target.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            entry.target.style.opacity    = '1';
+            entry.target.style.transform  = 'translateX(0)';
+          }, i * 90);
+          timelineObs.unobserve(entry.target);
+        });
+      }, { threshold: 0.2 });
+      timelineObs.observe(item);
+    });
+
+    // ── Contact form ─────────────────────────────────────────────
+    document.getElementById('kontakt-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const btn     = document.getElementById('submitBtn');
+      const success = document.getElementById('form-success');
+      btn.textContent = 'Wysyłanie…';
+      btn.disabled    = true;
+      setTimeout(() => {
+        success.classList.remove('hidden');
+        e.target.reset();
+        btn.textContent = 'Wyślij wiadomość';
+        btn.disabled    = false;
+        success.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 1200);
+    });
+
+    // ── Hero scroll hint fade out ────────────────────────────────
+    const scrollHint = document.querySelector('.hero-scroll-hint');
+    window.addEventListener('scroll', () => {
+      if (scrollHint) {
+        scrollHint.style.opacity = Math.max(0, 1 - window.scrollY / 300).toString();
+      }
+    }, { passive: true });
+  </script>
+</body>
+</html>

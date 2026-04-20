@@ -86,6 +86,297 @@ def find_song():
 SONG_PATH = find_song() or r"C:\Users\filip\Desktop\claudecode\sounds\iron_man.mp3"
 if not os.path.exists(SONG_PATH): SONG_PATH = None
 
+# ─── Mind Map HTML Template ───────────────────────────────────────────────────
+MINDMAP_HTML_TEMPLATE = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>__TITLE__ — Mind Map</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#04080f; font-family:'Consolas','Share Tech Mono',monospace; overflow:hidden; width:100vw; height:100vh; color:#e8f4f8; }
+  #header { position:fixed; top:0; left:0; right:0; height:32px; background:rgba(0,0,0,0.88); border-bottom:1px solid rgba(0,255,200,0.18); display:flex; align-items:center; justify-content:center; z-index:100; }
+  #header span { font-size:11px; letter-spacing:3px; color:rgba(0,255,200,0.7); text-transform:uppercase; }
+  .scanline { position:fixed; top:32px; left:0; right:0; bottom:0; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,200,0.010) 2px,rgba(0,255,200,0.010) 4px); pointer-events:none; z-index:50; }
+  #canvas-wrap { position:fixed; top:32px; left:0; right:0; bottom:0; cursor:grab; }
+  #canvas-wrap.dragging { cursor:grabbing; }
+  svg#map { width:100%; height:100%; display:block; }
+  .edge { fill:none; stroke-width:1.2; opacity:0.25; transition:opacity 0.2s,stroke-width 0.2s; }
+  .edge.bright { opacity:0.9; stroke-width:2; }
+  .edge.dim    { opacity:0.04; }
+  .node-group  { cursor:pointer; }
+  .node-circle { transition:filter 0.2s; }
+  .node-group:hover .node-circle { filter:drop-shadow(0 0 14px currentColor) drop-shadow(0 0 4px currentColor); }
+  .node-group.highlighted .node-circle { filter:drop-shadow(0 0 18px currentColor); }
+  .node-group.dim { opacity:0.12; }
+  .node-label { pointer-events:none; font-weight:700; letter-spacing:0.5px; }
+  #tooltip { position:fixed; z-index:200; display:none; background:rgba(4,8,15,0.97); border:1px solid rgba(0,255,200,0.3); border-radius:8px; padding:14px 16px; max-width:320px; box-shadow:0 0 28px rgba(0,255,200,0.13),inset 0 0 28px rgba(0,255,200,0.03); pointer-events:none; backdrop-filter:blur(8px); }
+  #tt-title { font-size:14px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:7px; }
+  #tt-body  { font-size:12px; color:rgba(232,244,248,0.78); line-height:1.55; }
+  #legend { position:fixed; top:46px; left:14px; z-index:100; background:rgba(4,8,15,0.65); border:1px solid rgba(0,255,200,0.14); border-radius:6px; padding:10px 12px; backdrop-filter:blur(4px); }
+  #legend .leg-title { font-size:9px; color:rgba(0,255,200,0.5); letter-spacing:2px; margin-bottom:8px; }
+  .leg-item { display:flex; align-items:center; gap:7px; font-size:10px; color:rgba(232,244,248,0.6); margin:3px 0; }
+  .leg-dot  { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  #controls { position:fixed; bottom:18px; right:18px; z-index:100; display:flex; flex-direction:column; gap:6px; }
+  .ctrl-btn { width:36px; height:36px; border-radius:6px; background:rgba(0,255,200,0.07); border:1px solid rgba(0,255,200,0.28); color:#00ffc8; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:'Consolas',monospace; transition:all 0.2s; }
+  .ctrl-btn:hover { background:rgba(0,255,200,0.16); box-shadow:0 0 12px rgba(0,255,200,0.32); }
+  #hint { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); font-size:9px; color:rgba(0,255,200,0.3); letter-spacing:3px; text-transform:uppercase; z-index:100; pointer-events:none; }
+  .ring { fill:none; stroke:#00ffc8; }
+  .ring1 { animation:pulse1 3s ease-in-out infinite; }
+  .ring2 { animation:pulse2 3s ease-in-out infinite; animation-delay:1.5s; }
+  @keyframes pulse1 { 0%,100%{r:58;opacity:.16;} 50%{r:66;opacity:.30;} }
+  @keyframes pulse2 { 0%,100%{r:78;opacity:.07;} 50%{r:86;opacity:.14;} }
+</style>
+</head>
+<body>
+<div id="header"><span>// __TITLE__ &nbsp;&middot;&nbsp; JARVIS KNOWLEDGE ATLAS</span></div>
+<div class="scanline"></div>
+<div id="legend"><div class="leg-title">// CATEGORIES</div><div id="legend-items"></div></div>
+<div id="canvas-wrap"><svg id="map" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div id="controls">
+  <button class="ctrl-btn" id="zoomIn">+</button>
+  <button class="ctrl-btn" id="zoomOut">&minus;</button>
+  <button class="ctrl-btn" id="resetBtn" title="Reset">&#x2316;</button>
+</div>
+<div id="hint">DRAG TO PAN &middot; SCROLL TO ZOOM &middot; HOVER FOR INFO</div>
+<div id="tooltip"><div id="tt-title"></div><div id="tt-body"></div></div>
+<script>
+const RAW_NODES = __NODES_JSON__;
+const RAW_EDGES = __EDGES_JSON__;
+const RAW_CATS  = __CATEGORIES_JSON__;
+
+const CAT = {};
+RAW_CATS.forEach(function(c){ CAT[c.name] = c.color; });
+
+const nodeById = {};
+RAW_NODES.forEach(function(n){ nodeById[n.id] = n; });
+const children = {};
+RAW_NODES.forEach(function(n){
+  const pid = n.parent_id;
+  if(pid){ if(!children[pid]) children[pid]=[]; children[pid].push(n.id); }
+});
+
+const RADII = [0, 220, 430, 620, 800];
+const POSITIONS = {};
+
+function getDepth(id, visited){
+  visited = visited || new Set();
+  if(visited.has(id)) return 0;
+  visited.add(id);
+  const n = nodeById[id];
+  if(!n || !n.parent_id) return 0;
+  return 1 + getDepth(n.parent_id, visited);
+}
+
+function layoutSubtree(id, startAngle, endAngle, depth){
+  const angle = (startAngle + endAngle) / 2;
+  const r = RADII[depth] !== undefined ? RADII[depth] : depth * 210;
+  POSITIONS[id] = { x: Math.cos(angle)*r, y: Math.sin(angle)*r };
+  const kids = children[id] || [];
+  if(kids.length === 0) return;
+  const span = endAngle - startAngle;
+  const step = span / kids.length;
+  kids.forEach(function(kid, i){
+    layoutSubtree(kid, startAngle + i*step, startAngle + (i+1)*step, depth+1);
+  });
+}
+
+let rootId = null;
+RAW_NODES.forEach(function(n){ if(!n.parent_id) rootId = n.id; });
+if(rootId){
+  POSITIONS[rootId] = {x:0, y:0};
+  const rootKids = children[rootId] || [];
+  const step = (2 * Math.PI) / Math.max(rootKids.length, 1);
+  rootKids.forEach(function(kid, i){
+    layoutSubtree(kid, i*step - Math.PI/2, (i+1)*step - Math.PI/2, 1);
+  });
+}
+
+const EDGES = [];
+RAW_NODES.forEach(function(n){
+  if(n.parent_id && nodeById[n.parent_id]) EDGES.push([n.parent_id, n.id]);
+});
+RAW_EDGES.forEach(function(e){ EDGES.push(e); });
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('map');
+let vbW=2400, vbH=1800, vbX=-1200, vbY=-900;
+function setVB(){ svg.setAttribute('viewBox', vbX+' '+vbY+' '+vbW+' '+vbH); }
+setVB();
+
+const gridG = document.createElementNS(SVG_NS,'g');
+for(let x=-1400;x<=1400;x+=90){
+  const l=document.createElementNS(SVG_NS,'line');
+  l.setAttribute('x1',x);l.setAttribute('y1',-1100);l.setAttribute('x2',x);l.setAttribute('y2',1100);
+  l.setAttribute('stroke','rgba(0,255,200,0.025)');l.setAttribute('stroke-width','1');
+  gridG.appendChild(l);
+}
+for(let y=-1100;y<=1100;y+=90){
+  const l=document.createElementNS(SVG_NS,'line');
+  l.setAttribute('x1',-1400);l.setAttribute('y1',y);l.setAttribute('x2',1400);l.setAttribute('y2',y);
+  l.setAttribute('stroke','rgba(0,255,200,0.025)');l.setAttribute('stroke-width','1');
+  gridG.appendChild(l);
+}
+svg.appendChild(gridG);
+
+['ring ring1','ring ring2'].forEach(function(cls){
+  const c=document.createElementNS(SVG_NS,'circle');
+  c.setAttribute('cx',0);c.setAttribute('cy',0);c.setAttribute('class',cls);
+  svg.appendChild(c);
+});
+
+const edgesG = document.createElementNS(SVG_NS,'g');
+svg.appendChild(edgesG);
+EDGES.forEach(function(pair){
+  const a=pair[0],b=pair[1];
+  const A=nodeById[a],B=nodeById[b];
+  if(!A||!B) return;
+  const px=POSITIONS[a],py=POSITIONS[b];
+  if(!px||!py) return;
+  const mx=(px.x+py.x)/2, my=(px.y+py.y)/2;
+  const dx=py.x-px.x, dy=py.y-px.y;
+  const len=Math.sqrt(dx*dx+dy*dy)||1;
+  const off=Math.min(70, len*0.14);
+  const ox=-dy/len*off, oy=dx/len*off;
+  const path=document.createElementNS(SVG_NS,'path');
+  path.setAttribute('d','M '+px.x+' '+px.y+' Q '+(mx+ox)+' '+(my+oy)+' '+py.x+' '+py.y);
+  path.setAttribute('class','edge');
+  const col = CAT[A.category] || '#00ffc8';
+  path.setAttribute('stroke', col);
+  path.dataset.a=a; path.dataset.b=b;
+  edgesG.appendChild(path);
+});
+
+const nodesG = document.createElementNS(SVG_NS,'g');
+svg.appendChild(nodesG);
+RAW_NODES.forEach(function(n){
+  const pos = POSITIONS[n.id];
+  if(!pos) return;
+  const color = CAT[n.category] || '#00ffc8';
+  const isRoot = !n.parent_id;
+  const depth = getDepth(n.id);
+  const r = isRoot ? 52 : (depth===1 ? 34 : (depth===2 ? 24 : 18));
+
+  const g=document.createElementNS(SVG_NS,'g');
+  g.setAttribute('class','node-group');
+  g.setAttribute('transform','translate('+pos.x+','+pos.y+')');
+  g.dataset.id=n.id;
+
+  const halo=document.createElementNS(SVG_NS,'circle');
+  halo.setAttribute('r',r+5);halo.setAttribute('fill',color);halo.setAttribute('opacity','0.055');
+  g.appendChild(halo);
+
+  const c=document.createElementNS(SVG_NS,'circle');
+  c.setAttribute('r',r);c.setAttribute('fill','#04080f');
+  c.setAttribute('stroke',color);c.setAttribute('stroke-width',isRoot?2.5:1.8);
+  c.setAttribute('class','node-circle');c.style.color=color;
+  g.appendChild(c);
+
+  const dot=document.createElementNS(SVG_NS,'circle');
+  dot.setAttribute('r',2.5);dot.setAttribute('cx',0);dot.setAttribute('cy',r-9);
+  dot.setAttribute('fill',color);dot.setAttribute('opacity','0.65');
+  g.appendChild(dot);
+
+  const lines=(n.label||'').split('\n');
+  const fs = isRoot?15:(depth===1?12:(depth===2?10:9));
+  const lh=fs+2;
+  const startY=-(lines.length*lh)/2+fs-2;
+  lines.forEach(function(line,i){
+    const t=document.createElementNS(SVG_NS,'text');
+    t.setAttribute('x',0);t.setAttribute('y',startY+i*lh);
+    t.setAttribute('text-anchor','middle');t.setAttribute('class','node-label');
+    t.setAttribute('fill',color);t.setAttribute('font-size',fs);
+    t.setAttribute('font-family',"'Consolas','Share Tech Mono',monospace");
+    t.textContent=line; g.appendChild(t);
+  });
+
+  nodesG.appendChild(g);
+  g.addEventListener('mouseenter',function(e){ showTT(n,color,e); hlConn(n.id,true); });
+  g.addEventListener('mousemove',moveTT);
+  g.addEventListener('mouseleave',function(){ hideTT(); hlConn(n.id,false); });
+});
+
+const tooltip=document.getElementById('tooltip');
+const ttTitle=document.getElementById('tt-title');
+const ttBody=document.getElementById('tt-body');
+function showTT(n,color,e){
+  ttTitle.textContent=(n.label||'').replace(/\n/g,' ');
+  ttTitle.style.color=color;
+  ttBody.textContent=n.info||'';
+  tooltip.style.borderColor=color+'88';
+  tooltip.style.boxShadow='0 0 28px '+color+'20,inset 0 0 28px '+color+'09';
+  tooltip.style.display='block';
+  moveTT(e);
+}
+function moveTT(e){
+  const pad=16,tw=tooltip.offsetWidth,th=tooltip.offsetHeight;
+  let x=e.clientX+pad,y=e.clientY+pad;
+  if(x+tw>window.innerWidth-10) x=e.clientX-tw-pad;
+  if(y+th>window.innerHeight-10) y=e.clientY-th-pad;
+  tooltip.style.left=x+'px'; tooltip.style.top=y+'px';
+}
+function hideTT(){ tooltip.style.display='none'; }
+
+function hlConn(id,on){
+  const conn=new Set([id]);
+  EDGES.forEach(function(p){ if(p[0]===id)conn.add(p[1]); if(p[1]===id)conn.add(p[0]); });
+  document.querySelectorAll('.node-group').forEach(function(g){
+    if(!on){g.classList.remove('dim','highlighted');return;}
+    if(conn.has(g.dataset.id)) g.classList.add('highlighted'); else g.classList.add('dim');
+  });
+  document.querySelectorAll('.edge').forEach(function(edge){
+    if(!on){edge.classList.remove('bright','dim');return;}
+    if(edge.dataset.a===id||edge.dataset.b===id) edge.classList.add('bright'); else edge.classList.add('dim');
+  });
+}
+
+const wrap=document.getElementById('canvas-wrap');
+let isDown=false,sx=0,sy=0,svbX=0,svbY=0;
+wrap.addEventListener('mousedown',function(e){
+  if(e.target.closest('.node-group'))return;
+  isDown=true;wrap.classList.add('dragging');
+  sx=e.clientX;sy=e.clientY;svbX=vbX;svbY=vbY;
+});
+window.addEventListener('mousemove',function(e){
+  if(!isDown)return;
+  const sc=vbW/wrap.clientWidth;
+  vbX=svbX-(e.clientX-sx)*sc; vbY=svbY-(e.clientY-sy)*sc; setVB();
+});
+window.addEventListener('mouseup',function(){isDown=false;wrap.classList.remove('dragging');});
+
+wrap.addEventListener('wheel',function(e){
+  e.preventDefault();
+  const f=e.deltaY>0?1.12:0.89;
+  const nW=vbW*f,nH=vbH*f;
+  if(nW<400||nW>5200)return;
+  const rect=wrap.getBoundingClientRect();
+  vbX+=(vbW-nW)*((e.clientX-rect.left)/rect.width);
+  vbY+=(vbH-nH)*((e.clientY-rect.top)/rect.height);
+  vbW=nW;vbH=nH;setVB();
+},{passive:false});
+
+function zoomBy(f){
+  const nW=vbW*f,nH=vbH*f;
+  if(nW<400||nW>5200)return;
+  vbX+=(vbW-nW)/2;vbY+=(vbH-nH)/2;vbW=nW;vbH=nH;setVB();
+}
+document.getElementById('zoomIn').addEventListener('click',function(){zoomBy(0.85);});
+document.getElementById('zoomOut').addEventListener('click',function(){zoomBy(1.18);});
+document.getElementById('resetBtn').addEventListener('click',function(){
+  vbW=2400;vbH=1800;vbX=-1200;vbY=-900;setVB();
+});
+
+const legEl=document.getElementById('legend-items');
+RAW_CATS.forEach(function(c){
+  const d=document.createElement('div');
+  d.className='leg-item';
+  d.innerHTML='<span class="leg-dot" style="background:'+c.color+';box-shadow:0 0 5px '+c.color+';"></span><span>'+c.name+'</span>';
+  legEl.appendChild(d);
+});
+</script>
+</body>
+</html>"""
+
 CHUNK = 1024; FORMAT = pyaudio.paInt16; CHANNELS = 1; RATE = 44100
 CLAP_THRESHOLD = 1400; DOUBLE_CLAP_MAX = 1.2; DOUBLE_CLAP_DEBOUNCE = 0.12
 
@@ -206,6 +497,23 @@ def build_memory_context(mem):
         "the data back verbatim, and don't mention that you have a memory log."
     )
     return "\n".join(lines)
+
+# ─── Mind Map Generator ───────────────────────────────────────────────────────
+def generate_mindmap_file(topic, nodes, categories):
+    import re as _re
+    edges = []
+    html = MINDMAP_HTML_TEMPLATE
+    html = html.replace("__TITLE__",           topic)
+    html = html.replace("__NODES_JSON__",      json.dumps(nodes,      ensure_ascii=False))
+    html = html.replace("__EDGES_JSON__",      json.dumps(edges,      ensure_ascii=False))
+    html = html.replace("__CATEGORIES_JSON__", json.dumps(categories, ensure_ascii=False))
+    slug    = _re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")
+    outpath = os.path.join(r"C:\Users\filip\Downloads", f"{slug}-mindmap.html")
+    os.makedirs(os.path.dirname(os.path.abspath(outpath)), exist_ok=True)
+    with open(outpath, "w", encoding="utf-8") as f:
+        f.write(html)
+    webbrowser.open(f"file:///{outpath.replace(os.sep, '/')}")
+    return f"Mind map saved to {outpath} and opened in browser"
 
 # ─── Calendar / Librus / Birthdays ────────────────────────────────────────────
 def _parse_ics_line(line):
@@ -2054,6 +2362,37 @@ TOOLS = [
     {"name": "show_librus",
      "description": "Show only the Librus Synergia schedule for the next 7 days as a holographic panel. Use this when the user asks specifically about Librus, school schedule, tests, homework deadlines, etc.",
      "input_schema": {"type": "object", "properties": {}}},
+    {"name": "generate_mindmap",
+     "description": (
+         "Create and display an interactive holographic HTML mind map for any topic. "
+         "Opens automatically in the browser. Use for knowledge maps, brainstorming, "
+         "topic breakdowns, concept summaries, or learning plans."
+     ),
+     "input_schema": {
+         "type": "object",
+         "properties": {
+             "topic": {
+                 "type": "string",
+                 "description": "Central topic label (shown at the center node)"
+             },
+             "nodes": {
+                 "type": "array",
+                 "description": (
+                     "All nodes including the center. Each node object: "
+                     "{id (str), label (str, use \\n for line breaks), "
+                     "parent_id (null for the center node, else parent node id), "
+                     "category (str matching a category name), info (str tooltip text)}"
+                 ),
+                 "items": {"type": "object"}
+             },
+             "categories": {
+                 "type": "array",
+                 "description": "Category definitions. Each: {name (str), color (hex string e.g. '#00ffc8')}",
+                 "items": {"type": "object"}
+             }
+         },
+         "required": ["topic", "nodes", "categories"]
+     }},
 ]
 
 
@@ -2209,6 +2548,8 @@ def execute_tool(name, inp):
             mem["gmail_imap_pass"] = pw.replace(" ", "").strip()
             save_memory(mem)
             return f"Gmail credentials saved for {email.strip()}."
+        elif name == "generate_mindmap":
+            return generate_mindmap_file(inp["topic"], inp["nodes"], inp.get("categories", []))
     except Exception as e:
         return f"Error in {name}: {e}"
 
@@ -2513,7 +2854,9 @@ SYSTEM = (
     "rather than behaving like you've just met them. "
     "For complex tasks that require fetching external data — reading emails, in-depth web research — "
     "use the dispatch_agent tool. Always say a brief line before dispatching (e.g. 'On it, sir.'). "
-    "Never dispatch agents unless the user explicitly asks for something that requires it."
+    "Never dispatch agents unless the user explicitly asks for something that requires it. "
+    "Use `generate_mindmap` to visually display knowledge, plans, topic breakdowns, or "
+    "learning summaries as interactive holographic mind maps that open in the browser."
 )
 
 def ask_claude(user_message):
@@ -2526,7 +2869,7 @@ def ask_claude(user_message):
     while True:
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
+            max_tokens=4096,
             system=system_blocks,
             tools=TOOLS,
             messages=conversation_history,

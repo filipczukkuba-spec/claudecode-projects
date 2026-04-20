@@ -43,7 +43,8 @@
       "WebFetch(domain:cedreo.com)",
       "WebFetch(domain:www.facebook.com)",
       "WebFetch(domain:onedesign.pl)",
-      "WebFetch(domain:www.truefuturemedia.com)"
+      "WebFetch(domain:www.truefuturemedia.com)",
+      "Bash(del *)"
     ]
   }
 }
