@@ -1522,8 +1522,9 @@ class ReminderScreen:
         if not date_iso:
             self._err = "Invalid date — use DD/MM/YYYY"; self._err_t = 2.5; return
         mem = load_memory()
+        note = self.inputs["note"].strip()
         mem.setdefault("reminders", []).append(
-            {"date": date_iso, "subject": subject, "note": self.inputs["note"].strip()}
+            {"date": date_iso, "subject": subject, "note": note}
         )
         mem["reminders"].sort(key=lambda r: r.get("date", ""))
         save_memory(mem)
@@ -1531,6 +1532,8 @@ class ReminderScreen:
         self.mode = "list"
         self.inputs = {"date": "", "subject": "", "note": ""}
         self.cur_field = 0
+        full_topic = f"{subject} — {note}" if note else subject
+        threading.Thread(target=run_study_pipeline, args=(full_topic,), daemon=True).start()
 
     def _delete_selected(self):
         if not self.reminders: return
@@ -3697,23 +3700,13 @@ def wake_up():
     speak(" ".join(parts))
 
     # ── Auto-act on study reminders (no confirmation needed) ─────────────────
-    _STUDY_KEYWORDS = {
-        "sprawdzian", "egzamin", "kartkówka", "klasówka", "kolokwium",
-        "test", "quiz", "referat", "prezentacja", "praca", "study", "exam", "homework"
-    }
-    def _is_study(subject):
-        sl = subject.lower()
-        return any(kw in sl for kw in _STUDY_KEYWORDS)
-
-    study_reminders = [r for r in due_today if _is_study(r.get("subject", ""))]
-    if study_reminders:
-        def _run_study_reminders():
-            for r in study_reminders:
+    if due_today:
+        def _run_due_reminders():
+            for r in due_today:
                 topic = r.get("subject", "")
                 note  = r.get("note", "")
-                full_topic = f"{topic} — {note}" if note else topic
-                run_study_pipeline(full_topic)
-        threading.Thread(target=_run_study_reminders, daemon=True).start()
+                run_study_pipeline(f"{topic} — {note}" if note else topic)
+        threading.Thread(target=_run_due_reminders, daemon=True).start()
 
     # Hide weather/news cards 1s after the briefing finishes
     def _fade_briefing_cards():
