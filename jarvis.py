@@ -3848,16 +3848,6 @@ def main():
 
     threading.Thread(target=wake_word_listener, daemon=True).start()
 
-    # ── Fire study pipelines for any reminders due today, on launch ──────────
-    def _launch_due_reminders():
-        import datetime as _ldt
-        today_iso = _ldt.date.today().strftime("%Y-%m-%d")
-        due = [r for r in load_memory().get("reminders", []) if r.get("date") == today_iso]
-        for r in due:
-            topic = r.get("subject", "")
-            note  = r.get("note", "")
-            run_study_pipeline(f"{topic} — {note}" if note else topic)
-    threading.Thread(target=_launch_due_reminders, daemon=True).start()
 
     visual.run()
 
