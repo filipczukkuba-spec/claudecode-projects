@@ -45,7 +45,8 @@
       "WebFetch(domain:onedesign.pl)",
       "WebFetch(domain:www.truefuturemedia.com)",
       "Bash(del *)",
-      "Bash(grep -n \"    \\\\]$\" \"C:\\\\Users\\\\Filip\\\\Desktop\\\\claudecode\\\\jarvis.py\")"
+      "Bash(grep -n \"    \\\\]$\" \"C:\\\\Users\\\\Filip\\\\Desktop\\\\claudecode\\\\jarvis.py\")",
+      "Bash(grep -n \"^]$\" jarvis.py)"
     ]
   }
 }

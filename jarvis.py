@@ -2852,7 +2852,8 @@ TOOLS = [
      "input_schema": {"type":"object","properties":{
          "seconds": {"type":"number","description":"Duration in seconds"},
          "label":   {"type":"string","description":"Timer label (e.g. 'Pasta', 'Pomodoro')"}
-     },"required":["seconds"]}},
+     },"required":["seconds"]},
+     "cache_control": {"type": "ephemeral"}},
 ]
 
 
@@ -3418,7 +3419,7 @@ def _study_tool_fn(name, inp):
 
 def make_study_agent():
     return SubAgent("StudyAgent", _STUDY_AGENT_SYSTEM, _STUDY_AGENT_TOOLS,
-                    _study_tool_fn, model="claude-sonnet-4-6", max_tokens=4096, max_rounds=6)
+                    _study_tool_fn, model="claude-sonnet-4-6", max_tokens=3000, max_rounds=4)
 
 _STUDY_EMAIL_HTML = """\
 <!DOCTYPE html>
@@ -3543,7 +3544,7 @@ def ask_claude(user_message):
         conversation_history.append({"role": "user", "content": tool_results})
         if response.stop_reason == "end_turn": break
     if len(conversation_history) > 20:
-        conversation_history = conversation_history[-20:]
+        conversation_history = conversation_history[-8:]
 
 # ─── Wake Word Detection ──────────────────────────────────────────────────────
 WAKE_WORD = "jarvis"
@@ -3689,13 +3690,30 @@ def wake_up():
         parts.append(suggestion)
     parts.append("Shall I display the week ahead?")
 
-    # ── Today's reminders ────────────────────────────────────────────────────
+    # ── Upcoming reminders (today + next 7 days) ─────────────────────────────
     import datetime as _wdt
-    today_iso = _wdt.date.today().strftime("%Y-%m-%d")
-    due_today = [r for r in load_memory().get("reminders", []) if r.get("date") == today_iso]
-    if due_today:
-        reminder_lines = "; ".join(r.get("subject", "") for r in due_today)
-        parts.append(f"Reminder{'s' if len(due_today)>1 else ''} for today: {reminder_lines}.")
+    _today = _wdt.date.today()
+    today_iso = _today.strftime("%Y-%m-%d")
+    upcoming = []
+    for r in load_memory().get("reminders", []):
+        try:
+            rd = _wdt.date.fromisoformat(r.get("date", ""))
+        except ValueError:
+            continue
+        delta = (rd - _today).days
+        if 0 <= delta <= 7:
+            upcoming.append((delta, r.get("subject", "")))
+    upcoming.sort()
+    if upcoming:
+        lines = []
+        for delta, subj in upcoming:
+            if delta == 0:
+                lines.append(f"{subj} — today")
+            elif delta == 1:
+                lines.append(f"{subj} — tomorrow")
+            else:
+                lines.append(f"{subj} — in {delta} days")
+        parts.append("Upcoming reminder" + ("s" if len(lines) > 1 else "") + ": " + "; ".join(lines) + ".")
 
     speak(" ".join(parts))
 
