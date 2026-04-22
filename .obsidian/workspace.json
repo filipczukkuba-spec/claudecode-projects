@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "813f04881d458dbb",
+        "id": "126810e5a9fa7111",
         "type": "tabs",
         "children": [
           {
-            "id": "6977d6f1606d7f5e",
+            "id": "b579b8e3968b783a",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -176,13 +176,19 @@
       "bases:Create new base": false
     }
   },
-  "active": "6977d6f1606d7f5e",
+  "active": "b579b8e3968b783a",
   "lastOpenFiles": [
+    "_claude/onedesign.md",
+    "onedesignpl_marketing_masterplan.md",
+    "CLAUDE.md",
+    "_claude/trading.md",
+    "_claude/jarvis.md",
+    "_claude/index.md",
+    "_claude/games.md",
+    "_claude/agent_workflow.md",
     "Untitled.canvas",
     "Untitled.md",
-    "CLAUDE.md",
     "Untitled",
-    "onedesignpl_marketing_masterplan.md",
     "Screenshot 2026-04-18 232804.png"
   ]
 }
