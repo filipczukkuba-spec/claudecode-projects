@@ -2670,18 +2670,22 @@ TOOLS = [
      "description": (
          "Dispatch a specialist sub-agent pipeline for complex multi-step tasks that require "
          "fetching and synthesising information from external sources. "
-         "Use this when the user asks for email summaries, inbox analysis, or in-depth web research "
-         "that requires reading actual page content rather than just opening a browser. "
-         "Available pipeline types: 'email_summary' (reads Gmail inbox and summarises), "
-         "'web_research' (searches the web and synthesises a factual briefing). "
-         "Pass the user's original request verbatim as context."
+         "Use this when the user asks for email summaries, inbox analysis, in-depth web research, "
+         "OR study/learning materials for a test or exam topic. "
+         "Available pipeline types: "
+         "'email_summary' (reads Gmail inbox and summarises), "
+         "'web_research' (searches the web and synthesises a factual briefing), "
+         "'study' (researches an exam/test topic and emails a full study guide — "
+         "ALWAYS use this when the user mentions sprawdzian, egzamin, test, kartkówka, "
+         "or asks to prepare for any subject/topic exam; pass the EXACT topic as context). "
+         "Pass the user's original topic/request verbatim as context — preserving the original language."
      ),
      "input_schema": {"type": "object",
                       "properties": {
                           "pipeline_type": {"type": "string",
-                                            "description": "One of: email_summary, web_research"},
+                                            "description": "One of: email_summary, web_research, study"},
                           "context": {"type": "string",
-                                      "description": "The user's original request verbatim"},
+                                      "description": "The user's original request verbatim (preserve language)"},
                       },
                       "required": ["pipeline_type", "context"]}},
     {"name": "set_gmail_credentials",
@@ -3327,11 +3331,128 @@ def run_web_research_pipeline(query=""):
         return _strip_review_prefix(reviewed.text)
     return result.text
 
+def _smtp_send_email(subject, html_body):
+    """Send an HTML email to the user's own Gmail address via SMTP."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    mem  = load_memory()
+    user = (mem.get("gmail_imap_user") or "").strip()
+    pw   = (mem.get("gmail_imap_pass")  or "").strip()
+    if not user or not pw:
+        return False, "Gmail credentials not set. Ask Jarvis to set your Gmail credentials first."
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = user
+        msg["To"]      = user
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+        with smtplib.SMTP("smtp.gmail.com", 587) as s:
+            s.ehlo(); s.starttls(); s.ehlo()
+            s.login(user, pw)
+            s.sendmail(user, user, msg.as_string())
+        return True, f"Sent to {user}"
+    except Exception as e:
+        return False, str(e)
+
+
+_STUDY_AGENT_SYSTEM = (
+    "You are StudyAgent, a specialist sub-system of JARVIS that creates personalised study materials. "
+    "CRITICAL: detect the language of the topic provided by the user and respond ENTIRELY in that language — "
+    "including section headings, explanations, and questions. "
+    "If the topic is in Polish, all output must be in Polish. If English, in English. Match the language exactly. "
+    "Your job: use the search and fetch tools to research the topic thoroughly, then produce a structured HTML study guide. "
+    "The HTML must use inline styles only (no <style> block), dark-on-white, clean and readable. "
+    "Structure: "
+    "1. H2 title with the topic name. "
+    "2. 'Kluczowe pojęcia' / 'Key Concepts' section — bullet list of 6-10 definitions. "
+    "3. 'Streszczenie' / 'Summary' section — 3-4 paragraphs covering the main ideas. "
+    "4. 'Ważne daty / fakty' / 'Key Dates & Facts' section — timeline or bullet list. "
+    "5. 'Pytania ćwiczebne' / 'Practice Questions' section — 5 questions with answers hidden in a <details> tag. "
+    "6. 'Źródła' / 'Sources' section — list the URLs you used. "
+    "Return ONLY the HTML fragment (from <h2> onwards, no <html>/<body> wrapper). "
+    "Be thorough — this is for a real exam. Do not hallucinate facts."
+)
+
+_STUDY_AGENT_TOOLS = [
+    {"name": "search",
+     "description": "Search DuckDuckGo for information on a topic.",
+     "input_schema": {"type": "object",
+                      "properties": {"query": {"type": "string"}},
+                      "required": ["query"]}},
+    {"name": "fetch",
+     "description": "Fetch and read a web page.",
+     "input_schema": {"type": "object",
+                      "properties": {"url":       {"type": "string"},
+                                     "max_chars": {"type": "integer"}},
+                      "required": ["url"]}},
+]
+
+def _study_tool_fn(name, inp):
+    if name == "search":
+        return json.dumps(_ddg_search(inp["query"], max_results=6), ensure_ascii=False)
+    if name == "fetch":
+        return _web_fetch(inp["url"], inp.get("max_chars", 5000))
+    return f"Unknown tool: {name}"
+
+def make_study_agent():
+    return SubAgent("StudyAgent", _STUDY_AGENT_SYSTEM, _STUDY_AGENT_TOOLS,
+                    _study_tool_fn, model="claude-sonnet-4-6", max_tokens=4096, max_rounds=6)
+
+_STUDY_EMAIL_HTML = """\
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:Georgia,serif;background:#ffffff;color:#1a1a2e;max-width:720px;margin:0 auto;padding:32px 24px;line-height:1.7">
+<div style="border-top:4px solid #0077b6;padding-top:20px;margin-bottom:28px">
+  <p style="font-size:11px;letter-spacing:2px;color:#0077b6;text-transform:uppercase;margin:0">J.A.R.V.I.S. · Study Materials</p>
+  <p style="font-size:11px;color:#888;margin:4px 0 0">__DATE__</p>
+</div>
+__CONTENT__
+<hr style="border:none;border-top:1px solid #e0e0e0;margin:40px 0 20px">
+<p style="font-size:11px;color:#aaa;text-align:center">Generated by J.A.R.V.I.S. · Study Intelligence System</p>
+</body></html>
+"""
+
+def run_study_pipeline(topic):
+    import datetime as _dt
+    speak("Understood, sir. Researching the topic now.")
+    agent  = make_study_agent()
+    result = agent.run(
+        f"Topic: {topic}\n\n"
+        f"Research this topic thoroughly using the search and fetch tools, "
+        f"then produce a complete HTML study guide as described in your instructions. "
+        f"Remember: respond in the same language as the topic."
+    )
+    if not result.success or not result.text:
+        return f"Research hit a snag, sir. {result.error}"
+
+    content = result.text.strip()
+    # strip any markdown code fences the model might wrap it in
+    import re as _re
+    content = _re.sub(r"^```html?\s*", "", content, flags=_re.I)
+    content = _re.sub(r"\s*```$", "", content)
+
+    date_str = _dt.date.today().strftime("%d %B %Y")
+    html = _STUDY_EMAIL_HTML.replace("__DATE__", date_str).replace("__CONTENT__", content)
+
+    subject = f"JARVIS · Materiały: {topic}" if any(
+        c in topic.lower() for c in ["ą","ę","ó","ś","ź","ż","ć","ń","ł","sprawdzian","egzamin","test","praca"]
+    ) else f"JARVIS · Study Guide: {topic}"
+
+    speak("Research complete. Sending materials to your inbox now, sir.")
+    ok, msg = _smtp_send_email(subject, html)
+    if ok:
+        return f"Study materials for '{topic}' sent to your inbox."
+    return f"Research done but email failed: {msg}. Check Gmail credentials."
+
+
 def run_agent_pipeline(pipeline_type, context):
     if pipeline_type == "email_summary":
         return run_email_summary_pipeline(timeframe=context)
     if pipeline_type == "web_research":
         return run_web_research_pipeline(query=context)
+    if pipeline_type == "study":
+        return run_study_pipeline(topic=context)
     return f"I don't have an agent pipeline for '{pipeline_type}' yet, sir."
 
 # ─── Claude ───────────────────────────────────────────────────────────────────
@@ -3350,9 +3471,13 @@ SYSTEM = (
     "A second system block below contains the user's recent habits and session context — use it to make "
     "familiar, personalised suggestions (e.g. referencing their usual music, routines, or recent topics) "
     "rather than behaving like you've just met them. "
-    "For complex tasks that require fetching external data — reading emails, in-depth web research — "
-    "use the dispatch_agent tool. Always say a brief line before dispatching (e.g. 'On it, sir.'). "
-    "Never dispatch agents unless the user explicitly asks for something that requires it. "
+    "For complex tasks that require fetching external data — reading emails, in-depth web research, "
+    "or preparing study materials — use the dispatch_agent tool. "
+    "Always say a brief acknowledgement before dispatching. "
+    "STUDY MATERIALS: whenever the user mentions a test, exam, sprawdzian, egzamin, kartkówka, "
+    "or asks to prepare for any subject, immediately dispatch pipeline_type='study' with the exact topic. "
+    "The study agent will research the topic and email a full study guide. "
+    "Always preserve the original language of the topic — if Polish, keep it Polish. "
     "VISUALISATIONS — use these proactively when they add value: "
     "`generate_mindmap` for knowledge maps and topic breakdowns; "
     "`generate_chart` for any data comparison or trend (bar/line/pie/donut); "
