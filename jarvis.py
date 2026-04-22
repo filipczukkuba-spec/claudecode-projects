@@ -3457,9 +3457,7 @@ def run_study_pipeline(topic):
     date_str = _dt.date.today().strftime("%d %B %Y")
     html = _STUDY_EMAIL_HTML.replace("__DATE__", date_str).replace("__CONTENT__", content)
 
-    subject = f"JARVIS · Materiały: {topic}" if any(
-        c in topic.lower() for c in ["ą","ę","ó","ś","ź","ż","ć","ń","ł","sprawdzian","egzamin","test","praca"]
-    ) else f"JARVIS · Study Guide: {topic}"
+    subject = f"[Learning Resources] {topic}"
 
     speak("Research complete. Sending materials to your inbox now, sir.")
     ok, msg = _smtp_send_email(subject, html)
