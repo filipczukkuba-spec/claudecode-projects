@@ -299,6 +299,30 @@
     {
       "text": "okay open some terminal stuff where you can show me the Mind map about the conditionals and emergency speech",
       "time": 1776714046.7921875
+    },
+    {
+      "text": "okay create me a mind map for investment banking",
+      "time": 1776886093.9360642
+    },
+    {
+      "text": "could you expand the Mind map with some examples from books and stuff like that so I can see what I'm learning about",
+      "time": 1776886182.1141686
+    },
+    {
+      "text": "show me this mind map in Google",
+      "time": 1776886349.5901146
+    },
+    {
+      "text": "so show me the one that",
+      "time": 1776886368.5621462
+    },
+    {
+      "text": "the one that we build",
+      "time": 1776886384.7987952
+    },
+    {
+      "text": "okay pull Spotify and play some chill jazz on medium volume",
+      "time": 1776886401.4153435
     }
   ],
   "habits": {
@@ -306,11 +330,11 @@
     "h18": 32,
     "h22": 17,
     "h19": 10,
-    "h21": 6
+    "h21": 12
   },
   "birthdays": [],
-  "wake_count": 23,
-  "last_wake": 1776778864.1378667,
+  "wake_count": 24,
+  "last_wake": 1776886016.4287517,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "librus_user": "1203917u",
@@ -320,5 +344,5 @@
   "todos": [],
   "notes": [],
   "facts": {},
-  "skip_intro": false
+  "skip_intro": true
 }

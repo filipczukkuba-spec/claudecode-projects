@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "126810e5a9fa7111",
+        "id": "aa83a70afdd5d21e",
         "type": "tabs",
         "children": [
           {
-            "id": "b579b8e3968b783a",
+            "id": "535fa1cdc6170683",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -176,16 +176,18 @@
       "bases:Create new base": false
     }
   },
-  "active": "b579b8e3968b783a",
+  "active": "535fa1cdc6170683",
   "lastOpenFiles": [
+    "jarvis.py.tmp.10748.1776886617618",
+    "jarvis.py.tmp.10748.1776886608501",
+    "_claude/agent_workflow.md",
+    "_claude/trading.md",
     "_claude/onedesign.md",
     "onedesignpl_marketing_masterplan.md",
     "CLAUDE.md",
-    "_claude/trading.md",
     "_claude/jarvis.md",
     "_claude/index.md",
     "_claude/games.md",
-    "_claude/agent_workflow.md",
     "Untitled.canvas",
     "Untitled.md",
     "Untitled",

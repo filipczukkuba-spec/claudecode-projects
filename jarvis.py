@@ -2465,9 +2465,9 @@ class JarvisVisual:
             self.screen.blit(self._scanline_surf, (0, 0))
 
     def _draw_hud(self, state, t):
-        labels={"idle":"STANDBY","waking":"ACTIVATING","listening":"LISTENING","speaking":"SPEAKING"}
-        colors={"idle":(35,70,155),"waking":(100,100,255),"listening":(0,195,215),"speaking":(0,180,255)}
-        dot="● " if state in("listening","speaking") and int(t*2)%2==0 else "○ "
+        labels={"idle":"STANDBY","waking":"ACTIVATING","listening":"LISTENING","speaking":"SPEAKING","working":"WORKING"}
+        colors={"idle":(35,70,155),"waking":(100,100,255),"listening":(0,195,215),"speaking":(0,180,255),"working":(255,160,0)}
+        dot="● " if state in("listening","speaking","working") and int(t*2)%2==0 else "○ "
         txt=self.font_hud.render(f"{dot}J.A.R.V.I.S.  ·  {labels.get(state,'STANDBY')}",
                                  True,colors.get(state,(35,70,155)))
         self.screen.blit(txt,(self.W//2-txt.get_width()//2,self.H-52))
@@ -2531,6 +2531,7 @@ async def _tts_generate(text):
 
 def speak(text):
     global visual_state
+    text = text.replace("*", "")
     print(f"\nJARVIS: {text}")
     visual_state = "speaking"
     spoken = False
@@ -3437,13 +3438,15 @@ SYSTEM = (
 )
 
 def ask_claude(user_message):
-    global conversation_history
+    global conversation_history, visual_state
+    visual_state = "working"
     conversation_history.append({"role": "user", "content": user_message})
     mem_ctx = build_memory_context(load_memory())
     system_blocks = [{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}]
     if mem_ctx:
         system_blocks.append({"type": "text", "text": mem_ctx})
     while True:
+        visual_state = "working"
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=4096,
@@ -3458,6 +3461,7 @@ def ask_claude(user_message):
         if text_parts: speak(" ".join(text_parts))
         if not tool_uses: break
         tool_results = []
+        visual_state = "working"
         for tu in tool_uses:
             print(f"  [tool] {tu.name}({tu.input})")
             result = execute_tool(tu.name, tu.input)
