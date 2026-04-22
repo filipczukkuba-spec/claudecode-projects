@@ -607,7 +607,7 @@ def _default_memory():
             "wake_count": 0, "last_wake": 0,
             "gcal_ics_url": "", "gcal_birthdays_ics_url": "",
             "gmail_imap_user": "", "gmail_imap_pass": "",
-            "todos": [], "notes": [], "facts": {}}
+            "todos": [], "notes": [], "facts": {}, "reminders": []}
 
 def load_memory():
     if os.path.exists(MEMORY_PATH):
@@ -1462,6 +1462,237 @@ class DayCard:
                               [(cx2+sx*10, cy2),(cx2, cy2),(cx2, cy2+sy*10)], 1)
 
 
+class ReminderScreen:
+    """Full-screen holographic overlay for viewing, adding and deleting reminders."""
+
+    FIELD_LABELS = ["DATE  (DD/MM/YYYY)", "SUBJECT", "NOTE (optional)"]
+    FIELD_KEYS   = ["date", "subject", "note"]
+
+    def __init__(self):
+        self.active  = False
+        self.mode    = "list"   # "list" | "add"
+        self.inputs  = {"date": "", "subject": "", "note": ""}
+        self.cur_field = 0
+        self.selected  = 0
+        self.reminders = []
+        self._err = ""
+        self._err_t = 0.0
+        self._t = 0.0
+
+    def open(self):
+        self.active = True
+        self.mode   = "list"
+        self.inputs = {"date": "", "subject": "", "note": ""}
+        self.cur_field = 0
+        self._err  = ""
+        self._reload()
+
+    def _reload(self):
+        import datetime as _dt
+        self.reminders = sorted(
+            load_memory().get("reminders", []),
+            key=lambda r: r.get("date", "")
+        )
+        self.selected = max(0, min(self.selected, len(self.reminders) - 1))
+
+    def _parse_date(self, s):
+        import datetime as _dt
+        for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y"):
+            try:
+                return _dt.datetime.strptime(s.strip(), fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+        return None
+
+    def _save(self):
+        date_raw = self.inputs["date"].strip()
+        subject  = self.inputs["subject"].strip()
+        if not subject:
+            self._err = "Subject cannot be empty"; self._err_t = 2.5; return
+        date_iso = self._parse_date(date_raw)
+        if not date_iso:
+            self._err = "Invalid date — use DD/MM/YYYY"; self._err_t = 2.5; return
+        mem = load_memory()
+        mem.setdefault("reminders", []).append(
+            {"date": date_iso, "subject": subject, "note": self.inputs["note"].strip()}
+        )
+        mem["reminders"].sort(key=lambda r: r.get("date", ""))
+        save_memory(mem)
+        self._reload()
+        self.mode = "list"
+        self.inputs = {"date": "", "subject": "", "note": ""}
+        self.cur_field = 0
+
+    def _delete_selected(self):
+        if not self.reminders: return
+        mem = load_memory()
+        rems = mem.get("reminders", [])
+        if 0 <= self.selected < len(rems):
+            del rems[self.selected]
+            mem["reminders"] = rems
+            save_memory(mem)
+            self._reload()
+
+    def handle_event(self, event):
+        if not self.active: return True
+        if event.type != pygame.KEYDOWN: return True
+        k = event.key
+        if self.mode == "list":
+            if k == pygame.K_ESCAPE:
+                self.active = False
+            elif k == pygame.K_UP:
+                self.selected = max(0, self.selected - 1)
+            elif k == pygame.K_DOWN:
+                self.selected = min(len(self.reminders) - 1, self.selected + 1)
+            elif k in (pygame.K_DELETE, pygame.K_BACKSPACE):
+                self._delete_selected()
+            elif k == pygame.K_RETURN or k == pygame.K_n:
+                self.mode = "add"
+                self.inputs = {"date": "", "subject": "", "note": ""}
+                self.cur_field = 0
+                self._err = ""
+        else:  # add mode
+            if k == pygame.K_ESCAPE:
+                self.mode = "list"
+            elif k == pygame.K_TAB:
+                self.cur_field = (self.cur_field + 1) % len(self.FIELD_KEYS)
+            elif k == pygame.K_RETURN:
+                self._save()
+            elif k == pygame.K_BACKSPACE:
+                fk = self.FIELD_KEYS[self.cur_field]
+                self.inputs[fk] = self.inputs[fk][:-1]
+            elif event.unicode and event.unicode.isprintable():
+                fk = self.FIELD_KEYS[self.cur_field]
+                self.inputs[fk] += event.unicode
+        return True
+
+    def draw(self, screen, font_hud, font_body, t):
+        import datetime as _dt
+        if not self.active: return
+        self._t = t
+        if self._err_t > 0: self._err_t -= 0.016
+
+        W, H = screen.get_size()
+        today = _dt.date.today().strftime("%Y-%m-%d")
+
+        # dim background
+        dim = pygame.Surface((W, H), pygame.SRCALPHA)
+        dim.fill((0, 2, 12, 210))
+        screen.blit(dim, (0, 0))
+
+        PW, PH = min(820, W - 80), min(600, H - 80)
+        px, py = (W - PW) // 2, (H - PH) // 2
+
+        # panel background + border
+        bg = pygame.Surface((PW, PH), pygame.SRCALPHA)
+        bg.fill((0, 6, 22, 240))
+        screen.blit(bg, (px, py))
+        pygame.draw.rect(screen, (0, 200, 255), (px, py, PW, PH), 1)
+
+        # corner brackets
+        sz = 14
+        for bx, by, sx, sy in [(px,py,1,1),(px+PW,py,-1,1),(px,py+PH,1,-1),(px+PW,py+PH,-1,-1)]:
+            pygame.draw.lines(screen, (0, 255, 200), False,
+                              [(bx+sx*sz, by),(bx, by),(bx, by+sy*sz)], 2)
+
+        # header
+        title = font_hud.render("J.A.R.V.I.S.  ·  REMINDER SYSTEM", True, (0, 220, 255))
+        screen.blit(title, (px + PW//2 - title.get_width()//2, py + 10))
+        pygame.draw.line(screen, (0, 140, 200), (px+10, py+34), (px+PW-10, py+34), 1)
+
+        if self.mode == "list":
+            self._draw_list(screen, font_hud, font_body, px, py, PW, PH, today, t)
+        else:
+            self._draw_add(screen, font_hud, font_body, px, py, PW, PH, t)
+
+    def _draw_list(self, screen, font_hud, font_body, px, py, PW, PH, today, t):
+        import datetime as _dt
+        y = py + 44
+        sub = font_body.render(
+            f"  {len(self.reminders)} reminder(s)   ↑↓ navigate   DEL remove   ENTER / N  add new   ESC close",
+            True, (60, 120, 180))
+        screen.blit(sub, (px + 14, y))
+        y += 22
+        pygame.draw.line(screen, (0, 80, 130), (px+10, y), (px+PW-10, y), 1)
+        y += 8
+
+        row_h = 46
+        if not self.reminders:
+            empty = font_hud.render("No reminders saved.", True, (40, 100, 160))
+            screen.blit(empty, (px + PW//2 - empty.get_width()//2, py + PH//2 - 20))
+        else:
+            for i, rem in enumerate(self.reminders):
+                if y + row_h > py + PH - 40: break
+                is_sel = (i == self.selected)
+                is_today = rem.get("date", "") == today
+                is_past  = rem.get("date", "") < today
+
+                row_col = (0, 50, 120, 180) if is_sel else (0, 15, 40, 120)
+                row_s = pygame.Surface((PW - 20, row_h - 4), pygame.SRCALPHA)
+                row_s.fill(row_col)
+                screen.blit(row_s, (px + 10, y))
+                if is_sel:
+                    pygame.draw.rect(screen, (0, 200, 255), (px+10, y, PW-20, row_h-4), 1)
+
+                date_str = rem.get("date", "")
+                try:
+                    d = _dt.date.fromisoformat(date_str)
+                    date_disp = d.strftime("%d %b %Y")
+                except Exception:
+                    date_disp = date_str
+
+                if is_today:
+                    dc = (255, 220, 60)
+                    tag = font_body.render("TODAY", True, (255, 220, 60))
+                    screen.blit(tag, (px + PW - tag.get_width() - 16, y + 4))
+                elif is_past:
+                    dc = (180, 80, 80)
+                else:
+                    dc = (0, 195, 215)
+
+                ds = font_hud.render(date_disp, True, dc)
+                screen.blit(ds, (px + 18, y + 4))
+                ss = font_body.render(rem.get("subject", ""), True, (220, 240, 255))
+                screen.blit(ss, (px + 18 + ds.get_width() + 14, y + 6))
+                note = rem.get("note", "")
+                if note:
+                    ns = font_body.render(note[:80], True, (100, 160, 200))
+                    screen.blit(ns, (px + 18, y + row_h - 18))
+                y += row_h
+
+    def _draw_add(self, screen, font_hud, font_body, px, py, PW, PH, t):
+        y = py + 50
+        title2 = font_hud.render("ADD REMINDER", True, (0, 255, 200))
+        screen.blit(title2, (px + PW//2 - title2.get_width()//2, y))
+        y += 36
+
+        for i, fk in enumerate(self.FIELD_KEYS):
+            is_active = (i == self.cur_field)
+            label = font_body.render(self.FIELD_LABELS[i], True,
+                                     (0, 220, 255) if is_active else (60, 120, 180))
+            screen.blit(label, (px + 40, y))
+            y += 20
+
+            field_w = PW - 80
+            fb = pygame.Surface((field_w, 32), pygame.SRCALPHA)
+            fb.fill((0, 30, 70, 200) if is_active else (0, 10, 30, 160))
+            screen.blit(fb, (px + 40, y))
+            border_col = (0, 220, 255) if is_active else (0, 80, 130)
+            pygame.draw.rect(screen, border_col, (px+40, y, field_w, 32), 1)
+
+            cursor = "_" if is_active and int(t * 2) % 2 == 0 else ""
+            val = font_hud.render(self.inputs[fk] + cursor, True, (220, 240, 255))
+            screen.blit(val, (px + 48, y + 6))
+            y += 46
+
+        if self._err and self._err_t > 0:
+            err_s = font_body.render(self._err, True, (255, 80, 80))
+            screen.blit(err_s, (px + PW//2 - err_s.get_width()//2, py + PH - 60))
+
+        hint = font_body.render("TAB · next field   ENTER · save   ESC · back", True, (40, 100, 160))
+        screen.blit(hint, (px + PW//2 - hint.get_width()//2, py + PH - 34))
+
+
 class JarvisVisual:
     def __init__(self):
         self.W = self.H = self.cx = self.cy = 0
@@ -1476,6 +1707,7 @@ class JarvisVisual:
         self.font_data    = None
         self._overlay     = None
         self._glow_cache  = {}
+        self.reminder_screen = ReminderScreen()
         self._sphere_nodes  = []
         self._sphere_edges  = []
         self._sphere_rot    = 0.0
@@ -2138,7 +2370,7 @@ class JarvisVisual:
         txt=self.font_hud.render(f"{dot}J.A.R.V.I.S.  ·  {labels.get(state,'STANDBY')}",
                                  True,colors.get(state,(35,70,155)))
         self.screen.blit(txt,(self.W//2-txt.get_width()//2,self.H-52))
-        hint=self.font_data.render('ESC · exit   SAY "JARVIS" · wake',True,(20,45,100))
+        hint=self.font_data.render('ESC · exit   SAY "JARVIS" · wake   R · reminders',True,(20,45,100))
         self.screen.blit(hint,(self.W//2-hint.get_width()//2,self.H-27))
 
     def add_news_card(self, text, tx, ty, delay=0.0, tag="NEWS", img_url=None, fly_dx=-500, fly_dy=0):
@@ -2155,8 +2387,14 @@ class JarvisVisual:
             dt=self.clock.tick(60)/1000.0; self.t+=dt
             for event in pygame.event.get():
                 if event.type==pygame.QUIT: pygame.quit(); return
-                if event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE:
-                    pygame.quit(); return
+                if self.reminder_screen.active:
+                    self.reminder_screen.handle_event(event)
+                    continue
+                if event.type==pygame.KEYDOWN:
+                    if event.key==pygame.K_ESCAPE:
+                        pygame.quit(); return
+                    if event.key==pygame.K_r:
+                        self.reminder_screen.open()
             state=visual_state
             self.screen.fill((0,2,12))
             # --- bottom background layer ---
@@ -2181,6 +2419,7 @@ class JarvisVisual:
             self._draw_diag_panels(self.t, dt)
             self._draw_corners()
             self._draw_hud(state,self.t)
+            self.reminder_screen.draw(self.screen, self.font_hud, self.font_data, self.t)
             fps=self.clock.get_fps()
             fs=fps_font.render(f"{fps:.0f} fps",True,(20,50,100))
             self.screen.blit(fs,(self.W-fs.get_width()-12,10))
@@ -2505,6 +2744,17 @@ TOOLS = [
          "topic": {"type":"string","description":"Deck topic/title"},
          "cards": {"type":"array","description":"Array of {front: 'question', back: 'answer'} objects","items":{"type":"object"}}
      },"required":["topic","cards"]}},
+    {"name": "manage_reminder",
+     "description": "Add, list, or delete reminders. Each reminder has a date and a subject. Jarvis reads due reminders aloud every morning.",
+     "input_schema": {"type": "object",
+                      "properties": {
+                          "action":  {"type": "string",  "description": "add | list | delete"},
+                          "date":    {"type": "string",  "description": "Date for the reminder, e.g. 25/04/2026 or 2026-04-25 (for add)"},
+                          "subject": {"type": "string",  "description": "What to be reminded about (for add)"},
+                          "note":    {"type": "string",  "description": "Optional extra detail (for add)"},
+                          "index":   {"type": "integer", "description": "1-based reminder index to delete (for delete)"}
+                      },
+                      "required": ["action"]}},
     {"name": "manage_todo",
      "description": "Manage a persistent to-do list. Actions: add, complete, delete, list, clear_done.",
      "input_schema": {"type":"object","properties":{
@@ -2729,6 +2979,45 @@ def execute_tool(name, inp):
                                        inp.get("colors"), inp.get("x_label",""), inp.get("y_label",""))
         elif name == "generate_flashcards":
             return generate_flashcard_file(inp["topic"], inp["cards"])
+        elif name == "manage_reminder":
+            import datetime as _rdt
+            action = inp.get("action", "list")
+            mem = load_memory()
+            rems = mem.setdefault("reminders", [])
+            if action == "add":
+                raw_date = inp.get("date", "").strip()
+                subject  = inp.get("subject", "").strip()
+                note     = inp.get("note", "").strip()
+                date_iso = None
+                for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y"):
+                    try:
+                        date_iso = _rdt.datetime.strptime(raw_date, fmt).strftime("%Y-%m-%d"); break
+                    except ValueError: pass
+                if not date_iso: return f"I couldn't parse the date '{raw_date}'. Please use DD/MM/YYYY format."
+                if not subject: return "Please provide a subject for the reminder."
+                rems.append({"date": date_iso, "subject": subject, "note": note})
+                rems.sort(key=lambda r: r.get("date", ""))
+                mem["reminders"] = rems
+                save_memory(mem)
+                visual.reminder_screen._reload()
+                d = _rdt.date.fromisoformat(date_iso)
+                return f"Reminder set for {d.strftime('%d %B %Y')}: {subject}"
+            elif action == "delete":
+                idx = inp.get("index", 0) - 1
+                if 0 <= idx < len(rems):
+                    removed = rems.pop(idx)
+                    mem["reminders"] = rems; save_memory(mem)
+                    visual.reminder_screen._reload()
+                    return f"Removed reminder: {removed.get('subject', '')}"
+                return "Invalid reminder index."
+            else:  # list
+                if not rems: return "No reminders saved."
+                today = _rdt.date.today().strftime("%Y-%m-%d")
+                lines = []
+                for i, r in enumerate(rems, 1):
+                    tag = " ← TODAY" if r.get("date") == today else (" ← PAST" if r.get("date","") < today else "")
+                    lines.append(f"{i}. {r.get('date','')}  {r.get('subject','')}{tag}")
+                return "\n".join(lines)
         elif name == "manage_todo":
             return manage_todo(inp["action"], inp.get("text",""), inp.get("item_id"))
         elif name == "take_note":
@@ -3253,6 +3542,14 @@ def wake_up():
     if suggestion:
         parts.append(suggestion)
     parts.append("Shall I display the week ahead?")
+
+    # ── Today's reminders ────────────────────────────────────────────────────
+    import datetime as _wdt
+    today_iso = _wdt.date.today().strftime("%Y-%m-%d")
+    due_today = [r for r in load_memory().get("reminders", []) if r.get("date") == today_iso]
+    if due_today:
+        reminder_lines = "; ".join(r.get("subject", "") for r in due_today)
+        parts.append(f"Reminder{'s' if len(due_today)>1 else ''} for today: {reminder_lines}.")
 
     speak(" ".join(parts))
 
