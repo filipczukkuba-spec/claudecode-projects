@@ -323,26 +323,45 @@
     {
       "text": "okay pull Spotify and play some chill jazz on medium volume",
       "time": 1776886401.4153435
+    },
+    {
+      "text": "Travis if I add a reminder for you will you do the like resources for me to learn from",
+      "time": 1776888331.7619298
+    },
+    {
+      "text": "but I added to your like reminder reminders box so like you you were working on on the desk",
+      "time": 1776888369.2843816
+    },
+    {
+      "text": "do it always after I add an extra reminder for you always",
+      "time": 1776888399.6171098
     }
   ],
   "habits": {
     "h17": 10,
     "h18": 32,
-    "h22": 17,
+    "h22": 20,
     "h19": 10,
     "h21": 12
   },
   "birthdays": [],
-  "wake_count": 24,
-  "last_wake": 1776886016.4287517,
+  "wake_count": 25,
+  "last_wake": 1776888239.1276796,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
-  "librus_user": "1203917u",
-  "librus_pass": "Kubbrus2027!",
   "gmail_imap_user": "filipczuk.kuba@gmail.com",
   "gmail_imap_pass": "xjpmxcyuzrinbjap",
   "todos": [],
   "notes": [],
   "facts": {},
-  "skip_intro": true
+  "reminders": [
+    {
+      "date": "2026-04-23",
+      "subject": "polski renesans",
+      "note": "zrob mi pe\u0142ne notatki do nauki"
+    }
+  ],
+  "librus_user": "1203917u",
+  "librus_pass": "Kubbrus2027!",
+  "skip_intro": false
 }

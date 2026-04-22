@@ -1495,6 +1495,15 @@ class ReminderScreen:
         )
         self.selected = max(0, min(self.selected, len(self.reminders) - 1))
 
+    @staticmethod
+    def _fmt_date(digits):
+        d = "".join(c for c in digits if c.isdigit())[:8]
+        if len(d) > 4:
+            return d[:2] + "/" + d[2:4] + "/" + d[4:]
+        if len(d) > 2:
+            return d[:2] + "/" + d[2:]
+        return d
+
     def _parse_date(self, s):
         import datetime as _dt
         for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y"):
@@ -1560,10 +1569,19 @@ class ReminderScreen:
                 self._save()
             elif k == pygame.K_BACKSPACE:
                 fk = self.FIELD_KEYS[self.cur_field]
-                self.inputs[fk] = self.inputs[fk][:-1]
+                if fk == "date":
+                    digits = "".join(c for c in self.inputs["date"] if c.isdigit())
+                    self.inputs["date"] = self._fmt_date(digits[:-1])
+                else:
+                    self.inputs[fk] = self.inputs[fk][:-1]
             elif event.unicode and event.unicode.isprintable():
                 fk = self.FIELD_KEYS[self.cur_field]
-                self.inputs[fk] += event.unicode
+                if fk == "date":
+                    if event.unicode.isdigit():
+                        digits = "".join(c for c in self.inputs["date"] if c.isdigit())
+                        self.inputs["date"] = self._fmt_date(digits + event.unicode)
+                else:
+                    self.inputs[fk] += event.unicode
         return True
 
     def draw(self, screen, font_hud, font_body, t):
@@ -3677,6 +3695,25 @@ def wake_up():
         parts.append(f"Reminder{'s' if len(due_today)>1 else ''} for today: {reminder_lines}.")
 
     speak(" ".join(parts))
+
+    # ── Auto-act on study reminders (no confirmation needed) ─────────────────
+    _STUDY_KEYWORDS = {
+        "sprawdzian", "egzamin", "kartkówka", "klasówka", "kolokwium",
+        "test", "quiz", "referat", "prezentacja", "praca", "study", "exam", "homework"
+    }
+    def _is_study(subject):
+        sl = subject.lower()
+        return any(kw in sl for kw in _STUDY_KEYWORDS)
+
+    study_reminders = [r for r in due_today if _is_study(r.get("subject", ""))]
+    if study_reminders:
+        def _run_study_reminders():
+            for r in study_reminders:
+                topic = r.get("subject", "")
+                note  = r.get("note", "")
+                full_topic = f"{topic} — {note}" if note else topic
+                run_study_pipeline(full_topic)
+        threading.Thread(target=_run_study_reminders, daemon=True).start()
 
     # Hide weather/news cards 1s after the briefing finishes
     def _fade_briefing_cards():
