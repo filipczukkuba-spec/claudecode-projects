@@ -3237,7 +3237,7 @@ def _email_tool_fn(name, inp):
 
 def make_email_agent():
     return SubAgent("EmailAgent", _EMAIL_AGENT_SYSTEM, _EMAIL_AGENT_TOOLS,
-                    _email_tool_fn, model="claude-sonnet-4-6", max_tokens=512, max_rounds=3)
+                    _email_tool_fn, model="claude-haiku-4-5-20251001", max_tokens=768, max_rounds=3)
 
 
 _WEB_RESEARCH_SYSTEM = (
@@ -3270,7 +3270,7 @@ def _web_research_tool_fn(name, inp):
 
 def make_web_research_agent():
     return SubAgent("WebResearchAgent", _WEB_RESEARCH_SYSTEM, _WEB_RESEARCH_TOOLS,
-                    _web_research_tool_fn, model="claude-sonnet-4-6", max_tokens=512, max_rounds=3)
+                    _web_research_tool_fn, model="claude-haiku-4-5-20251001", max_tokens=768, max_rounds=3)
 
 
 _REVIEWER_SYSTEM = (
