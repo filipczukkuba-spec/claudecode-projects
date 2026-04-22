@@ -2,19 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Overview
+## Session startup
 
-This repo contains standalone browser games — each is a single self-contained `.html` file with inline CSS and JavaScript. No build system, no dependencies, no server required. Open any file directly in a browser.
+Read `_claude/index.md` first, then the relevant project file from `_claude/`. This gives full project context in ~50 lines instead of exploring the codebase from scratch. Update the relevant `_claude/*.md` note whenever significant changes are made.
 
 ## Projects
 
-- **`geometrydash.html`** — Side-scrolling platformer. Fixed-screen-X player, tile-based world that scrolls left. Physics: gravity + jump velocity, coyote time, jump buffering. Level is defined entirely in data arrays at the top of the script (`gapRanges`, `spikeData`, `platformData`, `tallBlocks`, `orbData`, `checkpointTiles`). Audio is synthesized via Web Audio API (no external assets). Game loop uses `requestAnimationFrame` with capped delta time.
+This repo is a monorepo containing multiple projects:
 
-- **`tictactoe.html`** — Two-player Tic Tac Toe. Pure DOM manipulation, no canvas. Score persists across rounds within a session (resets on page reload).
+- **`jarvis.py`** — Voice-controlled AI assistant (JARVIS). See `_claude/jarvis.md`.
+- **`agent.py`** — Multi-agent workflow foundation. See `_claude/agent_workflow.md`.
+- **`geometrydash.html`** — Side-scrolling platformer browser game. See `_claude/games.md`.
+- **`tictactoe.html`** — Two-player Tic Tac Toe browser game. See `_claude/games.md`.
+- **`*.mq4`** — MetaTrader 4 Expert Advisors (APEX SMC, TrendMomentum). See `_claude/trading.md`.
+- **`onedesign.html`** — Standalone marketing/design page. See `_claude/onedesign.md`.
 
-## Architecture pattern
+## Games — architecture pattern
 
-Both games follow the same pattern: all state as module-level `let` variables, a single `update(dt)` function advancing state, and a `render()` function drawing each frame. There is no framework or module system — everything is in one `<script>` block.
+All games: single `.html` file, inline CSS + JS, no build system, open directly in browser. State as module-level `let` vars → `update(dt)` → `render()` each frame.
 
 ## Adding a new level or obstacle (Geometry Dash)
 
