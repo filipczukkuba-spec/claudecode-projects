@@ -3353,6 +3353,30 @@ def run_web_research_pipeline(query=""):
         return _strip_review_prefix(reviewed.text)
     return result.text
 
+def _gmail_apply_label(subject, label="Learning Resources"):
+    """Create Gmail label (if needed) and tag the sent email with it via IMAP."""
+    import imaplib, time as _t
+    mem  = load_memory()
+    user = (mem.get("gmail_imap_user") or "").strip()
+    pw   = (mem.get("gmail_imap_pass")  or "").strip()
+    if not user or not pw:
+        return
+    try:
+        _t.sleep(4)  # give Gmail time to file the sent message
+        mail = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+        mail.login(user, pw)
+        mail.create(label)          # no-op if label already exists
+        mail.select('"[Gmail]/Sent Mail"', readonly=False)
+        safe_subj = subject.replace('"', '')
+        _, data = mail.search(None, f'SUBJECT "{safe_subj}"')
+        if data and data[0]:
+            uid = data[0].split()[-1]
+            mail.copy(uid, label)
+        mail.logout()
+    except Exception as e:
+        print(f"[Gmail label] {e}")
+
+
 def _smtp_send_email(subject, html_body):
     """Send an HTML email to the user's own Gmail address via SMTP."""
     import smtplib
@@ -3373,6 +3397,7 @@ def _smtp_send_email(subject, html_body):
             s.ehlo(); s.starttls(); s.ehlo()
             s.login(user, pw)
             s.sendmail(user, user, msg.as_string())
+        threading.Thread(target=_gmail_apply_label, args=(subject,), daemon=True).start()
         return True, f"Sent to {user}"
     except Exception as e:
         return False, str(e)
