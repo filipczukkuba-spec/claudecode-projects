@@ -2948,9 +2948,7 @@ def execute_tool(name, inp):
             cal = fetch_calendar_events(days=7)
             buckets = group_events_by_day(cal, 7) if cal else [[] for _ in range(7)]
             show_week_view(buckets)
-            email_summary = run_email_summary_pipeline(timeframe="past 24 hours")
-            speak(email_summary)
-            return "Google Calendar week overlay displayed and email summary delivered"
+            return "Google Calendar week overlay displayed"
         elif name == "dispatch_agent":
             return run_agent_pipeline(inp.get("pipeline_type", ""), inp.get("context", ""))
         elif name == "set_gmail_credentials":
@@ -3082,14 +3080,16 @@ class SubAgent:
     def run(self, task):
         messages = [{"role": "user", "content": task}]
         rounds   = 0
+        sys_blocks = [{"type": "text", "text": self.system, "cache_control": {"type": "ephemeral"}}]
         try:
             while rounds < self.max_rounds:
                 rounds += 1
                 kwargs = dict(
                     model      = self.model,
                     max_tokens = self.max_tokens,
-                    system     = self.system,
+                    system     = sys_blocks,
                     messages   = messages,
+                    extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
                 )
                 if self.tools:
                     kwargs["tools"] = self.tools
@@ -3237,7 +3237,7 @@ def _email_tool_fn(name, inp):
 
 def make_email_agent():
     return SubAgent("EmailAgent", _EMAIL_AGENT_SYSTEM, _EMAIL_AGENT_TOOLS,
-                    _email_tool_fn, model="claude-sonnet-4-6", max_rounds=4)
+                    _email_tool_fn, model="claude-sonnet-4-6", max_tokens=512, max_rounds=3)
 
 
 _WEB_RESEARCH_SYSTEM = (
@@ -3270,7 +3270,7 @@ def _web_research_tool_fn(name, inp):
 
 def make_web_research_agent():
     return SubAgent("WebResearchAgent", _WEB_RESEARCH_SYSTEM, _WEB_RESEARCH_TOOLS,
-                    _web_research_tool_fn, model="claude-sonnet-4-6", max_rounds=5)
+                    _web_research_tool_fn, model="claude-sonnet-4-6", max_tokens=512, max_rounds=3)
 
 
 _REVIEWER_SYSTEM = (
@@ -3298,10 +3298,10 @@ def _strip_review_prefix(text):
 def run_email_summary_pipeline(timeframe="recent"):
     speak("Accessing your inbox now, sir.")
     agent  = make_email_agent()
-    task   = (f"Fetch the last 15 emails and produce a spoken summary. "
+    task   = (f"Fetch the last 8 emails and produce a spoken summary. "
               f"The user asked about: '{timeframe}'. "
               f"Group by sender or topic if there's a cluster. "
-              f"Highlight anything requiring action. Keep it under 120 words.")
+              f"Highlight anything requiring action. Keep it under 80 words.")
     result = agent.run(task)
     if not result.success or not result.text:
         return f"I'm afraid the email retrieval hit a snag, sir. {result.error}"
@@ -3377,7 +3377,7 @@ def ask_claude(user_message):
         visual_state = "working"
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=4096,
+            max_tokens=1024,
             system=system_blocks,
             tools=TOOLS,
             messages=conversation_history,
