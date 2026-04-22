@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "aa83a70afdd5d21e",
+        "id": "7301cbaa2ac4f767",
         "type": "tabs",
         "children": [
           {
-            "id": "535fa1cdc6170683",
+            "id": "ec6ed6b47b9d35d6",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "_claude/jarvis.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "jarvis"
             }
           }
         ]
@@ -176,8 +180,9 @@
       "bases:Create new base": false
     }
   },
-  "active": "535fa1cdc6170683",
+  "active": "ec6ed6b47b9d35d6",
   "lastOpenFiles": [
+    "Untitled.canvas",
     "jarvis.py.tmp.10748.1776886617618",
     "jarvis.py.tmp.10748.1776886608501",
     "_claude/agent_workflow.md",
@@ -188,7 +193,6 @@
     "_claude/jarvis.md",
     "_claude/index.md",
     "_claude/games.md",
-    "Untitled.canvas",
     "Untitled.md",
     "Untitled",
     "Screenshot 2026-04-18 232804.png"

@@ -606,7 +606,6 @@ def _default_memory():
     return {"commands": [], "habits": {}, "birthdays": [],
             "wake_count": 0, "last_wake": 0,
             "gcal_ics_url": "", "gcal_birthdays_ics_url": "",
-            "librus_user": "", "librus_pass": "",
             "gmail_imap_user": "", "gmail_imap_pass": "",
             "todos": [], "notes": [], "facts": {}}
 
@@ -659,7 +658,7 @@ def build_memory_context(mem):
     cmds = mem.get("commands", [])[-40:]
     if cmds:
         keywords = ["spotify", "music", "jazz", "calendar", "week", "email",
-                    "news", "weather", "play", "librus", "birthday", "open", "gmail"]
+                    "news", "weather", "play", "birthday", "open", "gmail"]
         topics = {}
         for c in cmds:
             t = (c.get("text") or "").lower()
@@ -959,7 +958,7 @@ def set_timer(seconds, label="Timer"):
     parts = ([f"{h}h"] if h else []) + ([f"{m}m"] if m else []) + ([f"{s}s"] if s else [])
     return f"Timer set: '{label}' fires in {' '.join(parts) or '0s'}"
 
-# ─── Calendar / Librus / Birthdays ────────────────────────────────────────────
+# ─── Calendar / Birthdays ─────────────────────────────────────────────────────
 def _parse_ics_line(line):
     if ":" not in line: return None, None, {}
     key_part, value = line.split(":", 1)
@@ -1044,174 +1043,6 @@ def group_events_by_day(events, days=7):
                 label = f"{e['start'].strftime('%H:%M')} {label}"
             buckets[delta].append(label)
     return buckets
-
-def _librus_web_session(user, pw):
-    """Log in to Librus Synergia via the web form. Returns a requests.Session or None."""
-    import requests as _req
-    from bs4 import BeautifulSoup as _BS
-    BASE = "https://synergia.librus.pl"
-    s = _req.Session()
-    s.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
-    try:
-        r = s.get(BASE + "/logowanie", timeout=15)
-        soup = _BS(r.text, "lxml")
-        form = soup.find("form")
-        hidden = {}
-        action = BASE + "/logowanie"
-        if form:
-            action_path = form.get("action", "/logowanie")
-            action = action_path if action_path.startswith("http") else BASE + action_path
-            for inp in form.find_all("input", type="hidden"):
-                hidden[inp.get("name", "")] = inp.get("value", "")
-        payload = {**hidden, "login": user, "pass": pw}
-        r2 = s.post(action, data=payload, timeout=15, allow_redirects=True)
-        # check we're logged in
-        if "wyloguj" in r2.text.lower() or "/terminarz" in r2.text or "uczen" in r2.url:
-            print("[Librus] web login OK")
-            return s
-        # some accounts redirect through a portal
-        soup2 = _BS(r2.text, "lxml")
-        auto = soup2.find("form")
-        if auto:
-            action2 = auto.get("action", "")
-            hidden2 = {i.get("name",""): i.get("value","") for i in auto.find_all("input", type="hidden")}
-            if action2 and hidden2:
-                r3 = s.post(action2, data=hidden2, timeout=15, allow_redirects=True)
-                if "wyloguj" in r3.text.lower():
-                    print("[Librus] web login OK (via redirect form)")
-                    return s
-        print(f"[Librus] login may have failed — url={r2.url}")
-        return s  # return anyway and let the fetch attempt reveal the truth
-    except Exception as e:
-        print(f"[Librus] web login error: {e}")
-        return None
-
-
-def _librus_parse_terminarz(html, today, days):
-    """Parse terminarz HTML → list of {summary, start, end} dicts."""
-    import datetime as _dt, re as _re
-    from bs4 import BeautifulSoup as _BS
-    out, seen = [], set()
-    soup = _BS(html, "lxml")
-
-    def _add(date_obj, label):
-        label = label.strip()
-        if not label: return
-        key = (date_obj, label)
-        if key in seen: return
-        seen.add(key)
-        dt = _dt.datetime(date_obj.year, date_obj.month, date_obj.day)
-        out.append({"summary": label, "start": dt, "end": dt})
-
-    # ── Strategy 1: classic librus table layout ──────────────────────────────
-    for day_div in soup.find_all("div", class_=_re.compile(r"kalendarz")):
-        num_div = day_div.find("div", class_=_re.compile(r"numer"))
-        if not num_div: continue
-        try: day_num = int(_re.sub(r"\D", "", num_div.get_text()))
-        except: continue
-        try:
-            year  = today.year if not hasattr(today, "_year") else today.year
-            month = today.month
-            event_date = _dt.date(year, month, day_num)
-        except: continue
-        delta = (event_date - today).days
-        if not (0 <= delta < days): continue
-        for td in day_div.find_all("td"):
-            text = td.get_text(" ", strip=True)
-            if text: _add(event_date, text)
-
-    # ── Strategy 2: FullCalendar JSON in <script> ────────────────────────────
-    if not out:
-        for script in soup.find_all("script"):
-            raw = script.string or ""
-            # look for arrays of event objects with date fields
-            for m in _re.finditer(r'\{[^{}]{10,500}\}', raw):
-                try:
-                    import json as _j
-                    obj = _j.loads(m.group())
-                    date_str = obj.get("start") or obj.get("date") or obj.get("data") or ""
-                    title    = obj.get("title") or obj.get("name") or obj.get("tytul") or ""
-                    if not date_str or not title: continue
-                    event_date = _dt.date.fromisoformat(str(date_str)[:10])
-                    delta = (event_date - today).days
-                    if 0 <= delta < days:
-                        _add(event_date, str(title))
-                except: pass
-
-    # ── Strategy 3: any <a> or <td> with a data-date attribute ───────────────
-    if not out:
-        for tag in soup.find_all(True, attrs={"data-date": True}):
-            try: event_date = _dt.date.fromisoformat(tag["data-date"][:10])
-            except: continue
-            delta = (event_date - today).days
-            if not (0 <= delta < days): continue
-            text = tag.get_text(" ", strip=True)
-            if text: _add(event_date, text)
-
-    # ── Strategy 4: table rows that contain a recognisable date ──────────────
-    if not out:
-        date_pat = _re.compile(r'(\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4}|\d{2}-\d{2}-\d{4})')
-        for tr in soup.find_all("tr"):
-            cells = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
-            row_text = " | ".join(cells)
-            m = date_pat.search(row_text)
-            if not m: continue
-            raw = m.group()
-            event_date = None
-            for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d-%m-%Y"):
-                try: event_date = _dt.datetime.strptime(raw, fmt).date(); break
-                except: pass
-            if not event_date: continue
-            delta = (event_date - today).days
-            if not (0 <= delta < days): continue
-            label = row_text.replace(raw, "").strip(" |")
-            if label: _add(event_date, label)
-
-    return out
-
-
-def fetch_librus_events(days=7):
-    import datetime as _dt
-    mem  = load_memory()
-    user = (mem.get("librus_user") or "").strip()
-    pw   = (mem.get("librus_pass") or "").strip()
-    if not user or not pw: return []
-    try:
-        BASE  = "https://synergia.librus.pl"
-        today = _dt.date.today()
-        sess  = _librus_web_session(user, pw)
-        if sess is None: return []
-
-        out, seen_months = [], set()
-        for d in range(days):
-            day = today + _dt.timedelta(days=d)
-            mk  = (day.month, day.year)
-            if mk in seen_months: continue
-            seen_months.add(mk)
-            try:
-                r = sess.post(BASE + "/terminarz/",
-                              data={"rok": str(day.year), "miesiac": str(day.month)},
-                              timeout=15)
-                # save raw HTML for first month so user can inspect if needed
-                if not seen_months - {mk}:
-                    try:
-                        with open("terminarz_raw.html", "w", encoding="utf-8") as _f:
-                            _f.write(r.text)
-                    except: pass
-                month_events = _librus_parse_terminarz(r.text, today, days)
-                # only keep events in this month
-                for ev in month_events:
-                    if ev["start"].month == day.month and ev not in out:
-                        out.append(ev)
-            except Exception as e:
-                print(f"[Librus] terminarz fetch error: {e}")
-
-        print(f"[Librus] fetched {len(out)} events via web scrape")
-        return out
-    except Exception as e:
-        import traceback; traceback.print_exc()
-        print(f"Librus error: {e}")
-        return []
 
 def _fetch_birthday_ics():
     """Fetch birthdays from Google Birthday calendar ICS. Returns list of {name, month, day}."""
@@ -1629,170 +1460,6 @@ class DayCard:
         for cx2, cy2, sx, sy in [(x,y,1,1),(x+W,y,-1,1),(x,y+H,1,-1),(x+W,y+H,-1,-1)]:
             pygame.draw.lines(screen, tc, False,
                               [(cx2+sx*10, cy2),(cx2, cy2),(cx2, cy2+sy*10)], 1)
-
-
-class LibrusPanel:
-    """Large holographic Librus schedule panel — looks like a floating sci-fi screen."""
-
-    PANEL_W = 820
-    PANEL_H = 540
-
-    def __init__(self, day_buckets, cx, cy, lifetime=60.0):
-        import random as _r, datetime as _dt
-        self.day_buckets = day_buckets   # list of 7 lists of event strings
-        self.tx = cx
-        self.ty = cy
-        self.x  = cx
-        self.y  = cy - 900          # flies in from above
-        self.alpha   = 0.0
-        self.age     = 0.0
-        self.alive   = True
-        self.lifetime = lifetime
-        self.phase   = _r.uniform(0, 6.283)
-        self._glitch_t   = _r.uniform(5, 11)
-        self._glitch_on  = False
-        self._glitch_dur = 0.0
-        today = _dt.date.today()
-        self._day_names = []
-        for i in range(7):
-            d = today + _dt.timedelta(days=i)
-            self._day_names.append(d.strftime("%a %d/%m"))
-
-    def update(self, dt):
-        import math as _m, random as _r
-        self.age += dt
-        a = self.age
-        if a < 1.2:
-            self.alpha = min(1.0, a / 1.2)
-            self.x += (self.tx - self.x) * 0.12
-            self.y += (self.ty - self.y) * 0.12
-        elif a > self.lifetime - 1.5:
-            self.alpha = max(0.0, 1.0 - (a - (self.lifetime - 1.5)) / 1.5)
-        else:
-            self.y = self.ty + 3 * _m.sin(self.phase + a * 0.9)
-        self._glitch_t -= dt
-        if self._glitch_t <= 0 and a > 2.0:
-            self._glitch_on  = True
-            self._glitch_dur = 0.09
-            self._glitch_t   = _r.uniform(7, 14)
-        if self._glitch_on:
-            self._glitch_dur -= dt
-            if self._glitch_dur <= 0: self._glitch_on = False
-        if self.age > self.lifetime:
-            self.alive = False
-
-    def draw(self, screen, font_tag, font_body):
-        import math as _m
-        if self.alpha <= 0: return
-        a    = int(self.alpha * 255)
-        W, H = self.PANEL_W, self.PANEL_H
-        x    = int(self.x) - W // 2
-        y    = int(self.y) - H // 2
-
-        # ── background panel ──
-        bg = pygame.Surface((W, H), pygame.SRCALPHA)
-        bg.fill((0, 4, 18, int(a * 0.92)))
-        screen.blit(bg, (x, y))
-
-        # ── scanlines ──
-        sl = pygame.Surface((W, H), pygame.SRCALPHA)
-        for sy in range(0, H, 2):
-            pygame.draw.line(sl, (0, 0, 0, 28), (0, sy), (W, sy))
-        screen.blit(sl, (x, y))
-
-        # ── header bar ──
-        hh = 38
-        hdr = pygame.Surface((W, hh), pygame.SRCALPHA)
-        hdr.fill((0, 30, 90, int(a * 0.85)))
-        screen.blit(hdr, (x, y))
-
-        title_s = font_tag.render("LIBRUS  SYNERGIA  ·  TERMINARZ", True, (0, 210, 255))
-        title_s.set_alpha(a)
-        screen.blit(title_s, (x + W // 2 - title_s.get_width() // 2, y + 9))
-
-        # ── divider ──
-        pygame.draw.line(screen, (0, 180, 255, a), (x + 10, y + hh), (x + W - 10, y + hh), 1)
-
-        # ── glitch offset ──
-        gx = 3 if self._glitch_on else 0
-
-        # ── 7-day columns ──
-        col_w    = (W - 20) // 7
-        col_gap  = 6
-        col_x0   = x + 10
-        col_y0   = y + hh + 8
-        col_h    = H - hh - 16
-        line_h   = 16
-
-        for i, events in enumerate(self.day_buckets):
-            cx2 = col_x0 + i * col_w
-            # column background — today highlighted
-            col_bg = pygame.Surface((col_w - col_gap, col_h), pygame.SRCALPHA)
-            if i == 0:
-                col_bg.fill((0, 40, 100, int(a * 0.45)))
-            else:
-                col_bg.fill((0, 10, 40, int(a * 0.30)))
-            screen.blit(col_bg, (cx2 + gx, col_y0))
-
-            # day header
-            day_s = font_tag.render(self._day_names[i], True,
-                                    (255, 220, 60) if i == 0 else (140, 200, 255))
-            day_s.set_alpha(a)
-            screen.blit(day_s, (cx2 + (col_w - col_gap)//2 - day_s.get_width()//2 + gx, col_y0 + 3))
-            pygame.draw.line(screen, (0, 140, 220, int(a * 0.6)),
-                             (cx2 + gx, col_y0 + 20), (cx2 + col_w - col_gap + gx, col_y0 + 20), 1)
-
-            # events
-            ey = col_y0 + 26
-            max_lines = max(1, (col_h - 30) // line_h)
-            shown = 0
-            for ev in events:
-                if shown >= max_lines - 1 and len(events) > max_lines:
-                    more_s = font_body.render(f"+{len(events)-shown} more", True, (80, 150, 200))
-                    more_s.set_alpha(int(a * 0.7))
-                    screen.blit(more_s, (cx2 + 4 + gx, ey))
-                    break
-                # word-wrap to column width
-                words = str(ev).split()
-                line  = ""
-                for w in words:
-                    test = line + (" " if line else "") + w
-                    if font_body.size("• " + test)[0] <= col_w - col_gap - 8:
-                        line = test
-                    else:
-                        if line:
-                            ls = font_body.render("• " + line, True, (180, 230, 255))
-                            ls.set_alpha(a)
-                            screen.blit(ls, (cx2 + 4 + gx, ey))
-                            ey += line_h; shown += 1
-                        line = w
-                if line:
-                    ls = font_body.render("• " + line, True, (180, 230, 255))
-                    ls.set_alpha(a)
-                    screen.blit(ls, (cx2 + 4 + gx, ey))
-                    ey += line_h; shown += 1
-            if not events:
-                cl_s = font_body.render("clear", True, (50, 100, 160))
-                cl_s.set_alpha(int(a * 0.6))
-                screen.blit(cl_s, (cx2 + (col_w - col_gap)//2 - cl_s.get_width()//2 + gx, col_y0 + 32))
-
-        # ── outer border ──
-        border_c = (0, int(180 * self.alpha), int(255 * self.alpha), a)
-        bd = pygame.Surface((W, H), pygame.SRCALPHA)
-        pygame.draw.rect(bd, border_c, (0, 0, W, H), 1)
-        screen.blit(bd, (x, y))
-
-        # ── corner brackets ──
-        tc = (0, 220, 255, a)
-        sz = 16
-        for bx, by, sx, sy in [(x,y,1,1),(x+W,y,-1,1),(x,y+H,1,-1),(x+W,y+H,-1,-1)]:
-            pygame.draw.lines(screen, tc, False,
-                              [(bx+sx*sz, by),(bx, by),(bx, by+sy*sz)], 2)
-
-        # ── top-right source label ──
-        src_s = font_body.render("synergia.librus.pl", True, (40, 100, 160))
-        src_s.set_alpha(int(a * 0.55))
-        screen.blit(src_s, (x + W - src_s.get_width() - 10, y + H - 18))
 
 
 class JarvisVisual:
@@ -2641,14 +2308,6 @@ def show_week_view(day_buckets):
             fly_dx=900 - i * 40, fly_dy=-700,
             w=card_w, h=card_h, lifetime=55.0))
 
-def show_librus_view(day_buckets):
-    """Show Librus schedule as a single large holographic panel, clearing any existing cards first."""
-    for c in list(visual.news_cards):
-        c.alive = False
-    import time as _t; _t.sleep(1.4)
-    cx, cy = visual.cx, visual.cy
-    visual.news_cards.append(LibrusPanel(day_buckets, cx, cy - 30, lifetime=60.0))
-
 def show_birthday_view(birthdays):
     """Show a single wide card listing upcoming birthdays."""
     cx, cy = visual.cx, visual.cy
@@ -2751,12 +2410,6 @@ TOOLS = [
      "input_schema": {"type": "object",
                       "properties": {"url": {"type": "string"}},
                       "required": ["url"]}},
-    {"name": "set_librus",
-     "description": "Save Librus Synergia credentials (stored locally on disk).",
-     "input_schema": {"type": "object",
-                      "properties": {"username": {"type": "string"},
-                                     "password": {"type": "string"}},
-                      "required": ["username", "password"]}},
     {"name": "add_birthday",
      "description": "Save someone's birthday. Date format MM-DD, e.g. 07-25.",
      "input_schema": {"type": "object",
@@ -2804,9 +2457,6 @@ TOOLS = [
                           "app_password": {"type": "string", "description": "16-character Google App Password (spaces are stripped automatically)"},
                       },
                       "required": ["email", "app_password"]}},
-    {"name": "show_librus",
-     "description": "Show only the Librus Synergia schedule for the next 7 days as a holographic panel. Use this when the user asks specifically about Librus, school schedule, tests, homework deadlines, etc.",
-     "input_schema": {"type": "object", "properties": {}}},
     {"name": "generate_mindmap",
      "description": (
          "Create and display an interactive holographic HTML mind map for any topic. "
@@ -3020,11 +2670,6 @@ def execute_tool(name, inp):
         elif name == "set_birthdays_url":
             mem = load_memory(); mem["gcal_birthdays_ics_url"] = inp["url"].strip(); save_memory(mem)
             return "Birthday calendar URL saved"
-        elif name == "set_librus":
-            mem = load_memory()
-            mem["librus_user"] = inp["username"]; mem["librus_pass"] = inp["password"]
-            save_memory(mem)
-            return "Librus credentials saved (stored locally)"
         elif name == "add_birthday":
             mem = load_memory()
             bds = [b for b in mem.get("birthdays", [])
@@ -3053,15 +2698,9 @@ def execute_tool(name, inp):
             cal = fetch_calendar_events(days=7)
             buckets = group_events_by_day(cal, 7) if cal else [[] for _ in range(7)]
             show_week_view(buckets)
-            return "Google Calendar week overlay displayed"
-        elif name == "show_librus":
-            lib = fetch_librus_events(days=7)
-            lib_buckets = group_events_by_day(lib, 7) if lib else [[] for _ in range(7)]
-            show_librus_view(lib_buckets)
-            if not lib:
-                return "Librus panel displayed — no events found this week (check credentials or there may genuinely be nothing scheduled)"
-            return f"Librus panel displayed — {len(lib)} events this week"
-            return run_streak_check()
+            email_summary = run_email_summary_pipeline(timeframe="past 24 hours")
+            speak(email_summary)
+            return "Google Calendar week overlay displayed and email summary delivered"
         elif name == "dispatch_agent":
             return run_agent_pipeline(inp.get("pipeline_type", ""), inp.get("context", ""))
         elif name == "set_gmail_credentials":
@@ -3641,18 +3280,6 @@ def wake_up():
         elif not cal_events:
             speak("Your calendar looks clear this week.")
         time.sleep(0.3)
-
-    if cur_mem.get("librus_user"):
-        speak("Shall I display your Librus schedule?")
-        want_librus = listen_yes_no()
-        if want_librus:
-            speak("Fetching Librus schedule.")
-            librus_events = fetch_librus_events(days=7)
-            librus_buckets = group_events_by_day(librus_events, 7) if librus_events else [[] for _ in range(7)]
-            show_librus_view(librus_buckets)
-            if not librus_events:
-                speak("Librus schedule loaded but nothing found this week.")
-            time.sleep(0.3)
 
     speak("How may I assist you?")
     listen_loop()
