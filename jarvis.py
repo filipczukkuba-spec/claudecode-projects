@@ -2584,109 +2584,59 @@ def show_birthday_view(birthdays):
         w=520, h=150, lifetime=45.0))
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
-TOOLS = [
+# Split into groups — only relevant groups are sent per request.
+# CORE (~13 tools) is always sent; others are added based on keywords in the message.
+
+TOOLS_CORE = [
     {"name": "open_application",
      "description": "Open any installed application on the Windows computer by name.",
-     "input_schema": {"type": "object",
-                      "properties": {"app_name": {"type": "string"}},
-                      "required": ["app_name"]}},
+     "input_schema": {"type": "object", "properties": {"app_name": {"type": "string"}}, "required": ["app_name"]}},
     {"name": "open_website",
      "description": "Open a URL in the default web browser.",
-     "input_schema": {"type": "object",
-                      "properties": {"url": {"type": "string"}},
-                      "required": ["url"]}},
+     "input_schema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}},
     {"name": "search_web",
      "description": "Search Google and open results in the browser.",
-     "input_schema": {"type": "object",
-                      "properties": {"query": {"type": "string"}},
-                      "required": ["query"]}},
+     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
     {"name": "set_volume",
      "description": "Set the Windows master volume (0-100).",
-     "input_schema": {"type": "object",
-                      "properties": {"level": {"type": "integer"}},
-                      "required": ["level"]}},
-    {"name": "run_command",
-     "description": "Run a shell or PowerShell command on the computer.",
-     "input_schema": {"type": "object",
-                      "properties": {"command": {"type": "string"},
-                                     "powershell": {"type": "boolean"}},
-                      "required": ["command"]}},
-    {"name": "create_file",
-     "description": "Create a file with specified content.",
-     "input_schema": {"type": "object",
-                      "properties": {"path": {"type": "string"},
-                                     "content": {"type": "string"}},
-                      "required": ["path", "content"]}},
-    {"name": "read_file",
-     "description": "Read the contents of a file.",
-     "input_schema": {"type": "object",
-                      "properties": {"path": {"type": "string"}},
-                      "required": ["path"]}},
-    {"name": "list_directory",
-     "description": "List files in a directory.",
-     "input_schema": {"type": "object",
-                      "properties": {"path": {"type": "string"}}}},
-    {"name": "get_system_info",
-     "description": "Get CPU, RAM, disk usage and running processes.",
-     "input_schema": {"type": "object", "properties": {}}},
-    {"name": "type_text",
-     "description": "Type text at the current cursor position.",
-     "input_schema": {"type": "object",
-                      "properties": {"text": {"type": "string"}},
-                      "required": ["text"]}},
-    {"name": "press_keys",
-     "description": "Press a keyboard shortcut.",
-     "input_schema": {"type": "object",
-                      "properties": {"keys": {"type": "string"}},
-                      "required": ["keys"]}},
-    {"name": "take_screenshot",
-     "description": "Take a screenshot and save it to the Desktop.",
-     "input_schema": {"type": "object",
-                      "properties": {"filename": {"type": "string"}}}},
+     "input_schema": {"type": "object", "properties": {"level": {"type": "integer"}}, "required": ["level"]}},
     {"name": "play_spotify",
      "description": "Play a song, artist, album or playlist on Spotify.",
-     "input_schema": {"type": "object",
-                      "properties": {"query": {"type": "string"}},
-                      "required": ["query"]}},
+     "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}},
     {"name": "spotify_control",
      "description": "Control Spotify: pause, resume, next, previous, mute.",
-     "input_schema": {"type": "object",
-                      "properties": {"action": {"type": "string"}},
-                      "required": ["action"]}},
-    {"name": "send_email",
-     "description": "Open Gmail to compose an email.",
-     "input_schema": {"type": "object",
-                      "properties": {"to": {"type": "string"},
-                                     "subject": {"type": "string"},
-                                     "body": {"type": "string"}},
-                      "required": ["to", "subject", "body"]}},
-    {"name": "set_calendar_url",
-     "description": "Save the user's Google Calendar secret iCal URL for weekly previews. User finds it at calendar.google.com → Settings → Integrate calendar → Secret address in iCal format.",
-     "input_schema": {"type": "object",
-                      "properties": {"url": {"type": "string"}},
-                      "required": ["url"]}},
-    {"name": "set_birthdays_url",
-     "description": "Save the user's Google Contacts birthday calendar secret iCal URL (used to surface upcoming birthdays).",
-     "input_schema": {"type": "object",
-                      "properties": {"url": {"type": "string"}},
-                      "required": ["url"]}},
-    {"name": "add_birthday",
-     "description": "Save someone's birthday. Date format MM-DD, e.g. 07-25.",
-     "input_schema": {"type": "object",
-                      "properties": {"name": {"type": "string"},
-                                     "date": {"type": "string"}},
-                      "required": ["name", "date"]}},
-    {"name": "remove_birthday",
-     "description": "Remove a saved birthday by name.",
-     "input_schema": {"type": "object",
-                      "properties": {"name": {"type": "string"}},
-                      "required": ["name"]}},
-    {"name": "list_birthdays",
-     "description": "List birthdays in the coming month.",
-     "input_schema": {"type": "object", "properties": {}}},
+     "input_schema": {"type": "object", "properties": {"action": {"type": "string"}}, "required": ["action"]}},
     {"name": "show_week",
      "description": "Display the holographic 7-day calendar overlay on the JARVIS visual.",
      "input_schema": {"type": "object", "properties": {}}},
+    {"name": "set_timer",
+     "description": "Set a countdown timer. Jarvis will speak when it fires and show a Windows popup.",
+     "input_schema": {"type": "object", "properties": {
+         "seconds": {"type": "number", "description": "Duration in seconds"},
+         "label":   {"type": "string", "description": "Timer label (e.g. 'Pasta', 'Pomodoro')"}
+     }, "required": ["seconds"]}},
+    {"name": "manage_todo",
+     "description": "Manage a persistent to-do list. Actions: add, complete, delete, list, clear_done.",
+     "input_schema": {"type": "object", "properties": {
+         "action":  {"type": "string", "description": "add | complete | delete | list | clear_done"},
+         "text":    {"type": "string", "description": "Task text (for add/complete/delete)"},
+         "item_id": {"type": "integer", "description": "Task ID number (for complete/delete by ID)"}
+     }, "required": ["action"]}},
+    {"name": "take_note",
+     "description": "Save a voice note or idea to persistent storage. Optionally list/search saved notes.",
+     "input_schema": {"type": "object", "properties": {
+         "action":  {"type": "string", "description": "save | list"},
+         "title":   {"type": "string", "description": "Note title (for save)"},
+         "content": {"type": "string", "description": "Note content (for save)"},
+         "query":   {"type": "string", "description": "Search query (for list)"}
+     }, "required": ["action"]}},
+    {"name": "remember_fact",
+     "description": "Store or retrieve a named fact across sessions.",
+     "input_schema": {"type": "object", "properties": {
+         "action": {"type": "string", "description": "store | recall"},
+         "key":    {"type": "string", "description": "Fact name/key"},
+         "value":  {"type": "string", "description": "Fact value (for store only)"}
+     }, "required": ["action", "key"]}},
     {"name": "dispatch_agent",
      "description": (
          "Dispatch a specialist sub-agent pipeline for complex multi-step tasks that require "
@@ -2701,160 +2651,187 @@ TOOLS = [
          "or asks to prepare for any subject/topic exam; pass the EXACT topic as context). "
          "Pass the user's original topic/request verbatim as context — preserving the original language."
      ),
-     "input_schema": {"type": "object",
-                      "properties": {
-                          "pipeline_type": {"type": "string",
-                                            "description": "One of: email_summary, web_research, study"},
-                          "context": {"type": "string",
-                                      "description": "The user's original request verbatim (preserve language)"},
-                      },
-                      "required": ["pipeline_type", "context"]}},
+     "input_schema": {"type": "object", "properties": {
+         "pipeline_type": {"type": "string", "description": "One of: email_summary, web_research, study"},
+         "context":       {"type": "string", "description": "The user's original request verbatim (preserve language)"},
+     }, "required": ["pipeline_type", "context"]}},
+    {"name": "get_wikipedia",
+     "description": "Fetch a short Wikipedia summary for any topic. Great for quick factual lookups.",
+     "input_schema": {"type": "object", "properties": {
+         "query":     {"type": "string", "description": "Topic to look up"},
+         "sentences": {"type": "integer", "description": "Number of sentences to return (default 4)"}
+     }, "required": ["query"]}},
+]
+
+TOOLS_SYSTEM = [
+    {"name": "run_command",
+     "description": "Run a shell or PowerShell command on the computer.",
+     "input_schema": {"type": "object", "properties": {
+         "command":    {"type": "string"},
+         "powershell": {"type": "boolean"}
+     }, "required": ["command"]}},
+    {"name": "create_file",
+     "description": "Create a file with specified content.",
+     "input_schema": {"type": "object", "properties": {
+         "path":    {"type": "string"},
+         "content": {"type": "string"}
+     }, "required": ["path", "content"]}},
+    {"name": "read_file",
+     "description": "Read the contents of a file.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+    {"name": "list_directory",
+     "description": "List files in a directory.",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}}},
+    {"name": "get_system_info",
+     "description": "Get CPU, RAM, disk usage and running processes.",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "type_text",
+     "description": "Type text at the current cursor position.",
+     "input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
+    {"name": "press_keys",
+     "description": "Press a keyboard shortcut.",
+     "input_schema": {"type": "object", "properties": {"keys": {"type": "string"}}, "required": ["keys"]}},
+    {"name": "take_screenshot",
+     "description": "Take a screenshot and save it to the Desktop.",
+     "input_schema": {"type": "object", "properties": {"filename": {"type": "string"}}}},
+    {"name": "kill_process",
+     "description": "Kill a running process by name (e.g. 'chrome', 'notepad', 'spotify').",
+     "input_schema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}},
+    {"name": "get_clipboard",
+     "description": "Read the current contents of the Windows clipboard.",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "set_clipboard",
+     "description": "Write text to the Windows clipboard.",
+     "input_schema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
+    {"name": "download_file",
+     "description": "Download a file from a URL to the Downloads folder.",
+     "input_schema": {"type": "object", "properties": {
+         "url":      {"type": "string"},
+         "filename": {"type": "string"}
+     }, "required": ["url"]}},
+    {"name": "open_file",
+     "description": "Open any file with its default application (documents, images, videos, PDFs, etc.).",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}},
+    {"name": "file_operation",
+     "description": "Move, copy, rename, or delete files and folders.",
+     "input_schema": {"type": "object", "properties": {
+         "operation": {"type": "string", "description": "move | copy | rename | delete"},
+         "src":       {"type": "string"},
+         "dst":       {"type": "string", "description": "Destination path (not needed for delete)"}
+     }, "required": ["operation", "src"]}},
+    {"name": "get_network_info",
+     "description": "Get the local IP address, Wi-Fi SSID, and ping latency.",
+     "input_schema": {"type": "object", "properties": {}}},
+]
+
+TOOLS_COMMS = [
+    {"name": "send_email",
+     "description": "Open Gmail to compose an email.",
+     "input_schema": {"type": "object", "properties": {
+         "to":      {"type": "string"},
+         "subject": {"type": "string"},
+         "body":    {"type": "string"}
+     }, "required": ["to", "subject", "body"]}},
     {"name": "set_gmail_credentials",
      "description": (
          "Save the user's Gmail IMAP credentials so JARVIS can read emails. "
          "Requires the Gmail address and a Google App Password (NOT the main Gmail password). "
          "The user generates App Passwords at myaccount.google.com → Security → App passwords."
      ),
-     "input_schema": {"type": "object",
-                      "properties": {
-                          "email":        {"type": "string", "description": "Full Gmail address"},
-                          "app_password": {"type": "string", "description": "16-character Google App Password (spaces are stripped automatically)"},
-                      },
-                      "required": ["email", "app_password"]}},
+     "input_schema": {"type": "object", "properties": {
+         "email":        {"type": "string", "description": "Full Gmail address"},
+         "app_password": {"type": "string", "description": "16-character Google App Password"},
+     }, "required": ["email", "app_password"]}},
+]
+
+TOOLS_CALENDAR = [
+    {"name": "set_calendar_url",
+     "description": "Save the user's Google Calendar secret iCal URL for weekly previews.",
+     "input_schema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}},
+    {"name": "set_birthdays_url",
+     "description": "Save the user's Google Contacts birthday calendar secret iCal URL.",
+     "input_schema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}},
+    {"name": "add_birthday",
+     "description": "Save someone's birthday. Date format MM-DD, e.g. 07-25.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string"},
+         "date": {"type": "string"}
+     }, "required": ["name", "date"]}},
+    {"name": "remove_birthday",
+     "description": "Remove a saved birthday by name.",
+     "input_schema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}},
+    {"name": "list_birthdays",
+     "description": "List birthdays in the coming month.",
+     "input_schema": {"type": "object", "properties": {}}},
+]
+
+TOOLS_VISUAL = [
     {"name": "generate_mindmap",
      "description": (
          "Create and display an interactive holographic HTML mind map for any topic. "
          "Opens automatically in the browser. Use for knowledge maps, brainstorming, "
          "topic breakdowns, concept summaries, or learning plans."
      ),
-     "input_schema": {
-         "type": "object",
-         "properties": {
-             "topic": {
-                 "type": "string",
-                 "description": "Central topic label (shown at the center node)"
-             },
-             "nodes": {
-                 "type": "array",
-                 "description": (
-                     "All nodes including the center. Each node object: "
-                     "{id (str), label (str, use \\n for line breaks), "
-                     "parent_id (null for the center node, else parent node id), "
-                     "category (str matching a category name), info (str tooltip text)}"
-                 ),
-                 "items": {"type": "object"}
-             },
-             "categories": {
-                 "type": "array",
-                 "description": "Category definitions. Each: {name (str), color (hex string e.g. '#00ffc8')}",
-                 "items": {"type": "object"}
-             }
-         },
-         "required": ["topic", "nodes", "categories"]
-     }},
+     "input_schema": {"type": "object", "properties": {
+         "topic":      {"type": "string", "description": "Central topic label"},
+         "nodes":      {"type": "array",  "description": "All nodes. Each: {id, label, parent_id, category, info}", "items": {"type": "object"}},
+         "categories": {"type": "array",  "description": "Category definitions. Each: {name, color (hex)}", "items": {"type": "object"}}
+     }, "required": ["topic", "nodes", "categories"]}},
     {"name": "generate_chart",
-     "description": "Create an interactive holographic HTML chart (bar, line, pie, or donut) and open it in the browser. Use to visualise data, comparisons, trends, or distributions.",
-     "input_schema": {"type":"object","properties":{
-         "title":      {"type":"string","description":"Chart title"},
-         "chart_type": {"type":"string","description":"bar | line | pie | donut"},
-         "labels":     {"type":"array","items":{"type":"string"},"description":"Category/X-axis labels"},
-         "values":     {"type":"array","items":{"type":"number"},"description":"Numeric values matching labels"},
-         "colors":     {"type":"array","items":{"type":"string"},"description":"Optional hex colors (e.g. ['#00ffc8','#00b4ff'])"},
-         "x_label":    {"type":"string","description":"X-axis label (optional)"},
-         "y_label":    {"type":"string","description":"Y-axis label (optional)"}
-     },"required":["title","chart_type","labels","values"]}},
+     "description": "Create an interactive holographic HTML chart (bar, line, pie, or donut) and open it in the browser.",
+     "input_schema": {"type": "object", "properties": {
+         "title":      {"type": "string"},
+         "chart_type": {"type": "string", "description": "bar | line | pie | donut"},
+         "labels":     {"type": "array", "items": {"type": "string"}},
+         "values":     {"type": "array", "items": {"type": "number"}},
+         "colors":     {"type": "array", "items": {"type": "string"}},
+         "x_label":    {"type": "string"},
+         "y_label":    {"type": "string"}
+     }, "required": ["title", "chart_type", "labels", "values"]}},
     {"name": "generate_flashcards",
-     "description": "Create an interactive HTML flashcard deck for studying any topic. Opens in browser with flip animation, shuffle, and progress tracking.",
-     "input_schema": {"type":"object","properties":{
-         "topic": {"type":"string","description":"Deck topic/title"},
-         "cards": {"type":"array","description":"Array of {front: 'question', back: 'answer'} objects","items":{"type":"object"}}
-     },"required":["topic","cards"]}},
-    {"name": "manage_reminder",
-     "description": "Add, list, or delete reminders. Each reminder has a date and a subject. Jarvis reads due reminders aloud every morning.",
-     "input_schema": {"type": "object",
-                      "properties": {
-                          "action":  {"type": "string",  "description": "add | list | delete"},
-                          "date":    {"type": "string",  "description": "Date for the reminder, e.g. 25/04/2026 or 2026-04-25 (for add)"},
-                          "subject": {"type": "string",  "description": "What to be reminded about (for add)"},
-                          "note":    {"type": "string",  "description": "Optional extra detail (for add)"},
-                          "index":   {"type": "integer", "description": "1-based reminder index to delete (for delete)"}
-                      },
-                      "required": ["action"]}},
-    {"name": "manage_todo",
-     "description": "Manage a persistent to-do list. Actions: add, complete, delete, list, clear_done.",
-     "input_schema": {"type":"object","properties":{
-         "action":  {"type":"string","description":"add | complete | delete | list | clear_done"},
-         "text":    {"type":"string","description":"Task text (for add/complete/delete)"},
-         "item_id": {"type":"integer","description":"Task ID number (for complete/delete by ID)"}
-     },"required":["action"]}},
-    {"name": "take_note",
-     "description": "Save a voice note or idea to persistent storage. Optionally list/search saved notes.",
-     "input_schema": {"type":"object","properties":{
-         "action":  {"type":"string","description":"save | list"},
-         "title":   {"type":"string","description":"Note title (for save)"},
-         "content": {"type":"string","description":"Note content (for save)"},
-         "query":   {"type":"string","description":"Search query (for list — leave empty to list recent notes)"}
-     },"required":["action"]}},
-    {"name": "remember_fact",
-     "description": "Store or retrieve a named fact. Use to remember arbitrary information the user wants saved (e.g. 'my gym password is X', 'sister birthday is March 5').",
-     "input_schema": {"type":"object","properties":{
-         "action": {"type":"string","description":"store | recall"},
-         "key":    {"type":"string","description":"Fact name/key (for both actions)"},
-         "value":  {"type":"string","description":"Fact value (for store only)"}
-     },"required":["action","key"]}},
-    {"name": "get_stock_price",
-     "description": "Get the current price and daily change for a stock or crypto symbol (e.g. AAPL, TSLA, BTC-USD, ETH-USD).",
-     "input_schema": {"type":"object","properties":{
-         "symbol": {"type":"string","description":"Ticker symbol (e.g. AAPL, BTC-USD)"}
-     },"required":["symbol"]}},
-    {"name": "get_wikipedia",
-     "description": "Fetch a short Wikipedia summary for any topic. Great for quick factual lookups.",
-     "input_schema": {"type":"object","properties":{
-         "query":     {"type":"string","description":"Topic to look up"},
-         "sentences": {"type":"integer","description":"Number of sentences to return (default 4)"}
-     },"required":["query"]}},
-    {"name": "kill_process",
-     "description": "Kill a running process by name (e.g. 'chrome', 'notepad', 'spotify').",
-     "input_schema": {"type":"object","properties":{
-         "name": {"type":"string","description":"Process name or partial name to kill"}
-     },"required":["name"]}},
-    {"name": "get_clipboard",
-     "description": "Read the current contents of the Windows clipboard.",
-     "input_schema": {"type":"object","properties":{}}},
-    {"name": "set_clipboard",
-     "description": "Write text to the Windows clipboard.",
-     "input_schema": {"type":"object","properties":{
-         "text": {"type":"string","description":"Text to copy to clipboard"}
-     },"required":["text"]}},
-    {"name": "download_file",
-     "description": "Download a file from a URL to the Downloads folder.",
-     "input_schema": {"type":"object","properties":{
-         "url":      {"type":"string","description":"URL to download"},
-         "filename": {"type":"string","description":"Optional filename (auto-detected from URL if omitted)"}
-     },"required":["url"]}},
-    {"name": "open_file",
-     "description": "Open any file with its default application (documents, images, videos, PDFs, etc.).",
-     "input_schema": {"type":"object","properties":{
-         "path": {"type":"string","description":"Absolute path to the file to open"}
-     },"required":["path"]}},
-    {"name": "file_operation",
-     "description": "Move, copy, rename, or delete files and folders.",
-     "input_schema": {"type":"object","properties":{
-         "operation": {"type":"string","description":"move | copy | rename | delete"},
-         "src":       {"type":"string","description":"Source path"},
-         "dst":       {"type":"string","description":"Destination path (not needed for delete)"}
-     },"required":["operation","src"]}},
-    {"name": "get_network_info",
-     "description": "Get the local IP address, Wi-Fi SSID, and ping latency.",
-     "input_schema": {"type":"object","properties":{}}},
-    {"name": "set_timer",
-     "description": "Set a countdown timer. Jarvis will speak when it fires and show a Windows popup.",
-     "input_schema": {"type":"object","properties":{
-         "seconds": {"type":"number","description":"Duration in seconds"},
-         "label":   {"type":"string","description":"Timer label (e.g. 'Pasta', 'Pomodoro')"}
-     },"required":["seconds"]},
-     "cache_control": {"type": "ephemeral"}},
+     "description": "Create an interactive HTML flashcard deck for studying any topic. Opens in browser.",
+     "input_schema": {"type": "object", "properties": {
+         "topic": {"type": "string"},
+         "cards": {"type": "array", "description": "Array of {front, back} objects", "items": {"type": "object"}}
+     }, "required": ["topic", "cards"]}},
 ]
+
+TOOLS_PRODUCTIVITY = [
+    {"name": "manage_reminder",
+     "description": "Add, list, or delete reminders. Jarvis reads due reminders aloud every morning.",
+     "input_schema": {"type": "object", "properties": {
+         "action":  {"type": "string",  "description": "add | list | delete"},
+         "date":    {"type": "string",  "description": "Date for the reminder, e.g. 25/04/2026 (for add)"},
+         "subject": {"type": "string",  "description": "What to be reminded about (for add)"},
+         "note":    {"type": "string",  "description": "Optional extra detail (for add)"},
+         "index":   {"type": "integer", "description": "1-based index to delete (for delete)"}
+     }, "required": ["action"]}},
+    {"name": "get_stock_price",
+     "description": "Get the current price and daily change for a stock or crypto symbol (e.g. AAPL, BTC-USD).",
+     "input_schema": {"type": "object", "properties": {
+         "symbol": {"type": "string", "description": "Ticker symbol"}
+     }, "required": ["symbol"]}},
+]
+
+# Keyword sets for tool group selection
+_KW_SYSTEM     = ("file","folder","directory","command","run","process","clipboard","network",
+                  "screenshot","type ","download","delete","move","copy","rename","kill","open ")
+_KW_COMMS      = ("email","gmail","mail","send","inbox","message")
+_KW_CALENDAR   = ("calendar","birthday","birthdays","schedule","event","appointment")
+_KW_VISUAL     = ("mindmap","chart","graph","flashcard","visual","diagram","plot","map")
+_KW_PRODUCTIVITY = ("remind","stock","price","crypto","bitcoin","market","invest","finance")
+
+def select_tools(text):
+    t = text.lower()
+    groups = [TOOLS_CORE]
+    if any(k in t for k in _KW_SYSTEM):      groups.append(TOOLS_SYSTEM)
+    if any(k in t for k in _KW_COMMS):       groups.append(TOOLS_COMMS)
+    if any(k in t for k in _KW_CALENDAR):    groups.append(TOOLS_CALENDAR)
+    if any(k in t for k in _KW_VISUAL):      groups.append(TOOLS_VISUAL)
+    if any(k in t for k in _KW_PRODUCTIVITY): groups.append(TOOLS_PRODUCTIVITY)
+    return [tool for group in groups for tool in group]
+
+TOOLS = TOOLS_CORE  # legacy alias (sub-agents still reference this)
 
 
 def execute_tool(name, inp):
@@ -3547,13 +3524,14 @@ def ask_claude(user_message):
     system_blocks = [{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}]
     if mem_ctx:
         system_blocks.append({"type": "text", "text": mem_ctx})
+    active_tools = select_tools(user_message)
     while True:
         visual_state = "working"
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
             system=system_blocks,
-            tools=TOOLS,
+            tools=active_tools,
             messages=conversation_history,
             extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
         )
