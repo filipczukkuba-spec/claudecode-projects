@@ -335,18 +335,22 @@
     {
       "text": "do it always after I add an extra reminder for you always",
       "time": 1776888399.6171098
+    },
+    {
+      "text": "goodbye jar",
+      "time": 1776966442.4820206
     }
   ],
   "habits": {
     "h17": 10,
     "h18": 32,
     "h22": 20,
-    "h19": 10,
+    "h19": 11,
     "h21": 12
   },
   "birthdays": [],
-  "wake_count": 25,
-  "last_wake": 1776888239.1276796,
+  "wake_count": 26,
+  "last_wake": 1776966284.4489264,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "gmail_imap_user": "filipczuk.kuba@gmail.com",
@@ -356,12 +360,12 @@
   "facts": {},
   "reminders": [
     {
-      "date": "2026-04-23",
-      "subject": "polski renesans",
-      "note": "zrob mi pe\u0142ne notatki do nauki"
+      "date": "2026-04-24",
+      "subject": "matemathic",
+      "note": "chc\u0119 si\u0119 przygotowa\u0107 do prawdopodobie\u0144stwa sprawdzan 3 klasa liceum"
     }
   ],
   "librus_user": "1203917u",
   "librus_pass": "Kubbrus2027!",
-  "skip_intro": false
+  "skip_intro": true
 }
