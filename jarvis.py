@@ -3535,10 +3535,14 @@ SYSTEM = (
     "You are a full-capability super-assistant. When a user asks something that a tool can answer better than words, use the tool."
 )
 
+MAX_HISTORY = 20  # keep last 10 turns (user + assistant pairs)
+
 def ask_claude(user_message):
     global conversation_history, visual_state
     visual_state = "working"
     conversation_history.append({"role": "user", "content": user_message})
+    if len(conversation_history) > MAX_HISTORY:
+        conversation_history = conversation_history[-MAX_HISTORY:]
     mem_ctx = build_memory_context(load_memory())
     system_blocks = [{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}]
     if mem_ctx:
@@ -3546,7 +3550,7 @@ def ask_claude(user_message):
     while True:
         visual_state = "working"
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="claude-haiku-4-5-20251001",
             max_tokens=1024,
             system=system_blocks,
             tools=TOOLS,
