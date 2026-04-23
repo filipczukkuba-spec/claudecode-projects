@@ -607,7 +607,8 @@ def _default_memory():
             "wake_count": 0, "last_wake": 0,
             "gcal_ics_url": "", "gcal_birthdays_ics_url": "",
             "gmail_imap_user": "", "gmail_imap_pass": "",
-            "todos": [], "notes": [], "facts": {}, "reminders": []}
+            "todos": [], "notes": [], "facts": {}, "reminders": [],
+            "pending_studies": []}
 
 def load_memory():
     if os.path.exists(MEMORY_PATH):
@@ -1533,7 +1534,10 @@ class ReminderScreen:
         self.inputs = {"date": "", "subject": "", "note": ""}
         self.cur_field = 0
         full_topic = f"{subject} — {note}" if note else subject
-        threading.Thread(target=run_study_pipeline, args=(full_topic,), daemon=True).start()
+        mem2 = load_memory()
+        mem2.setdefault("pending_studies", []).append(full_topic)
+        save_memory(mem2)
+        threading.Thread(target=_run_study_and_clear, args=(full_topic,), daemon=True).start()
 
     def _delete_selected(self):
         if not self.reminders: return
@@ -2999,8 +3003,11 @@ def execute_tool(name, inp):
                 rems.append({"date": date_iso, "subject": subject, "note": note})
                 rems.sort(key=lambda r: r.get("date", ""))
                 mem["reminders"] = rems
+                full_topic = f"{subject} — {note}" if note else subject
+                mem.setdefault("pending_studies", []).append(full_topic)
                 save_memory(mem)
                 visual.reminder_screen._reload()
+                threading.Thread(target=_run_study_and_clear, args=(full_topic,), daemon=True).start()
                 d = _rdt.date.fromisoformat(date_iso)
                 return f"Reminder set for {d.strftime('%d %B %Y')}: {subject}"
             elif action == "delete":
@@ -3437,6 +3444,26 @@ __CONTENT__
 </body></html>
 """
 
+def _run_study_and_clear(topic):
+    """Run study pipeline then remove topic from pending_studies."""
+    run_study_pipeline(topic)
+    mem = load_memory()
+    pending = mem.get("pending_studies", [])
+    if topic in pending:
+        pending.remove(topic)
+        mem["pending_studies"] = pending
+        save_memory(mem)
+
+def drain_pending_studies():
+    """On startup, resume any study pipelines that were interrupted."""
+    mem = load_memory()
+    pending = list(mem.get("pending_studies", []))
+    if not pending:
+        return
+    speak(f"I have {len(pending)} pending study {'material' if len(pending)==1 else 'materials'} from last session. Resuming now, sir.")
+    for topic in pending:
+        threading.Thread(target=_run_study_and_clear, args=(topic,), daemon=True).start()
+
 def run_study_pipeline(topic):
     import datetime as _dt
     speak("Understood, sir. Researching the topic now.")
@@ -3870,7 +3897,7 @@ def main():
     print('  Say "Jarvis" → wake  |  ESC → exit')
 
     threading.Thread(target=wake_word_listener, daemon=True).start()
-
+    threading.Thread(target=drain_pending_studies, daemon=True).start()
 
     visual.run()
 

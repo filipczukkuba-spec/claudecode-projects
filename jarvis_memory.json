@@ -339,6 +339,42 @@
     {
       "text": "goodbye jar",
       "time": 1776966442.4820206
+    },
+    {
+      "text": "did you work on my reminder",
+      "time": 1776968440.1149595
+    },
+    {
+      "text": "I'm just checking if you did something on the reminder I said earlier",
+      "time": 1776968463.0588672
+    },
+    {
+      "text": "there's one reminder that that said",
+      "time": 1776968489.379976
+    },
+    {
+      "text": "can you check the reminder",
+      "time": 1776968503.9849374
+    },
+    {
+      "text": "that's right",
+      "time": 1776968521.7391639
+    },
+    {
+      "text": "did you prepare the resources to learn from already",
+      "time": 1776968542.4209483
+    },
+    {
+      "text": "do it always after I set a new reminder always send me an email with prepared materials to learn from from the topic I set on my reminder",
+      "time": 1776968580.3966603
+    },
+    {
+      "text": "yes",
+      "time": 1776968603.786161
+    },
+    {
+      "text": "goodbye jar",
+      "time": 1776968716.5199027
     }
   ],
   "habits": {
@@ -346,11 +382,12 @@
     "h18": 32,
     "h22": 20,
     "h19": 11,
-    "h21": 12
+    "h21": 12,
+    "h20": 9
   },
   "birthdays": [],
-  "wake_count": 26,
-  "last_wake": 1776966284.4489264,
+  "wake_count": 27,
+  "last_wake": 1776968428.6948419,
   "gcal_ics_url": "https://calendar.google.com/calendar/ical/filip.filipczuk%40gmail.com/private-62ddd0c99bc45a39e26a79917d58a7c0/basic.ics",
   "gcal_birthdays_ics_url": "",
   "gmail_imap_user": "filipczuk.kuba@gmail.com",
@@ -367,5 +404,5 @@
   ],
   "librus_user": "1203917u",
   "librus_pass": "Kubbrus2027!",
-  "skip_intro": true
+  "skip_intro": false
 }
