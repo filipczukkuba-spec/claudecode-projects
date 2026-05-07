@@ -68,7 +68,8 @@
       "PowerShell(Get-Process *)",
       "Bash(powershell -Command \"while \\(-not \\(Test-Path 'C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies'\\)\\) { Start-Sleep 5 }; Write-Output 'FOLDER CREATED'; while \\(\\(Get-ChildItem 'C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies' -Filter *.md\\).Count -eq 0\\) { Start-Sleep 3 }; Write-Output 'FILE SAVED'\")",
       "Bash(powershell -Command \"while \\(-not \\(Test-Path 'C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies\\\\*.md'\\)\\) { Start-Sleep 3 }; Write-Output 'STRATEGY FILE SAVED'\")",
-      "Bash(powershell -Command \"while \\(Get-Process python -ErrorAction SilentlyContinue\\) { Start-Sleep 5 }; Write-Output 'PYTHON EXITED'\")"
+      "Bash(powershell -Command \"while \\(Get-Process python -ErrorAction SilentlyContinue\\) { Start-Sleep 5 }; Write-Output 'PYTHON EXITED'\")",
+      "Bash(start *)"
     ]
   }
 }

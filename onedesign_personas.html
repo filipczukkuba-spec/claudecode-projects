@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One Design — Eksplorator Klientów</title>
+<style>
+  :root {
+    --black: #1a1a2e;
+    --black2: #16213e;
+    --gold: #C9A800;
+    --gold-light: #e8c840;
+    --gold-dim: #8a7200;
+    --cream: #faf7f0;
+    --cream2: #f0ece0;
+    --grey: #555;
+    --grey-light: #888;
+    --card1: #1e2a1e;
+    --card2: #1e1e2a;
+    --card3: #2a1e1e;
+    --accent1: #6ab04c;
+    --accent2: #7b8cde;
+    --accent3: #e06060;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--black);
+    color: var(--cream);
+    font-family: 'Georgia', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+    padding: 48px 24px 32px;
+    border-bottom: 1px solid rgba(201,168,0,0.2);
+    position: relative;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(201,168,0,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .logo {
+    font-size: 11px;
+    letter-spacing: 6px;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  header h1 {
+    font-size: clamp(24px, 4vw, 42px);
+    font-weight: 400;
+    color: var(--cream);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  header p {
+    font-size: 13px;
+    color: var(--grey-light);
+    font-family: sans-serif;
+    letter-spacing: 1px;
+  }
+
+  /* ── Layout ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    padding: 40px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Card ── */
+  .card {
+    border-radius: 16px;
+    border: 1px solid rgba(201,168,0,0.15);
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+    position: relative;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 24px 64px rgba(0,0,0,0.5); }
+
+  .card-0 { background: linear-gradient(160deg, #1b2a1b 0%, #111a11 100%); --accent: #6ab04c; }
+  .card-1 { background: linear-gradient(160deg, #1b1b2a 0%, #11111a 100%); --accent: #7b8cde; }
+  .card-2 { background: linear-gradient(160deg, #2a1b1b 0%, #1a1111 100%); --accent: #e06060; }
+
+  .card-header {
+    padding: 28px 28px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .avatar {
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    border: 2px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .card-title { flex: 1; }
+  .card-title h2 { font-size: 18px; font-weight: 400; color: var(--cream); margin-bottom: 4px; }
+  .card-title .archetype {
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--accent); font-family: sans-serif;
+  }
+
+  .card-body { padding: 24px 28px; }
+
+  /* ── Age Pills ── */
+  .section-label {
+    font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--grey-light); font-family: sans-serif; margin-bottom: 10px;
+  }
+  .age-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 24px; }
+  .pill {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+    font-size: 12px; font-family: sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--grey-light);
+    background: rgba(255,255,255,0.03);
+  }
+  .pill:hover { border-color: var(--accent); color: var(--cream); }
+  .pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #111;
+    font-weight: bold;
+  }
+
+  /* ── Budget Slider ── */
+  .budget-section { margin-bottom: 28px; }
+  .budget-display {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .budget-amount {
+    font-size: 28px; color: var(--gold); letter-spacing: -1px;
+  }
+  .budget-amount span { font-size: 14px; color: var(--grey-light); font-family: sans-serif; }
+  .budget-tier {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    font-family: sans-serif; color: var(--accent); padding: 3px 8px;
+    border: 1px solid var(--accent); border-radius: 10px;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%; height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 8px rgba(201,168,0,0.5);
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px;
+  }
+
+  .range-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--grey-light);
+    font-family: sans-serif; margin-top: 6px;
+  }
+
+  /* ── Dynamic Content ── */
+  .dynamic { transition: opacity 0.3s, transform 0.3s; }
+  .dynamic.fade { opacity: 0; transform: translateY(6px); }
+
+  .content-block {
+    background: rgba(255,255,255,0.03);
+    border-left: 2px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+  .content-block h4 {
+    font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--accent); font-family: sans-serif; margin-bottom: 8px;
+  }
+  .content-block ul { list-style: none; padding: 0; }
+  .content-block ul li {
+    font-size: 13px; color: var(--cream2); font-family: sans-serif;
+    padding: 3px 0; padding-left: 14px; position: relative; line-height: 1.5;
+  }
+  .content-block ul li::before {
+    content: '→'; position: absolute; left: 0;
+    color: var(--accent); font-size: 11px; top: 4px;
+  }
+  .content-block p {
+    font-size: 13px; color: var(--cream2); font-family: sans-serif;
+    line-height: 1.6;
+  }
+
+  .scope-bar {
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px; overflow: hidden; height: 8px; margin: 8px 0 4px;
+  }
+  .scope-fill {
+    height: 100%; border-radius: 8px;
+    background: linear-gradient(90deg, var(--accent), var(--gold));
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+  }
+  .scope-label {
+    font-size: 12px; color: var(--cream); font-family: sans-serif;
+    font-weight: bold; margin-bottom: 4px;
+  }
+  .scope-desc {
+    font-size: 11px; color: var(--grey-light); font-family: sans-serif;
+    line-height: 1.5;
+  }
+
+  .ig-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .ig-tag {
+    font-size: 11px; font-family: sans-serif;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 3px 10px;
+    color: var(--cream2);
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center; padding: 40px 24px;
+    border-top: 1px solid rgba(201,168,0,0.1);
+    font-size: 11px; color: var(--grey-light);
+    font-family: sans-serif; letter-spacing: 2px;
+  }
+  footer span { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">One Design — Warsaw</div>
+  <h1>Eksplorator Profili Klientów</h1>
+  <p>Dostosuj wiek i budżet, aby zobaczyć czego szuka każdy typ klienta</p>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<footer>
+  <span>ONE DESIGN</span> &nbsp;·&nbsp; Projektowanie wnętrz Warszawa &nbsp;·&nbsp; @onedesignpl
+</footer>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────────
+
+const PERSONAS = [
+  {
+    id: 0,
+    name: "Marta & Tomek",
+    archetype: "Młoda Ambitna Para",
+    icon: "👨‍👩‍👧",
+    ages: ["35–38", "38–41", "41–44"],
+    ageLabels: ["Wczesna ambicja", "Szczyt kariery", "Konsolidacja"],
+    budgetMin: 60, budgetMax: 500,
+    data: {
+      // age index 0,1,2 × budget tier low/mid/high/premium
+      age: {
+        "35–38": { budgetCap: 280, incomeNote: "Dochód 15–25k PLN/mc, mocna hipoteka" },
+        "38–41": { budgetCap: 370, incomeNote: "Dochód 22–35k PLN/mc, stabilna sytuacja" },
+        "41–44": { budgetCap: 480, incomeNote: "Dochód 30–50k PLN/mc, awanse + oszczędności" },
+      },
+      budget: [
+        { // 0: low 60-149k
+          tier: "Selektywny",
+          scope: 28,
+          scopeLabel: "Remont 1-2 pomieszczeń",
+          scopeDesc: "Kuchnia lub łazienka + korytarz. Nie stać ich jeszcze na całość — wybierają co da największy efekt wizualny.",
+          wants: [
+            "Konkretny efekt w jednym pomieszczeniu",
+            "Gotowe rozwiązania bez długich konsultacji",
+            "Jasny budżet z góry, zero niespodzianek",
+            "Remont bez zakłócania codziennego życia",
+          ],
+          fears: [
+            "Przekroczenie budżetu",
+            "Zbyt długi czas realizacji",
+            "Projektant niezrozumiejący ich ograniczeń",
+          ],
+          ig: ["Reel 'jak zmienić kuchnię za 60k'", "Karuzela 'co wybrać przy ograniczonym budżecie'", "Before/after jednego pomieszczenia"],
+          dm_trigger: "Konkretna cena i czas realizacji w pierwszych 3 słowach posta",
+        },
+        { // 1: mid 150-299k
+          tier: "Ambitny",
+          scope: 55,
+          scopeLabel: "Pełne mieszkanie 70–100 m²",
+          scopeDesc: "Generalny remont całego mieszkania. Chcą kompleksowości — jeden wykonawca, jeden projekt, jeden harmonogram.",
+          wants: [
+            "Kompleksowa obsługa od A do Z",
+            "Styl nowoczesny + ciepły (Japandi light)",
+            "Strefa dla dzieci przemyślana funkcjonalnie",
+            "Harmonogram bez przestojów",
+            "Możliwość wybrania materiałów samodzielnie",
+          ],
+          fears: [
+            "Zbyt długi remont przy dzieciach w domu",
+            "Że nie spodobają im się propozycje projektanta",
+            "Ukryte koszty po starcie projektu",
+          ],
+          ig: ["Reel 'pełny remont mieszkania z rodziną'", "Karuzela 'oś czasu projektu krok po kroku'", "Stories z wyboru materiałów"],
+          dm_trigger: "Harmonogram + widełki budżetowe w treści posta",
+        },
+        { // 2: high 300-449k
+          tier: "Premium Start",
+          scope: 78,
+          scopeLabel: "Dom lub duże mieszkanie 110–160 m²",
+          scopeDesc: "Wyższy metraż, wyższe oczekiwania. Zależy im na jakości materiałów i długoterminowej trwałości.",
+          wants: [
+            "Naturalne materiały premium (dąb, kamień, len)",
+            "Projekt z wyraźną filozofią, nie catalog-style",
+            "Smart home integracja (oświetlenie, rolety)",
+            "Strefa dzienna otwarta, sypialnia jako azyl",
+            "Koordynacja wszystkich wykonawców",
+          ],
+          fears: [
+            "Efekt zbyt trendowy, nieponadczasowy",
+            "Projektant bez wyraźnego stylu",
+            "Brak koordynacji między ekipami",
+          ],
+          ig: ["Reel 'dlaczego wybraliśmy dąb zamiast laminatu'", "Karuzela 'materiały które przetrwają 20 lat'", "Before/after domu z opisem decyzji"],
+          dm_trigger: "Komentarz ekspercki 'dlaczego' przy każdej decyzji materiałowej",
+        },
+        { // 3: premium 450k+
+          tier: "Luksusowy",
+          scope: 95,
+          scopeLabel: "Rezydencja / Dom 180 m²+",
+          scopeDesc: "Pełna swoboda projektowa. Chcą czegoś wyjątkowego — dom jako statement ich sukcesu zawodowego.",
+          wants: [
+            "Indywidualny projekt bez gotowych rozwiązań",
+            "Materiały sprowadzane na zamówienie",
+            "Architektura wnętrz + ogród + elewacja",
+            "Pełny nadzór autorski przez cały czas budowy",
+            "Dom gotowy na sesję zdjęciową",
+          ],
+          fears: [
+            "Efekt podobny do innych domów z Wilanowa",
+            "Opóźnienia przy drogich materiałach importowanych",
+            "Brak wizji projektanta mimo wysokiego budżetu",
+          ],
+          ig: ["Behind-the-scenes: wybór materiałów za granicą", "Reel 'nasz największy projekt w tym roku'", "Zdjęcia z sesji gotowego domu"],
+          dm_trigger: "Ekskluzywność i unikatowość — to, czego nie ma nikt inny",
+        },
+      ],
+    },
+  },
+
+  {
+    id: 1,
+    name: "Agnieszka & Marek",
+    archetype: "Ugruntowana Rodzina",
+    icon: "👨‍👩‍👦‍👦",
+    ages: ["40–44", "44–48", "48–52"],
+    ageLabels: ["Środek drogi", "Dojrzała stabilność", "Szczyt możliwości"],
+    budgetMin: 80, budgetMax: 550,
+    data: {
+      age: {
+        "40–44": { budgetCap: 300, incomeNote: "Dochód 18–30k PLN/mc, kredyt + oszczędności" },
+        "44–48": { budgetCap: 400, incomeNote: "Dochód 28–45k PLN/mc, kredyt spłacony lub mały" },
+        "48–52": { budgetCap: 550, incomeNote: "Dochód 40–65k PLN/mc, pełna zdolność inwestycyjna" },
+      },
+      budget: [
+        {
+          tier: "Funkcjonalny",
+          scope: 30,
+          scopeLabel: "Modernizacja 2–3 pomieszczeń",
+          scopeDesc: "Priorytet: kuchnia + łazienka. Dzieci w domu, nie mogą długo żyć w remoncie — musi być szybko i sprawnie.",
+          wants: [
+            "Szybka realizacja (max 6 tygodni na pomieszczenie)",
+            "Materiały odporne na dzieci (tynk mineralny, drewno olejowane)",
+            "Dobre schowki — organizacja to priorytet",
+            "Przejrzyste etapy prac z datami",
+          ],
+          fears: [
+            "Remont trwa 3 miesiące zamiast 6 tygodni",
+            "Bałagan na całym piętrze przy dzieciach",
+            "Ekipa nie przychodzi zgodnie z harmonogramem",
+          ],
+          ig: ["Karuzela 'jak zorganizować kuchnię przy 3 dzieciach'", "Reel 'remont w 5 tygodni, dzieci w domu'", "Stories z postępu prac"],
+          dm_trigger: "Konkretny czas realizacji + materiały bezpieczne dla dzieci",
+        },
+        {
+          tier: "Kompleksowy",
+          scope: 60,
+          scopeLabel: "Generalny remont 90–120 m²",
+          scopeDesc: "Cały dom naraz. Chcą wyjechać na 2-3 miesiące i wrócić do gotowego — pełna obsługa kluczem w drzwiach.",
+          wants: [
+            "Usługa pod klucz — oni nie muszą niczego koordynować",
+            "Strefa dla dzieci: pokoje + strefa odrabiania lekcji",
+            "Przestrzenie wielofunkcyjne (salon-jadalnia-praca)",
+            "Materiały trwałe, łatwe w utrzymaniu",
+            "Jeden punkt kontaktu dla wszystkich ekip",
+          ],
+          fears: [
+            "Brak koordynacji między ekipami",
+            "Powrót do niedokończonego domu",
+            "Projektant nie słucha potrzeb dzieci",
+          ],
+          ig: ["Reel 'jak wygląda remont pod klucz'", "Karuzela 'co oznacza usługa pod klucz krok po kroku'", "Testimonial rodziny z dziećmi"],
+          dm_trigger: "'Oni wyjechali w lipcu, wrócili we wrześniu. Czekał na nich gotowy dom.'",
+        },
+        {
+          tier: "Jakościowy",
+          scope: 80,
+          scopeLabel: "Premium remont 120–180 m²",
+          scopeDesc: "Duży metraż, dzieci starsze — mogą sobie pozwolić na kompromis i rozłożenie remontu. Jakość ważniejsza niż tempo.",
+          wants: [
+            "Naturalne materiały premium — inwestycja na dekady",
+            "Projekt z wyraźnym charakterem rodziny",
+            "Pokoje dzieci przemyślane na dorastanie (12-18 lat)",
+            "Oświetlenie regulowane strefowo",
+            "Dom reprezentacyjny, ale wygodny do codziennego życia",
+          ],
+          fears: [
+            "Dom piękny na zdjęciu, trudny w utrzymaniu",
+            "Pokoje dzieci przestają pasować za 3 lata",
+            "Za duże rozbicie na etapy — bez końca trwa",
+          ],
+          ig: ["Reel 'projektujemy pokoje które rosną razem z dziećmi'", "Karuzela '5 materiałów które przetrwają nastolatki'", "Before/after dużego domu"],
+          dm_trigger: "Funkcjonalność dla rodziny jako główne przesłanie, estetyka jako bonus",
+        },
+        {
+          tier: "Prestiżowy",
+          scope: 93,
+          scopeLabel: "Rezydencja rodzinna 180 m²+",
+          scopeDesc: "Dom na resztę życia. Chcą czegoś, z czego będą dumni za 20 lat — i co ich dzieci też będą lubić.",
+          wants: [
+            "Projekt ponadczasowy — nie trendowy",
+            "Przestrzenie do wspólnego spędzania czasu rodziny",
+            "Ogród zintegrowany z wnętrzem",
+            "Pokoje dzieci z łazienkami, strefa rodzicielska wydzielona",
+            "Dom gotowy na przyjęcia i spotkania rodzinne",
+          ],
+          fears: [
+            "Dom wyjdzie jak katalog — bez duszy",
+            "Zbyt długi projekt (ponad 12 miesięcy)",
+            "Projektant nie uwzględnia stylu życia ich rodziny",
+          ],
+          ig: ["Dom rodzinny jako narracja — 'projektujemy miejsca gdzie rosną dzieci'", "Reel filozofia: 'dom to nie galeria'", "Case study dużej realizacji rodzinnej"],
+          dm_trigger: "Historia i narracja projektu — emocje, nie tylko estetyka",
+        },
+      ],
+    },
+  },
+
+  {
+    id: 2,
+    name: "Katarzyna & Piotr",
+    archetype: "Premium Upgrade",
+    icon: "👫",
+    ages: ["46–50", "50–54", "54–58"],
+    ageLabels: ["Pre-szczyt", "Szczyt finansowy", "Legacy mode"],
+    budgetMin: 120, budgetMax: 700,
+    data: {
+      age: {
+        "46–50": { budgetCap: 400, incomeNote: "Dochód 40–70k PLN/mc, dzieci prawie samodzielne" },
+        "50–54": { budgetCap: 580, incomeNote: "Dochód 60–100k PLN/mc, pełna wolność finansowa" },
+        "54–58": { budgetCap: 700, incomeNote: "Dochód 80k+ PLN/mc, kapitał + inwestycje" },
+      },
+      budget: [
+        {
+          tier: "Wymagający",
+          scope: 40,
+          scopeLabel: "Metamorfoza kluczowych stref",
+          scopeDesc: "Salon + sypialnia + łazienka główna. Chcą poprawy jakości życia w miejscach, gdzie spędzają najwięcej czasu.",
+          wants: [
+            "Sypialnia jako azyl — pełen spokój i komfort",
+            "Salon do przyjmowania gości na wysokim poziomie",
+            "Materiały wysokiej jakości w widocznych miejscach",
+            "Projekt z wyraźnym charakterem, nie universalny",
+          ],
+          fears: [
+            "Efekt zbyt minimalistyczny i zimny",
+            "Projektant narzuca styl zamiast słuchać",
+            "Wynik podobny do wielu innych mieszkań",
+          ],
+          ig: ["Reel 'jak zaprojektować sypialnię na miarę hotelu 5*'", "Karuzela 'materiały premium które warto znać'", "Filozofia: 'projektujemy doznania, nie pokoje'"],
+          dm_trigger: "Ekspertyza i filozofia — nie lista usług",
+        },
+        {
+          tier: "Prestiżowy",
+          scope: 68,
+          scopeLabel: "Kompleksowy projekt 100–150 m²",
+          scopeDesc: "Nowe lub gruntownie remontowane mieszkanie. Chcą czegoś definitywnego — domu na resztę życia, bez kompromisów.",
+          wants: [
+            "Projekt z jednolitą filozofią od podłogi po sufit",
+            "Materiały naturalne sprowadzane z Europy",
+            "Oświetlenie jako element designu (2700K warstwowo)",
+            "Sztuka w przestrzeni — spójna z projektem",
+            "Brak wyraźnych trendów — ponadczasowość",
+          ],
+          fears: [
+            "Dom modny w 2026, przestarzały w 2032",
+            "Projektant bez wyraźnego POV",
+            "Zbyt wiele opcji do wyboru — oni chcą rekomendacji",
+          ],
+          ig: ["Reel 'dlaczego odeszliśmy od Japandi w tym projekcie'", "Karuzela '6 zasad ponadczasowego designu'", "Pełna realizacja z komentarzem filozoficznym"],
+          dm_trigger: "Wyraźny punkt widzenia projektanta — pewność i ekspertyza, zero 'co państwo wolą'",
+        },
+        {
+          tier: "Luksusowy",
+          scope: 85,
+          scopeLabel: "Premium rezydencja 150–200 m²",
+          scopeDesc: "Dom jako wyraz tożsamości. Chcą, żeby każdy detal był przemyślany i wyjątkowy — nie ma czegoś 'wystarczająco dobrego'.",
+          wants: [
+            "Każdy detal na zamówienie (meble, oświetlenie, sztuka)",
+            "Projekt który opowiada ich historię i charakter",
+            "Integracja wnętrza z architekturą (światło, proporcje)",
+            "Obsługa jednego projektanta od początku do końca",
+            "Dom gotowy na fotografię do prestiżowego magazynu",
+          ],
+          fears: [
+            "Projekt oddelegowany do asystenta",
+            "Kompromisy na materiałach 'bo niedostępne'",
+            "Dom bez duszy mimo wysokiego budżetu",
+          ],
+          ig: ["Behind-the-scenes projektu luksusowego krok po kroku", "Reel: projektant jako autor, nie wykonawca", "Sesja fotograficzna gotowej realizacji"],
+          dm_trigger: "Autorstwo i rzemiosło — projektant jako artysta, nie usługodawca",
+        },
+        {
+          tier: "Ultra Premium",
+          scope: 100,
+          scopeLabel: "Rezydencja / Willa 200 m²+",
+          scopeDesc: "Bez ograniczeń. Projekt życia — dom jako dziedzictwo i manifest stylu życia. Liczą się tylko doznania i jakość.",
+          wants: [
+            "Materiały sprowadzane z całego świata",
+            "Współpraca z artystami i rzemieślnikami",
+            "Dom jako przestrzeń do życia, pracy i gości VIP",
+            "Integracja: architektura + wnętrze + ogród + sztuka",
+            "Dokumentacja projektu jako część kolekcji",
+          ],
+          fears: [
+            "Brak spójności między częściami domu",
+            "Projektant nie dotrzymuje terminów przy luksusowych zleceniach",
+            "Efekt przepychu bez elegancji",
+          ],
+          ig: ["Ekskluzywny content — nie dla każdego odbiorcy", "Dokumentalny styl: historia projektu od zera", "Współpraca z fotografem architektonicznym"],
+          dm_trigger: "Dyskrecja, ekskluzywność, wyjątkowość — nie ma drugiego takiego projektu",
+        },
+      ],
+    },
+  },
+];
+
+// ─────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────
+
+const state = PERSONAS.map(p => ({
+  ageIdx: 1,
+  budget: Math.round((p.budgetMin + p.budgetMax) / 2),
+}));
+
+// ─────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────
+
+function getBudgetTierIdx(budget) {
+  if (budget < 150) return 0;
+  if (budget < 300) return 1;
+  if (budget < 450) return 2;
+  return 3;
+}
+
+function formatPLN(n) {
+  if (n >= 1000) return (n/1000).toFixed(0) + '–' + (n/1000 + 0.5 < 1 ? '' : '') + ' tys.';
+  return n + 'k';
+}
+
+function formatBudget(n) {
+  if (n < 1000) return n + ' 000 PLN';
+  return (n/1000).toFixed(2) + ' mln PLN';
+}
+
+// ─────────────────────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────────────────────
+
+function renderCard(p, idx) {
+  const s = state[idx];
+  const ageKey = p.ages[s.ageIdx];
+  const ageData = p.data.age[ageKey];
+  const cappedBudget = Math.min(s.budget, ageData.budgetCap);
+  const tierIdx = getBudgetTierIdx(cappedBudget);
+  const tier = p.data.budget[tierIdx];
+  const pct = Math.round((cappedBudget - p.budgetMin) / (ageData.budgetCap - p.budgetMin) * 100);
+
+  return `
+  <div class="card card-${idx}">
+    <div class="card-header">
+      <div class="avatar">${p.icon}</div>
+      <div class="card-title">
+        <h2>${p.name}</h2>
+        <div class="archetype">${p.archetype}</div>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <div class="section-label">Przedział wiekowy</div>
+      <div class="age-pills">
+        ${p.ages.map((a, i) => `
+          <div class="pill ${i === s.ageIdx ? 'active' : ''}"
+               onclick="selectAge(${idx},${i})">
+            ${a}<br><span style="font-size:9px;opacity:.7">${p.ageLabels[i]}</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="budget-section">
+        <div class="section-label">Budżet projektowy</div>
+        <div class="budget-display">
+          <div class="budget-amount">
+            ${cappedBudget < s.budget
+              ? `<span style="color:var(--grey-light);font-size:14px">max dla tego wieku: </span>`
+              : ''}
+            ${formatBudget(cappedBudget)}
+          </div>
+          <div class="budget-tier">${tier.tier}</div>
+        </div>
+        <input type="range"
+               min="${p.budgetMin}" max="${p.budgetMax}" value="${s.budget}"
+               oninput="updateBudget(${idx}, this.value)">
+        <div class="range-labels">
+          <span>${p.budgetMin}k PLN</span>
+          <span style="font-size:9px;color:var(--gold)">▲ limit wieku: ${ageData.budgetCap}k</span>
+          <span>${p.budgetMax}k PLN</span>
+        </div>
+        <div style="font-size:10px;color:var(--grey-light);font-family:sans-serif;margin-top:6px;">
+          ${ageData.incomeNote}
+        </div>
+      </div>
+
+      <div class="dynamic" id="dyn-${idx}">
+
+        <div class="content-block">
+          <h4>Zakres projektu</h4>
+          <div class="scope-label">${tier.scopeLabel}</div>
+          <div class="scope-bar"><div class="scope-fill" style="width:${tier.scope}%"></div></div>
+          <div class="scope-desc">${tier.scopeDesc}</div>
+        </div>
+
+        <div class="content-block">
+          <h4>Czego szukają</h4>
+          <ul>${tier.wants.map(w => `<li>${w}</li>`).join('')}</ul>
+        </div>
+
+        <div class="content-block">
+          <h4>Czego się boją</h4>
+          <ul>${tier.fears.map(f => `<li>${f}</li>`).join('')}</ul>
+        </div>
+
+        <div class="content-block">
+          <h4>Co ich przyciągnie do DM</h4>
+          <p style="color:var(--gold);font-style:italic;margin-bottom:8px;">"${tier.dm_trigger}"</p>
+        </div>
+
+        <div class="content-block">
+          <h4>Najlepszy content na Instagram</h4>
+          <div class="ig-tags">
+            ${tier.ig.map(t => `<div class="ig-tag">${t}</div>`).join('')}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>`;
+}
+
+function render() {
+  document.getElementById('grid').innerHTML =
+    PERSONAS.map((p, i) => renderCard(p, i)).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// INTERACTIONS
+// ─────────────────────────────────────────────────────────────
+
+function selectAge(pIdx, ageIdx) {
+  state[pIdx].ageIdx = ageIdx;
+  animateUpdate(pIdx);
+}
+
+function updateBudget(pIdx, val) {
+  state[pIdx].budget = parseInt(val);
+  animateUpdate(pIdx);
+}
+
+function animateUpdate(pIdx) {
+  const dyn = document.getElementById(`dyn-${pIdx}`);
+  if (dyn) {
+    dyn.classList.add('fade');
+    setTimeout(() => {
+      render();
+    }, 200);
+  } else {
+    render();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────
+
+render();
+</script>
+</body>
+</html>
