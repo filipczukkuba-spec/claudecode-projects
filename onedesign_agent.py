@@ -18,8 +18,19 @@ except ImportError:
 
 client = Anthropic()
 
-TODAY = datetime.now().strftime("%Y-%m-%d")
-START_DATE = (datetime.now() + timedelta(days=(7 - datetime.now().weekday()))).strftime("%Y-%m-%d")
+# Optional --date YYYY-MM-DD argument for historical runs
+_custom_date = None
+for i, arg in enumerate(sys.argv[1:]):
+    if arg == "--date" and i + 1 < len(sys.argv) - 1:
+        _custom_date = sys.argv[i + 2]
+
+if _custom_date:
+    _ref = datetime.strptime(_custom_date, "%Y-%m-%d")
+else:
+    _ref = datetime.now()
+
+TODAY = _ref.strftime("%Y-%m-%d")
+START_DATE = (_ref + timedelta(days=(7 - _ref.weekday()))).strftime("%Y-%m-%d")
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 STRATEGY_DIR = os.path.join(os.path.dirname(__file__), "strategies")
@@ -31,10 +42,11 @@ STRATEGY_FILE = os.path.join(STRATEGY_DIR, f"{TODAY}_strategia.md")
 # PHASE 1 — DATA COLLECTION (zero API calls)
 # ═══════════════════════════════════════════════════════════════
 
+_year = _ref.year
 SEARCH_QUERIES = [
-    "interior design trends 2026 luxury residential warm minimalism Japandi",
-    "Warsaw Poland real estate renovation market 2025 2026 high income families",
-    "Instagram Reels strategy interior design luxury account growth 2026",
+    f"interior design trends {_year} luxury residential warm minimalism Japandi",
+    f"Warsaw Poland real estate renovation market {_year} high income families",
+    f"Instagram Reels strategy interior design luxury account growth {_year}",
 ]
 
 def web_search(query, max_results=6):
