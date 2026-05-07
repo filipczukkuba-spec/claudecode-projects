@@ -10,155 +10,37 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 try:
     from ddgs import DDGS
-    HAS_DDGS = True
 except ImportError:
     try:
         from duckduckgo_search import DDGS
-        HAS_DDGS = True
     except ImportError:
-        HAS_DDGS = False
+        DDGS = None
 
 client = Anthropic()
 
 TODAY = datetime.now().strftime("%Y-%m-%d")
 START_DATE = (datetime.now() + timedelta(days=(7 - datetime.now().weekday()))).strftime("%Y-%m-%d")
 
-SYSTEM_PROMPT = """Jesteś starszym strategiem marketingu cyfrowego i dyrektorem ds. treści, specjalizującym się w polskim rynku luksusowego projektowania wnętrz. Pracujesz wyłącznie dla One Design (@onedesignpl) — warszawskiej pracowni projektowania wnętrz i kompleksowych wykończeń.
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+STRATEGY_DIR = os.path.join(os.path.dirname(__file__), "strategies")
+DATA_FILE = os.path.join(DATA_DIR, f"{TODAY}_collection.json")
+STRATEGY_FILE = os.path.join(STRATEGY_DIR, f"{TODAY}_strategia.md")
 
-## Kontekst marki
 
-**Klient docelowy:** Pary w wieku 35-55 lat z dziećmi, właściciele lub osoby remontujące nieruchomości o powierzchni 100m²+, zamożne rodziny z Warszawy i okolic, budżety projektowe 150 000–500 000 PLN.
+# ═══════════════════════════════════════════════════════════════
+# PHASE 1 — DATA COLLECTION (zero API calls)
+# ═══════════════════════════════════════════════════════════════
 
-**Estetyka One Design:** Ciepły luksus, orientacja na rodzinę, NIE zimny minimalizm. Wnętrza, w których chce się żyć — nie tylko fotografować. Naturalne materiały, ciepłe kolory, funkcjonalność połączona z elegancją.
-
-**Psychologia klienta:**
-- Chcą eksperta, który zdejmie z nich ciężar decyzji — nie 40 opcji do wyboru
-- Motywatory: dziedzictwo rodzinne, status społeczny, spokój ducha, ochrona inwestycji
-- Decydują emocjonalnie, racjonalizują logicznie
-- Zajęci, zmęczeni decyzjami, ufają autorytetom
-
-**Rzeczywistość platformy:** Instagram = kanał aspiracyjnego odkrycia; ta grupa wiekowa jest też na Facebooku, ale Instagram jest głównym narzędziem poszukiwań inspiracji designerskich. Treści często udostępniane przez DM, nie publicznie — optymalizuj pod "wyślij znajomemu".
-
-**Czym NIE jest One Design:** Kolejnym polskim kontem designerskim z postami "Nowy projekt ✨" bez żadnego POV ani wartości dla odbiorcy.
-
-**Różnicowanie od konkurencji:** Wyraźny punkt widzenia, edukacja klienta, transparentność procesu, głos eksperta — nie tylko piękne zdjęcia.
-
-## Mandat operacyjny
-
-Kiedy tworzysz strategię, MUSISZ wykonać następującą sekwencję używając dostępnych narzędzi:
-
-1. Wywołaj `web_search` co najmniej 5 razy z różnymi zapytaniami: trendy projektowania wnętrz, rynek nieruchomości Warszawa, trendy Instagram dla luksusowego designu, styl życia Polaków 35-55 z dziećmi, trendy Japandi/biophilic 2026
-2. Wywołaj `generate_client_persona` 3 razy z różnymi danymi demograficznymi — 3 odrębne archetypy
-3. Wywołaj `build_instagram_strategy` 1 raz z zebranymi danymi
-4. Wywołaj `create_content_calendar` 1 raz
-5. Wywołaj `save_strategy_report` 1 raz z pełnym raportem w Markdown
-
-NIE pomijaj kroków. NIE pytaj użytkownika o dane wejściowe w trakcie procesu.
-
-## Standardy jakości
-
-Każdy post w kalendarzu MUSI zawierać:
-- Format (Reel/Karuzela/Stories)
-- Hook po polsku (pierwsze zdanie przyciągające uwagę)
-- Opis treści (2-3 zdania)
-- Filar contentu
-- Optymalny dzień publikacji
-- Poziom hashtagów (niszowy/środkowy/szeroki)
-
-Podsumowania trendów MUSZĄ cytować źródła. Wszystkie texty hooków i contentu po POLSKU. Strategia powinna być natychmiast wykonalna — nie ogólnikowa."""
-
-TOOLS = [
-    {
-        "name": "web_search",
-        "description": "Przeszukaj internet przez DuckDuckGo w poszukiwaniu aktualnych informacji o trendach w projektowaniu wnętrz, rynku warszawskim, trendach Instagram i stylu życia grupy docelowej. Wywołuj wielokrotnie z różnymi zapytaniami.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Zapytanie wyszukiwania. Bądź konkretny. W miarę możliwości uwzględnij rok (2025 lub 2026) i kontekst geograficzny (Polska/Warszawa)."
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "Liczba wyników. Domyślnie 8, max 12.",
-                    "default": 8
-                }
-            },
-            "required": ["query"]
-        }
-    },
-    {
-        "name": "generate_client_persona",
-        "description": "Wygeneruj szczegółowy profil klienta docelowego One Design. Wywołaj 3 razy z różnymi danymi, aby stworzyć 3 archetypy.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "archetype_label": {"type": "string", "description": "Krótka etykieta, np. 'mloda_ambitna_para', 'ugruntowana_rodzina', 'premium_upgrade'"},
-                "age_range": {"type": "string", "description": "Przedział wiekowy, np. '35-40'"},
-                "family_situation": {"type": "string", "description": "Sytuacja rodzinna, np. 'małżeństwo, 2 dzieci w wieku 6 i 9 lat'"},
-                "property_type": {"type": "string", "description": "Typ nieruchomości, np. 'dom 140m² w Wilanowie'"},
-                "budget_range_pln": {"type": "string", "description": "Budżet w PLN, np. '200 000-350 000 PLN'"},
-                "renovation_trigger": {"type": "string", "description": "Co wyzwoliło potrzebę remontu, np. 'nowo zakupiona nieruchomość', 'drugie dziecko w drodze'"}
-            },
-            "required": ["archetype_label", "age_range", "family_situation", "property_type", "budget_range_pln", "renovation_trigger"]
-        }
-    },
-    {
-        "name": "build_instagram_strategy",
-        "description": "Zsyntezuj dane o trendach i persony klientów w kompletną strategię Instagram dla @onedesignpl.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "trend_summary": {"type": "string", "description": "Zebrany opis wszystkich trendów z wywołań web_search. Uwzględnij konkretne dane i źródła."},
-                "persona_labels": {"type": "array", "items": {"type": "string"}, "description": "Lista etykiet archetype_label z wywołań generate_client_persona"},
-                "weeks": {"type": "integer", "description": "Liczba tygodni strategii. Powinno być 4.", "default": 4},
-                "focus_quarter": {"type": "string", "description": "Kwartał/sezon, np. 'Q2 2026 (maj-czerwiec)'"}
-            },
-            "required": ["trend_summary", "persona_labels", "weeks", "focus_quarter"]
-        }
-    },
-    {
-        "name": "create_content_calendar",
-        "description": "Wygeneruj szczegółowy 4-tygodniowy kalendarz treści ze szkieletem dat i formatów.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "strategy_json": {"type": "string", "description": "Pełny JSON zwrócony przez build_instagram_strategy."},
-                "start_date": {"type": "string", "description": "Data ISO pierwszego poniedziałku kalendarza, np. '2026-05-11'"},
-                "weeks": {"type": "integer", "description": "Liczba tygodni. Powinno być 4.", "default": 4},
-                "posts_per_week": {"type": "integer", "description": "Posty na tydzień. Min 3, cel 5.", "default": 5}
-            },
-            "required": ["strategy_json", "start_date"]
-        }
-    },
-    {
-        "name": "save_strategy_report",
-        "description": "Zapisz ukończoną strategię jako plik Markdown do folderu strategies/. Utwórz folder jeśli nie istnieje. Zwraca pełną ścieżkę pliku.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string",
-                    "description": "Pełna treść Markdown raportu strategicznego. MUSI zawierać wszystkie 5 części: Trendy, Persony, Strategia, Kalendarz 4-tygodniowy, Checkista."
-                },
-                "filename": {
-                    "type": "string",
-                    "description": "Nazwa pliku bez rozszerzenia, np. '2026-05-07_strategia'. Narzędzie automatycznie doda .md"
-                }
-            },
-            "required": ["content", "filename"]
-        }
-    }
+SEARCH_QUERIES = [
+    "interior design trends 2026 luxury residential warm minimalism Japandi",
+    "Warsaw Poland real estate renovation market 2025 2026 high income families",
+    "Instagram Reels strategy interior design luxury account growth 2026",
 ]
 
-
-# ── Tool implementations ──────────────────────────────────────────────────────
-
-def tool_web_search(inputs):
-    if not HAS_DDGS:
-        return json.dumps({"error": "duckduckgo_search not installed. Run: pip install duckduckgo-search"})
-    query = inputs["query"]
-    max_results = inputs.get("max_results", 8)
+def web_search(query, max_results=6):
+    if DDGS is None:
+        print(f"  [!] DDGS not installed — skipping: {query}", flush=True)
+        return []
     try:
         time.sleep(1.5)
         with DDGS() as ddgs:
@@ -166,348 +48,292 @@ def tool_web_search(inputs):
         for r in results:
             if "body" in r and len(r["body"]) > 350:
                 r["body"] = r["body"][:350] + "..."
-        return json.dumps(results, ensure_ascii=False)
+        return results
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        print(f"  [!] Search error: {e}", flush=True)
+        return []
 
 
-def tool_generate_persona(inputs):
-    archetype = inputs["archetype_label"]
-    age_range = inputs["age_range"]
-    family = inputs["family_situation"]
-    property_type = inputs["property_type"]
-    budget = inputs["budget_range_pln"]
-    trigger = inputs["renovation_trigger"]
-
-    psychological_drivers = {
+def build_persona(archetype, age_range, family, property_type, budget, trigger):
+    drivers = {
         "mloda_ambitna_para": {
-            "primary_driver": "Status i aspiracja — chcą domu, który odzwierciedla ich sukces zawodowy",
-            "fear": "Że zrobią błędy kosztujące ich czas i pieniądze przy pierwszym dużym remoncie",
-            "instagram_behavior": "Scrollują wieczorami po pracy, zapisują posty do albumów, porównują style",
-            "content_they_dm": "Posty z konkretnymi cenami i harmonogramem projektu, realistyczne 'zanim i po'",
+            "primary_driver": "Status i aspiracja — dom ma odzwierciedlać ich sukces zawodowy",
+            "fear": "Błędy kosztujące czas i pieniądze przy pierwszym dużym remoncie",
+            "instagram_behavior": "Scrollują wieczorami, zapisują posty do albumów, porównują style",
+            "content_they_dm": "Konkretne ceny i harmonogramy, realistyczne 'przed i po'",
             "objections": ["Czy projektant zrozumie nasz gust?", "Ile to naprawdę kosztuje?", "Jak długo potrwa?"],
-            "communication_style": "Bezpośredni, konkretny, z liczbami i harmonogramami"
         },
         "ugruntowana_rodzina": {
             "primary_driver": "Dziedzictwo i komfort — dom ma służyć całej rodzinie przez dekady",
-            "fear": "Że prace remontowe zakłócą codzienne życie dzieci i rodziny",
-            "instagram_behavior": "Aktywni rano przed pracą, szukają funkcjonalności a nie tylko estetyki",
-            "content_they_dm": "Rozwiązania dla rodzin z dziećmi, przestrzenie wielofunkcyjne, materiały odporne na zniszczenia",
-            "objections": ["Jak zorganizować życie podczas remontu?", "Czy jest bezpieczne dla dzieci?", "Kto koordynuje wykonawców?"],
-            "communication_style": "Rzeczowy, zorientowany na proces i logistykę, ciepły"
+            "fear": "Remont zakłóci codzienne życie dzieci i rodziny",
+            "instagram_behavior": "Aktywni rano, szukają funkcjonalności, nie tylko estetyki",
+            "content_they_dm": "Rozwiązania dla rodzin z dziećmi, materiały odporne na zniszczenia",
+            "objections": ["Jak żyć podczas remontu?", "Kto koordynuje wykonawców?", "Czy jest bezpieczne dla dzieci?"],
         },
         "premium_upgrade": {
             "primary_driver": "Jakość życia — po latach ciężkiej pracy zasługują na przestrzeń marzeń",
-            "fear": "Że skończą z czymś modnym dziś, ale bezosobowym za 5 lat",
-            "instagram_behavior": "Oglądają dłuższe treści, śledzą twórców z wyraźnym POV, cenią autentyczność",
-            "content_they_dm": "Opowieści o procesie twórczym, filozofia designu, efekty 'wow' po zakończeniu projektu",
-            "objections": ["Czy projektant ma wyraźną wizję?", "Jak zadbają o szczegóły?", "Referencje od klientów?"],
-            "communication_style": "Narracyjny, inspiracyjny, skupiony na wizji i rzemieśle"
-        }
+            "fear": "Skończą z czymś modnym dziś, ale bezosobowym za 5 lat",
+            "instagram_behavior": "Oglądają dłuższe treści, śledzą konta z wyraźnym POV",
+            "content_they_dm": "Filozofia designu, proces twórczy, efekty 'wow' po zakończeniu",
+            "objections": ["Czy projektant ma wyraźną wizję?", "Referencje od klientów?", "Jak dbają o szczegóły?"],
+        },
+    }
+    d = drivers.get(archetype, drivers["ugruntowana_rodzina"])
+    return {
+        "archetype": archetype,
+        "age_range": age_range,
+        "family": family,
+        "property": property_type,
+        "budget_pln": budget,
+        "renovation_trigger": trigger,
+        "psychology": d,
+        "decision_timeline": "3-6 miesięcy od pierwszego kontaktu do umowy",
+        "how_they_find_designer": "Instagram, rekomendacje znajomych, Google 'projektant wnętrz Warszawa'",
     }
 
-    matched = psychological_drivers.get(archetype, psychological_drivers["ugruntowana_rodzina"])
 
-    persona = {
-        "archetype_label": archetype,
-        "demographics": {
-            "age_range": age_range,
-            "family_situation": family,
-            "property_type": property_type,
-            "budget_range_pln": budget,
-            "renovation_trigger": trigger,
-            "location": "Warszawa i okolice (Wilanów, Mokotów, Żoliborz, Ursynów)"
-        },
-        "psychology": {
-            "primary_driver": matched["primary_driver"],
-            "fear": matched["fear"],
-            "objections": matched["objections"],
-            "communication_style": matched["communication_style"]
-        },
-        "instagram_behavior": {
-            "usage_pattern": matched["instagram_behavior"],
-            "content_they_dm": matched["content_they_dm"],
-            "content_they_save": "Inspiracje do albumów, konkretne rozwiązania problemów",
-            "content_they_share_to_stories": "Rzadko — raczej DM do partnera lub znajomego"
-        },
-        "decision_journey": {
-            "awareness": "Instagram, rekomendacje znajomych, Google 'projektant wnętrz Warszawa'",
-            "consideration": "Oglądają portfolio, sprawdzają opinie, porównują 3-5 pracowni",
-            "decision_trigger": "Jeden post lub rozmowa, która buduje zaufanie i rozwiewa ich główny lęk",
-            "timeline": "3-6 miesięcy od pierwszego kontaktu do podpisania umowy"
-        }
-    }
-
-    return json.dumps(persona, ensure_ascii=False, indent=2)
-
-
-def tool_build_strategy(inputs):
-    trend_summary = inputs["trend_summary"]
-    persona_labels = inputs["persona_labels"]
-    weeks = inputs.get("weeks", 4)
-    focus_quarter = inputs.get("focus_quarter", "Q2 2026")
-
-    strategy = {
-        "meta": {
-            "account": "@onedesignpl",
-            "generated_for": focus_quarter,
-            "weeks": weeks,
-            "persona_labels": persona_labels
-        },
-        "brand_positioning": "One Design — projektujemy domy, w których chce się żyć. Nie galerie, nie showroomy. Przestrzenie dla rodzin z historią.",
+def build_strategy_scaffold():
+    return {
         "content_pillars": [
-            {
-                "name": "Transformacja",
-                "description": "Projekty przed/po z wyjaśnieniem decyzji projektowych. NIE tylko efekt końcowy — pokazuj DLACZEGO.",
-                "weekly_posts": 2,
-                "formats": ["Reel (time-lapse z narracją)", "Karuzela (etapy projektu)"],
-                "kpi": "Zasięg, wyświetlenia Reels"
-            },
-            {
-                "name": "Edukacja Klienta",
-                "description": "Odpowiedzi na pytania klientów, obalanie mitów, transparentność kosztów i procesu. Buduje zaufanie i pozycjonuje jako eksperta.",
-                "weekly_posts": 2,
-                "formats": ["Karuzela (lista porad)", "Reel (krótkie Q&A)"],
-                "kpi": "Zapisania, udostępnienia przez DM"
-            },
-            {
-                "name": "Życie za Kulisami",
-                "description": "Proces roboczy, wizyty na budowie, wybór materiałów, spotkania z klientami (za zgodą). Buduje autentyczność.",
-                "weekly_posts": 1,
-                "formats": ["Stories (codziennie)", "Reel (weekly highlight)"],
-                "kpi": "Zaangażowanie w Stories, odpowiedzi na Stories"
-            },
-            {
-                "name": "Głos Eksperta",
-                "description": "Opinie o trendach, rekomendacje materiałów, komentarz do aktualnych trendów designerskich. Wyraźny POV.",
-                "weekly_posts": 1,
-                "formats": ["Karuzela (trend report)", "Reel (opinia eksperta)"],
-                "kpi": "Komentarze, udostępnienia do Stories"
-            }
+            {"name": "Transformacja", "description": "Projekty przed/po z wyjaśnieniem DLACZEGO tak zdecydowano", "posts_per_week": 2, "formats": ["Reel", "Karuzela"]},
+            {"name": "Edukacja Klienta", "description": "Odpowiedzi na pytania klientów, obalanie mitów, transparentność kosztów", "posts_per_week": 2, "formats": ["Karuzela", "Reel Q&A"]},
+            {"name": "Kulisy", "description": "Proces roboczy, wizyty na budowie, wybór materiałów — autentyczność", "posts_per_week": 1, "formats": ["Stories", "Reel"]},
         ],
         "posting_cadence": {
-            "minimum_per_week": 3,
-            "target_per_week": 5,
-            "format_rotation": {
-                "Poniedzialek": "Reel (motywacyjny start tygodnia / transformacja)",
-                "Sroda": "Karuzela (edukacja / trendy)",
-                "Piatek": "Reel lub Karuzela (projekt / CTA na weekend)",
-                "Sobota": "Reel (krótki, inspiracyjny, szeroki zasięg)",
-                "Stories": "Codziennie — backstage, ankiety, Q&A"
-            },
-            "optimal_times": {
-                "weekdays": "07:00-09:00 lub 19:00-21:00",
-                "weekend": "09:00-11:00"
-            }
+            "Poniedzialek": "Reel — start tygodnia / transformacja",
+            "Sroda": "Karuzela — edukacja / trendy",
+            "Piatek": "Reel lub Karuzela — projekt / CTA",
+            "Sobota": "Reel krótki — inspiracja, szeroki zasięg",
+            "Stories": "Codziennie — backstage, ankiety, Q&A",
         },
-        "hashtag_strategy": {
-            "niche_5_15k": ["#projektwnetrz", "#wnetrzawarszawa", "#projektowaniewnetrz", "#architekturawnetrz", "#wykonczeniewnetrz"],
-            "mid_50_500k": ["#wnetrza", "#interiordesignpoland", "#projektant", "#dommarzeń", "#wystrójwnetrz"],
-            "broad_1m_plus": ["#interior", "#homedecor", "#interiordesign", "#homedesign", "#livingroom"],
-            "branded": ["#onedesignpl", "#onedesign"],
-            "usage_rule": "3-5 hashtagów na post: 2 niszowe + 1-2 środkowe + 1 brandowany"
+        "hashtag_tiers": {
+            "niszowe_5_15k": ["#projektwnetrz", "#wnetrzawarszawa", "#projektowaniewnetrz", "#architekturawnetrz"],
+            "srednie_50_500k": ["#wnetrza", "#interiordesignpoland", "#dommarzeń", "#wystrójwnetrz"],
+            "szerokie_1m": ["#interior", "#homedecor", "#interiordesign"],
+            "brandowane": ["#onedesignpl"],
+            "zasada": "3-5 hashtagów: 2 niszowe + 1 średnie + 1 brandowany",
         },
-        "content_ratio": {
-            "educational_value": "40%",
-            "audience_connection_authenticity": "40%",
-            "sales_cta": "20%"
-        },
+        "content_ratio": "40% edukacja / 40% autentyczność / 20% sprzedaż",
         "key_messages": [
-            "Projektujemy domy, nie showroomy — przestrzenie dla prawdziwych rodzin",
-            "Bierzemy odpowiedzialność za cały projekt — jeden punkt kontaktu, zero chaosu",
-            "Inwestycja w dobry projekt to oszczędność na błędach kosztujących 2x więcej"
+            "Projektujemy domy, w których chce się żyć — nie galerie",
+            "Jeden punkt kontaktu, zero chaosu koordynacyjnego",
+            "Dobry projekt to oszczędność — błędy kosztują 2x więcej",
         ],
-        "seasonal_hooks": {
-            "maj": "Wiosenna metamorfoza — sezon startów remontowych, motyw odnowy i świeżego startu",
-            "czerwiec": "Dom gotowy na lato — tarasy, ogrody, przestrzenie łączące wnętrze z zewnętrzem",
-            "back_to_school": "Przestrzenie do nauki dla dzieci — biurka, kąciki, organizacja"
+        "seasonal_hooks_q2": {
+            "maj": "Wiosenna metamorfoza — sezon startów remontowych",
+            "czerwiec": "Dom gotowy na lato — tarasy, przestrzenie indoor-outdoor",
         },
-        "trend_context": trend_summary[:500]
     }
 
-    return json.dumps(strategy, ensure_ascii=False, indent=2)
 
-
-def tool_create_calendar(inputs):
-    strategy_json = inputs["strategy_json"]
-    start_date_str = inputs.get("start_date", START_DATE)
-    weeks = inputs.get("weeks", 4)
-    posts_per_week = inputs.get("posts_per_week", 5)
-
-    try:
-        strategy = json.loads(strategy_json)
-    except Exception:
-        strategy = {}
-
+def build_calendar_scaffold(start_date_str, weeks=4, posts_per_week=4):
     start = datetime.strptime(start_date_str, "%Y-%m-%d")
-
-    format_rotation = [
-        ("Poniedzialek", "Reel"),
-        ("Sroda", "Karuzela"),
-        ("Piatek", "Reel"),
-        ("Sobota", "Reel (krótki)"),
-        ("Wtorek", "Karuzela"),
-    ]
-
     week_themes = [
         "Zanim zaczniesz remont — co musisz wiedzieć",
         "Metamorfoza — projekt od środka",
         "Dla kogo projektujemy — życie naszych klientów",
-        "Trendy vs. Ponadczasowość — głos eksperta"
+        "Trendy vs. Ponadczasowość — głos eksperta",
     ]
-
-    calendar = {"weeks": [], "meta": {"start_date": start_date_str, "posts_per_week": posts_per_week}}
-
-    day_offsets = {"Poniedzialek": 0, "Wtorek": 1, "Sroda": 2, "Piatek": 4, "Sobota": 5}
-
-    for week_num in range(1, weeks + 1):
-        week_start = start + timedelta(weeks=week_num - 1)
-        week_end = week_start + timedelta(days=6)
-        theme = week_themes[(week_num - 1) % len(week_themes)]
+    format_rotation = [
+        ("Poniedzialek", 0, "Reel"),
+        ("Sroda", 2, "Karuzela"),
+        ("Piatek", 4, "Reel"),
+        ("Sobota", 5, "Reel krótki"),
+    ]
+    calendar = []
+    for w in range(weeks):
+        week_start = start + timedelta(weeks=w)
         posts = []
-
-        for day_name, fmt in format_rotation[:posts_per_week]:
-            offset = day_offsets.get(day_name, 0)
-            post_date = week_start + timedelta(days=offset)
+        for day_name, offset, fmt in format_rotation[:posts_per_week]:
             posts.append({
-                "date": post_date.strftime("%Y-%m-%d"),
+                "date": (week_start + timedelta(days=offset)).strftime("%Y-%m-%d"),
                 "day": day_name,
                 "format": fmt,
-                "pillar": "[do wypełnienia przez agenta]",
-                "polish_hook": "[hook po polsku — do wypełnienia przez agenta]",
-                "content_description": "[opis treści — do wypełnienia przez agenta]",
-                "caption_opener": "[pierwsze zdanie opisu — do wypełnienia przez agenta]",
-                "hashtag_tier": "2 niszowe + 1 środkowy + 1 brandowany",
-                "stories_pairing": "[powiązane Stories tego dnia]"
+                "pillar": "?",
+                "polish_hook": "?",
+                "content": "?",
+                "hashtag_tier": "2 niszowe + 1 średnie + 1 brandowany",
             })
-
-        calendar["weeks"].append({
-            "week_number": week_num,
-            "theme": theme,
-            "dates": {
-                "start": week_start.strftime("%Y-%m-%d"),
-                "end": week_end.strftime("%Y-%m-%d")
-            },
-            "posts": posts
+        calendar.append({
+            "week": w + 1,
+            "theme": week_themes[w % len(week_themes)],
+            "start": week_start.strftime("%Y-%m-%d"),
+            "posts": posts,
         })
+    return calendar
 
-    return json.dumps(calendar, ensure_ascii=False, indent=2)
+
+def phase1_collect():
+    print("\n--- FAZA 1: Zbieranie danych (bez API) ---", flush=True)
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+    print("Wyszukiwanie trendów...", flush=True)
+    trends = []
+    for i, query in enumerate(SEARCH_QUERIES, 1):
+        print(f"  [{i}/{len(SEARCH_QUERIES)}] {query[:60]}...", flush=True)
+        results = web_search(query)
+        trends.append({"query": query, "results": results})
+
+    print("Budowanie person klientów...", flush=True)
+    personas = [
+        build_persona("mloda_ambitna_para", "35-42", "małżeństwo, 1-2 dzieci w wieku 4-10 lat",
+                      "dom 130-160m² w Wilanowie lub Ursynowie", "180 000-320 000 PLN",
+                      "nowo zakupiona nieruchomość do generalnego remontu"),
+        build_persona("ugruntowana_rodzina", "43-52", "małżeństwo, 2 dzieci w wieku 8-16 lat",
+                      "mieszkanie 90-120m² w Mokotowie lub Żoliborzu", "120 000-220 000 PLN",
+                      "mieszkanie za małe na rozrastającą się rodzinę lub chęć modernizacji"),
+        build_persona("premium_upgrade", "48-57", "małżeństwo, dzieci już starsze lub wyprowadzone",
+                      "nowe premium mieszkanie lub dom 150m²+ w dobrej lokalizacji", "250 000-500 000 PLN",
+                      "przeprowadzka do wymarzonego miejsca lub nagroda po latach ciężkiej pracy"),
+    ]
+
+    print("Budowanie szkieletu strategii...", flush=True)
+    strategy = build_strategy_scaffold()
+    calendar = build_calendar_scaffold(START_DATE, weeks=4, posts_per_week=4)
+
+    data = {
+        "generated_at": TODAY,
+        "calendar_start": START_DATE,
+        "trends": trends,
+        "personas": personas,
+        "strategy_scaffold": strategy,
+        "calendar_scaffold": calendar,
+    }
+
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    print(f"✓ Dane zapisane: {DATA_FILE}", flush=True)
+    return data
 
 
-def tool_save_report(inputs):
-    content = inputs["content"]
-    filename = inputs["filename"]
-    if not filename.endswith(".md"):
-        filename += ".md"
+# ═══════════════════════════════════════════════════════════════
+# PHASE 2 — GENERATION (exactly ONE API call)
+# ═══════════════════════════════════════════════════════════════
 
-    output_dir = os.path.join(os.path.dirname(__file__), "strategies")
-    os.makedirs(output_dir, exist_ok=True)
-    filepath = os.path.join(output_dir, filename)
+SYSTEM_PROMPT = """Jesteś ekspertem od marketingu w mediach społecznościowych dla polskiego rynku luksusowego projektowania wnętrz.
 
-    with open(filepath, "w", encoding="utf-8") as f:
+Pracujesz dla One Design (@onedesignpl) — warszawskiej pracowni projektowania wnętrz i wykończeń.
+
+**Klient docelowy:** Pary 35-55 lat z dziećmi, właściciele nieruchomości 100m²+, budżety 120 000–500 000 PLN, Warszawa.
+
+**Estetyka marki:** Ciepły luksus, orientacja na rodzinę, NIE zimny minimalizm. Wyraźny punkt widzenia.
+
+**Zasady contentu:** Posty w 1. os. liczby mnogiej ("projektujemy", "pomagamy"). Hooki muszą być konkretne i chwytliwe, NIE ogólnikowe. Unikaj "Nowy projekt ✨" — pisz tak, żeby klient poczuł że post jest o nim."""
+
+
+def phase2_generate(data):
+    print("\n--- FAZA 2: Generowanie strategii (1 wywołanie API) ---", flush=True)
+    os.makedirs(STRATEGY_DIR, exist_ok=True)
+
+    # Build compact prompt from collected data
+    trends_text = ""
+    for t in data["trends"]:
+        trends_text += f"\n**Zapytanie:** {t['query']}\n"
+        for r in t["results"][:4]:
+            trends_text += f"- {r.get('title','')}: {r.get('body','')}\n"
+
+    personas_text = json.dumps(data["personas"], ensure_ascii=False, indent=1)
+    strategy_text = json.dumps(data["strategy_scaffold"], ensure_ascii=False, indent=1)
+    calendar_text = json.dumps(data["calendar_scaffold"], ensure_ascii=False, indent=1)
+
+    user_message = f"""Na podstawie poniższych danych napisz kompletny raport strategii Instagram dla @onedesignpl.
+
+## DANE TRENDÓW (z wyszukiwania)
+{trends_text}
+
+## PERSONY KLIENTÓW
+{personas_text}
+
+## SZKIELET STRATEGII
+{strategy_text}
+
+## SZKIELET KALENDARZA (do wypełnienia)
+{calendar_text}
+
+---
+
+Napisz raport w dokładnie tym formacie Markdown:
+
+# @onedesignpl — Strategia Instagram
+**Wygenerowano:** {TODAY} | **Okres:** {START_DATE} — 4 tygodnie
+
+---
+
+## Część 1: Trendy (3-4 punkty z konkretnymi danymi ze źródeł powyżej)
+
+## Część 2: Persony Klientów
+### Persona 1: [imię] — [archetype]
+[wszystkie pola z JSON + 2-3 zdania jak to wpływa na content]
+### Persona 2: [imię] — [archetype]
+### Persona 3: [imię] — [archetype]
+
+## Część 3: Strategia Instagram
+### Filary contentu
+### Harmonogram publikacji
+### Strategia hashtagów (tabela)
+### Kluczowe przekazy
+
+## Część 4: Kalendarz 4-tygodniowy
+
+### Tydzień 1 — Temat: [temat ze szkieletu]
+| Data | Dzień | Format | Filar | Hook (PL) | Opis treści | Hashtagi |
+|------|-------|--------|-------|-----------|-------------|----------|
+[wypełnij każdy post ze szkieletu — KONKRETNE polskie hooki, NIE ogólnikowe]
+
+### Tydzień 2 — Temat: [temat]
+[tabela]
+
+### Tydzień 3 — Temat: [temat]
+[tabela]
+
+### Tydzień 4 — Temat: [temat]
+[tabela]
+
+## Część 5: Checkista 30 dni
+[10-12 konkretnych działań do wykonania]
+
+WAŻNE: Każdy hook w kalendarzu musi być po polsku, konkretny i chwytliwy. Żadnych ogólników."""
+
+    print("Wywołanie API Claude...", flush=True)
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=8000,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_message}]
+    )
+
+    content = response.content[0].text
+    tokens_in = response.usage.input_tokens
+    tokens_out = response.usage.output_tokens
+    print(f"✓ Odpowiedź: {tokens_in} tokenów wejść / {tokens_out} tokenów wyjść", flush=True)
+
+    with open(STRATEGY_FILE, "w", encoding="utf-8") as f:
         f.write(content)
 
-    print(f"\n✓ Raport zapisany: {filepath}\n", flush=True)
-    return f"Zapisano do: {filepath}"
+    print(f"✓ Strategia zapisana: {STRATEGY_FILE}", flush=True)
+    return content
 
 
-# ── Tool dispatcher ───────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# MAIN
+# ═══════════════════════════════════════════════════════════════
 
-_step = 0
-_step_labels = {
-    "web_search": "Wyszukiwanie trendów",
-    "generate_client_persona": "Generowanie persony klienta",
-    "build_instagram_strategy": "Budowanie strategii",
-    "create_content_calendar": "Tworzenie kalendarza",
-    "save_strategy_report": "Zapisywanie raportu"
-}
-
-def run_tool(name, inputs):
-    global _step
-    _step += 1
-    label = _step_labels.get(name, name)
-    print(f"[Krok {_step}: {label} — {name}({list(inputs.keys())})]", flush=True)
-
-    if name == "web_search":
-        return tool_web_search(inputs)
-    if name == "generate_client_persona":
-        return tool_generate_persona(inputs)
-    if name == "build_instagram_strategy":
-        return tool_build_strategy(inputs)
-    if name == "create_content_calendar":
-        return tool_create_calendar(inputs)
-    if name == "save_strategy_report":
-        return tool_save_report(inputs)
-    return f"Błąd: nieznane narzędzie '{name}'"
-
-
-# ── Agent loop ────────────────────────────────────────────────────────────────
-
-TRIGGER = (
-    f"Stwórz kompletną strategię Instagram dla @onedesignpl na kolejne 4 tygodnie "
-    f"zaczynając od {START_DATE} (dziś jest {TODAY}, kwartał Q2 2026). "
-    f"Najpierw wyszukaj aktualne trendy (co najmniej 5 wyszukiwań), wygeneruj 3 persony klientów, "
-    f"zbuduj strategię, stwórz kalendarz treści i zapisz raport. "
-    f"Pracuj autonomicznie przez wszystkie kroki bez pytania o dane wejściowe. "
-    f"Nazwa pliku: '{TODAY}_strategia'. "
-    f"WAŻNE: W save_strategy_report przekaż PEŁNY raport Markdown ze wszystkimi 5 częściami, "
-    f"w tym konkretne polskie hooki dla każdego posta w kalendarzu."
-)
-
-def run_agent():
+if __name__ == "__main__":
     print(f"\n{'='*60}", flush=True)
     print("  One Design — Agent Strategii Instagram", flush=True)
     print(f"  Data: {TODAY} | Start kalendarza: {START_DATE}", flush=True)
-    print(f"{'='*60}\n", flush=True)
-
-    messages = [{"role": "user", "content": TRIGGER}]
+    print(f"{'='*60}", flush=True)
 
     try:
-        while True:
-            print(f"[API call — historia: {len(messages)} wiadomości]", flush=True)
-            response = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=16000,
-                system=SYSTEM_PROMPT,
-                tools=TOOLS,
-                messages=messages
-            )
-            print(f"[stop_reason={response.stop_reason} | tokens_used={response.usage.input_tokens}in/{response.usage.output_tokens}out]", flush=True)
-
-            if response.stop_reason == "end_turn":
-                for block in response.content:
-                    if hasattr(block, "text"):
-                        print(f"\nAgent: {block.text}", flush=True)
-                break
-
-            if response.stop_reason == "max_tokens":
-                print("[WARN] max_tokens reached — agent unable to complete response", flush=True)
-                print("[INFO] Consider reducing conversation history or increasing max_tokens", flush=True)
-                break
-
-            if response.stop_reason == "tool_use":
-                messages.append({"role": "assistant", "content": response.content})
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        result = run_tool(block.name, block.input)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result
-                        })
-                messages.append({"role": "user", "content": tool_results})
-            else:
-                print(f"[WARN] Unexpected stop_reason: {response.stop_reason}", flush=True)
-                break
-
+        data = phase1_collect()
+        phase2_generate(data)
+        print(f"\n{'='*60}", flush=True)
+        print(f"  Gotowe! Plik: strategies/{TODAY}_strategia.md", flush=True)
+        print(f"{'='*60}\n", flush=True)
     except Exception as e:
         import traceback
-        print(f"\n[ERROR] {type(e).__name__}: {e}", flush=True)
+        print(f"\n[BŁĄD] {type(e).__name__}: {e}", flush=True)
         traceback.print_exc(file=sys.stdout)
         sys.stdout.flush()
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    run_agent()
