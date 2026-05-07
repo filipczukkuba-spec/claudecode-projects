@@ -72,7 +72,8 @@
       "Bash(start *)",
       "PowerShell(schtasks *)",
       "Bash(powershell -Command \"Start-Sleep 70; Get-Content 'C:\\\\Users\\\\filip\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-filip-Desktop-claudecode\\\\ea65fd69-87bf-41c1-8ada-2dd4cd8eb275\\\\tasks\\\\b37n47rc5.output' -Encoding UTF8\")",
-      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies\" | Sort-Object LastWriteTime -Descending | ForEach-Object { \"$\\($_.Name\\)  —  $\\([math]::Round\\($_.Length/1024,1\\)\\) KB  —  $\\($_.LastWriteTime.ToString\\('dd.MM.yyyy HH:mm'\\)\\)\" })"
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies\" | Sort-Object LastWriteTime -Descending | ForEach-Object { \"$\\($_.Name\\)  —  $\\([math]::Round\\($_.Length/1024,1\\)\\) KB  —  $\\($_.LastWriteTime.ToString\\('dd.MM.yyyy HH:mm'\\)\\)\" })",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }

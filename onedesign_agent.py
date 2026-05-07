@@ -44,8 +44,10 @@ STRATEGY_FILE = os.path.join(STRATEGY_DIR, f"{TODAY}_strategia.md")
 
 _year = _ref.year
 SEARCH_QUERIES = [
-    f"interior design trends {_year} luxury residential warm minimalism Japandi",
-    f"Warsaw Poland real estate renovation market {_year} high income families",
+    f"interior design styles {_year} Japandi Wabi-Sabi Organic Luxe Quiet Luxury Maximalism trends global",
+    f"Mediterranean Scanditalia Biophilic smart home interior design trends {_year} Europe luxury",
+    f"Warsaw Poland renovation interior design prices per sqm {_year} family costs remont Warszawa cena metr",
+    f"Polish family income demographics {_year} Warsaw household net salary per person couple GUS wynagrodzenia",
     f"Instagram Reels strategy interior design luxury account growth {_year}",
 ]
 
@@ -66,7 +68,7 @@ def web_search(query, max_results=6):
         return []
 
 
-def build_persona(archetype, age_range, family, property_type, budget, trigger):
+def build_persona(archetype, age_range, family, children_range, default_children, property_type, budget_family, budget_per_person_note, sqm_avg, trigger):
     drivers = {
         "mloda_ambitna_para": {
             "primary_driver": "Status i aspiracja — dom ma odzwierciedlać ich sukces zawodowy",
@@ -95,8 +97,14 @@ def build_persona(archetype, age_range, family, property_type, budget, trigger):
         "archetype": archetype,
         "age_range": age_range,
         "family": family,
+        "children_range": children_range,
+        "default_children": default_children,
         "property": property_type,
-        "budget_pln": budget,
+        "sqm_avg": sqm_avg,
+        "budget_family_pln": budget_family,
+        "budget_per_person_note": budget_per_person_note,
+        "design_fee_note": f"Projekt wnętrz ~250–350 PLN/m² × {sqm_avg}m² = {sqm_avg*250//1000*1000}–{sqm_avg*350//1000*1000} PLN",
+        "renovation_cost_note": f"Remont premium ~3 500–5 000 PLN/m² × {sqm_avg}m² = {sqm_avg*3500//1000*1000}–{sqm_avg*5000//1000*1000} PLN",
         "renovation_trigger": trigger,
         "psychology": d,
         "decision_timeline": "3-6 miesięcy od pierwszego kontaktu do umowy",
@@ -188,15 +196,36 @@ def phase1_collect():
 
     print("Budowanie person klientów...", flush=True)
     personas = [
-        build_persona("mloda_ambitna_para", "35-42", "małżeństwo, 1-2 dzieci w wieku 4-10 lat",
-                      "dom 130-160m² w Wilanowie lub Ursynowie", "180 000-320 000 PLN",
-                      "nowo zakupiona nieruchomość do generalnego remontu"),
-        build_persona("ugruntowana_rodzina", "43-52", "małżeństwo, 2 dzieci w wieku 8-16 lat",
-                      "mieszkanie 90-120m² w Mokotowie lub Żoliborzu", "120 000-220 000 PLN",
-                      "mieszkanie za małe na rozrastającą się rodzinę lub chęć modernizacji"),
-        build_persona("premium_upgrade", "48-57", "małżeństwo, dzieci już starsze lub wyprowadzone",
-                      "nowe premium mieszkanie lub dom 150m²+ w dobrej lokalizacji", "250 000-500 000 PLN",
-                      "przeprowadzka do wymarzonego miejsca lub nagroda po latach ciężkiej pracy"),
+        build_persona(
+            "mloda_ambitna_para", "35-42",
+            family="małżeństwo",
+            children_range="0–3", default_children=1,
+            property_type="dom lub duże mieszkanie 120-160m² w Wilanowie lub Ursynowie",
+            budget_family="150 000–350 000 PLN (na rodzinę)",
+            budget_per_person_note="Dochód pary: 12–22k PLN/mc netto (6–11k PLN/os.); top 20% Warszawa",
+            sqm_avg=140,
+            trigger="nowo zakupiona nieruchomość do generalnego remontu",
+        ),
+        build_persona(
+            "ugruntowana_rodzina", "43-52",
+            family="małżeństwo",
+            children_range="1–4+", default_children=2,
+            property_type="mieszkanie 90-130m² w Mokotowie lub Żoliborzu",
+            budget_family="100 000–280 000 PLN (na rodzinę)",
+            budget_per_person_note="Dochód pary: 14–35k PLN/mc netto (7–17.5k PLN/os.); uwaga: na osobę, nie na parę",
+            sqm_avg=110,
+            trigger="modernizacja po latach lub przeprowadzka do większego",
+        ),
+        build_persona(
+            "premium_upgrade", "48-57",
+            family="małżeństwo",
+            children_range="0–2 (starsze lub wyprowadzone)", default_children=0,
+            property_type="premium mieszkanie lub dom 150-220m² w centrum lub Wilanowie",
+            budget_family="250 000–700 000 PLN (na rodzinę)",
+            budget_per_person_note="Dochód pary: 25–70k PLN/mc netto (12.5–35k PLN/os.); top 5-10% Warszawa",
+            sqm_avg=180,
+            trigger="przeprowadzka do wymarzonego miejsca lub nagroda po latach ciężkiej pracy",
+        ),
     ]
 
     print("Budowanie szkieletu strategii...", flush=True)
@@ -227,11 +256,38 @@ SYSTEM_PROMPT = """Jesteś ekspertem od marketingu w mediach społecznościowych
 
 Pracujesz dla One Design (@onedesignpl) — warszawskiej pracowni projektowania wnętrz i wykończeń.
 
-**Klient docelowy:** Pary 35-55 lat z dziećmi, właściciele nieruchomości 100m²+, budżety 120 000–500 000 PLN, Warszawa.
+**Klient docelowy:** Pary 35-55 lat z dziećmi (0–4+), właściciele nieruchomości 100m²+, budżety 120 000–700 000 PLN, Warszawa.
 
 **Estetyka marki:** Ciepły luksus, orientacja na rodzinę, NIE zimny minimalizm. Wyraźny punkt widzenia.
 
-**Zasady contentu:** Posty w 1. os. liczby mnogiej ("projektujemy", "pomagamy"). Hooki muszą być konkretne i chwytliwe, NIE ogólnikowe. Unikaj "Nowy projekt ✨" — pisz tak, żeby klient poczuł że post jest o nim."""
+**Zasady contentu:** Posty w 1. os. liczby mnogiej ("projektujemy", "pomagamy"). Hooki muszą być konkretne i chwytliwe, NIE ogólnikowe. Unikaj "Nowy projekt ✨" — pisz tak, żeby klient poczuł że post jest o nim.
+
+---
+
+## Globalne style designu wnętrz 2025–2026 (wiedza bazowa)
+
+### Style dominujące:
+- **Japandi** — fuzja japońskiego minimalizmu i skandynawskiej prostoty. Materiały: drewno, len, kamień, glina. Kolory: greige, ciepłe biele (#C4B5A5–#B8A898). Oświetlenie 2700K. Filozofia życia, nie tylko styl.
+- **Wabi-Sabi** — piękno niedoskonałości i przemijania. Organiczne kształty, surowe materiały (kamień, drewno, len, rattan). "Dusza minimalizmu" — ciepłe, osobiste, pełne historii. Rośnie w luksusowym segmencie (LA, Londyn).
+- **Organic Luxe / Natural Luxe** — luksus przez tekstury i materiały naturalne. Bogate drewno z żyłowaniem, kamień, ręcznie robione płytki, tynk strukturalny, mosiądz. Rzeźbiarskie oświetlenie.
+- **Quiet Luxury / Sensorial Design** — "kuratorowany spokój zamiast powierzchownego przepychu". Materiał mówi sam za siebie — proweniencja i rzemiosło zamiast logosu. Oświetlenie cyrkadialne (wspiera zdrowie).
+- **Maximalism z kuracją** — 39% projektantów preferuje w 2026. Warstwy kolorów, wzorów i tekstur. Vintage i antyki jako zrównoważony fundament. Osobisty wyraz klienta.
+- **Scanditalia™** — skandynawska powściągliwość + włoskie ciepło. Ciemniejsze drewna (orzech, smoked oak, czekoladowa sosna). Bouclé, lniane tkaniny, wełna. Pełne warstwy tekstur.
+- **Biophilic Design** — dom żyjący z naturą. Duże okna, rośliny, naturalne materiały, oświetlenie naśladujące rytm słońca. Wspiera zdrowie psychiczne i koncentrację.
+- **Mediterranean Revival** — 272% wzrost zainteresowania w 2025. Kamień, terakota, drewno, otwarte plany z belkami. Kolory: cegła, głęboki czerwony, miękkie błękity.
+- **Smart Home Integration** — technologia niewidoczna. Rynek $622B do 2026. Termostat jako rzeźba, głośniki jako obiekty dekoracyjne. Protokół Matter jako standard.
+
+### Kolory 2026:
+- Burgund (wzrost z 7% do 21%), czekolada (33% top wybór projektantów), odcienie biżuterii (szmaragd, szafir, ametyst), petrol blue, ciepłe neutrale.
+
+### Rynek polski — ceny (dane GUS / rynek 2025–2026):
+- Mieszkania Warszawa (rynek wtórny): ~19 000 PLN/m² (mediana: 16 500 PLN/m²)
+- Remont standard: 2 500–3 500 PLN/m² | Comfort: 3 500–4 500 PLN/m² | Premium: 4 500–7 000 PLN/m²
+- Projekt wnętrz (only koncepcja): 100–130 PLN/m² | Projekt wykonawczy: ~200 PLN/m² | Pełna obsługa + nadzór: 250–400 PLN/m²
+- Średnia pensja netto (Polska 2025): ~6 294 PLN/mc na osobę | Mediana netto: ~4 900 PLN/mc na osobę
+- Top 10% Warszawa netto: ~9 400–11 000 PLN/mc na osobę
+- Para (2 × top 10%): ~18 800–22 000 PLN/mc netto razem
+- UWAGA: Budżety projektowe zawsze dotyczą całej rodziny (na projekt), nie na osobę."""
 
 
 def phase2_generate(data):
@@ -272,13 +328,17 @@ Napisz raport w dokładnie tym formacie Markdown:
 
 ---
 
-## Część 1: Trendy (3-4 punkty z konkretnymi danymi ze źródeł powyżej)
+## Część 1: Style i Trendy Globalne (8-10 stylów z opisem, materiałami, kolorami, kto kupuje, cena pozycjonowania)
+
+## Część 1b: Rynek Polski — Ceny i Dochody (tabela: remont/projekt per m², dochód per osoba vs. per rodzina)
 
 ## Część 2: Persony Klientów
-### Persona 1: [imię] — [archetype]
-[wszystkie pola z JSON + 2-3 zdania jak to wpływa na content]
-### Persona 2: [imię] — [archetype]
-### Persona 3: [imię] — [archetype]
+### Persona 1: Marta & Tomek — Młoda Ambitna Para
+[wszystkie pola z JSON + liczba dzieci 0–3 + dochód per osoba i per rodzina + koszt projektu per m² + 2-3 zdania jak to wpływa na content]
+### Persona 2: Agnieszka & Marek — Ugruntowana Rodzina
+[j.w. + domyślnie 2 dzieci, zakres 1–4+]
+### Persona 3: Katarzyna & Piotr — Premium Upgrade
+[j.w. + dzieci starsze lub 0]
 
 ## Część 3: Strategia Instagram
 ### Filary contentu
