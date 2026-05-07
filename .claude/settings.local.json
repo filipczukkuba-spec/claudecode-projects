@@ -46,7 +46,21 @@
       "WebFetch(domain:www.truefuturemedia.com)",
       "Bash(del *)",
       "Bash(grep -n \"    \\\\]$\" \"C:\\\\Users\\\\Filip\\\\Desktop\\\\claudecode\\\\jarvis.py\")",
-      "Bash(grep -n \"^]$\" jarvis.py)"
+      "Bash(grep -n \"^]$\" jarvis.py)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\" -Recurse -File)",
+      "Bash(Select-Object FullName, Extension)",
+      "Bash(Sort-Object FullName)",
+      "WebFetch(domain:giovanniperilli.com)",
+      "WebFetch(domain:socialbee.com)",
+      "WebFetch(domain:bloomagency.in)",
+      "WebFetch(domain:www.globalpropertyguide.com)",
+      "WebFetch(domain:datareportal.com)",
+      "WebFetch(domain:melissagalt.com)",
+      "WebFetch(domain:www.ownluxuryhomes.com)",
+      "Bash(pip list *)",
+      "Bash(findstr -i duck)",
+      "Bash(findstr -i \"duck\\\\|search\\\\|requests\")",
+      "Bash(findstr -i \"duck\\\\|search\\\\|requests\\\\|httpx\\\\|urllib\")"
     ]
   }
 }
