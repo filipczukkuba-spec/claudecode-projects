@@ -60,7 +60,15 @@
       "Bash(pip list *)",
       "Bash(findstr -i duck)",
       "Bash(findstr -i \"duck\\\\|search\\\\|requests\")",
-      "Bash(findstr -i \"duck\\\\|search\\\\|requests\\\\|httpx\\\\|urllib\")"
+      "Bash(findstr -i \"duck\\\\|search\\\\|requests\\\\|httpx\\\\|urllib\")",
+      "Bash(Test-Path \"C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies\\\\2026-05-07_strategia.md\")",
+      "Bash(Start-Sleep -Seconds 3)",
+      "Bash(Write-Output \"FILE CREATED\")",
+      "Bash(powershell -Command \"until \\(Test-Path 'C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies\\\\*.md'\\) { Start-Sleep 3 }; Write-Output 'FILE CREATED'\")",
+      "PowerShell(Get-Process *)",
+      "Bash(powershell -Command \"while \\(-not \\(Test-Path 'C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies'\\)\\) { Start-Sleep 5 }; Write-Output 'FOLDER CREATED'; while \\(\\(Get-ChildItem 'C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies' -Filter *.md\\).Count -eq 0\\) { Start-Sleep 3 }; Write-Output 'FILE SAVED'\")",
+      "Bash(powershell -Command \"while \\(-not \\(Test-Path 'C:\\\\Users\\\\filip\\\\Desktop\\\\claudecode\\\\strategies\\\\*.md'\\)\\) { Start-Sleep 3 }; Write-Output 'STRATEGY FILE SAVED'\")",
+      "Bash(powershell -Command \"while \\(Get-Process python -ErrorAction SilentlyContinue\\) { Start-Sleep 5 }; Write-Output 'PYTHON EXITED'\")"
     ]
   }
 }

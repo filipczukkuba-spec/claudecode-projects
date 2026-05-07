@@ -6,12 +6,17 @@ from datetime import datetime, timedelta
 from anthropic import Anthropic
 
 sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
     HAS_DDGS = True
 except ImportError:
-    HAS_DDGS = False
+    try:
+        from duckduckgo_search import DDGS
+        HAS_DDGS = True
+    except ImportError:
+        HAS_DDGS = False
 
 client = Anthropic()
 
@@ -158,6 +163,9 @@ def tool_web_search(inputs):
         time.sleep(1.5)
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=max_results))
+        for r in results:
+            if "body" in r and len(r["body"]) > 350:
+                r["body"] = r["body"][:350] + "..."
         return json.dumps(results, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -399,7 +407,7 @@ def tool_save_report(inputs):
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(content)
 
-    print(f"\n✓ Raport zapisany: {filepath}\n")
+    print(f"\n✓ Raport zapisany: {filepath}\n", flush=True)
     return f"Zapisano do: {filepath}"
 
 
@@ -418,7 +426,7 @@ def run_tool(name, inputs):
     global _step
     _step += 1
     label = _step_labels.get(name, name)
-    print(f"[Krok {_step}: {label} — {name}({list(inputs.keys())})]")
+    print(f"[Krok {_step}: {label} — {name}({list(inputs.keys())})]", flush=True)
 
     if name == "web_search":
         return tool_web_search(inputs)
@@ -447,40 +455,58 @@ TRIGGER = (
 )
 
 def run_agent():
-    print(f"\n{'='*60}")
-    print("  One Design — Agent Strategii Instagram")
-    print(f"  Data: {TODAY} | Start kalendarza: {START_DATE}")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*60}", flush=True)
+    print("  One Design — Agent Strategii Instagram", flush=True)
+    print(f"  Data: {TODAY} | Start kalendarza: {START_DATE}", flush=True)
+    print(f"{'='*60}\n", flush=True)
 
     messages = [{"role": "user", "content": TRIGGER}]
 
-    while True:
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=8192,
-            system=SYSTEM_PROMPT,
-            tools=TOOLS,
-            messages=messages
-        )
+    try:
+        while True:
+            print(f"[API call — historia: {len(messages)} wiadomości]", flush=True)
+            response = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=16000,
+                system=SYSTEM_PROMPT,
+                tools=TOOLS,
+                messages=messages
+            )
+            print(f"[stop_reason={response.stop_reason} | tokens_used={response.usage.input_tokens}in/{response.usage.output_tokens}out]", flush=True)
 
-        if response.stop_reason == "end_turn":
-            for block in response.content:
-                if hasattr(block, "text"):
-                    print(f"\nAgent: {block.text}")
-            break
+            if response.stop_reason == "end_turn":
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        print(f"\nAgent: {block.text}", flush=True)
+                break
 
-        if response.stop_reason == "tool_use":
-            messages.append({"role": "assistant", "content": response.content})
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    result = run_tool(block.name, block.input)
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result
-                    })
-            messages.append({"role": "user", "content": tool_results})
+            if response.stop_reason == "max_tokens":
+                print("[WARN] max_tokens reached — agent unable to complete response", flush=True)
+                print("[INFO] Consider reducing conversation history or increasing max_tokens", flush=True)
+                break
+
+            if response.stop_reason == "tool_use":
+                messages.append({"role": "assistant", "content": response.content})
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        result = run_tool(block.name, block.input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": result
+                        })
+                messages.append({"role": "user", "content": tool_results})
+            else:
+                print(f"[WARN] Unexpected stop_reason: {response.stop_reason}", flush=True)
+                break
+
+    except Exception as e:
+        import traceback
+        print(f"\n[ERROR] {type(e).__name__}: {e}", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        sys.stdout.flush()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
