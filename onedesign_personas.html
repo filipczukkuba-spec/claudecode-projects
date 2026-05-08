@@ -1601,6 +1601,11 @@ function renderCard(p, idx) {
   const budgetCoversAll = cappedBudget * 1000 >= fullCostMin;
   const shortfallK = budgetCoversAll ? 0 : Math.ceil((fullCostMin - cappedBudget * 1000) / 1000);
 
+  const coverPct = Math.min(100, Math.round(budgetSqm / needSqm * 100));
+  const scopeDescDynamic = budgetCoversAll
+    ? `Budżet ${cappedBudget}k PLN pokrywa pełny remont rodziny (${needSqm} m²) w standardzie ${tier.tier.toLowerCase()}. Stawka remontu: ${(rate[0]/1000).toFixed(1)}–${(rate[1]/1000).toFixed(1)}k PLN/m² + projekt One Design ~300 PLN/m².`
+    : `Budżet ${cappedBudget}k PLN pokrywa ${budgetSqm} m² z ${needSqm} m² potrzebnych tej rodzinie (${coverPct}% metrażu). Do pełnego remontu potrzeba +${shortfallK}k PLN. Stawka: ${(rate[0]/1000).toFixed(1)}–${(rate[1]/1000).toFixed(1)}k PLN/m² + projekt ~300 PLN/m².`;
+
   const allWants = (childMod && childMod.wants) ? childMod.wants : tier.wants;
   const allFears = (childMod && childMod.fears) ? childMod.fears : tier.fears;
   const dmTrigger = (childMod && childMod.dmNote) ? childMod.dmNote : tier.dm_trigger;
@@ -1689,9 +1694,9 @@ function renderCard(p, idx) {
 
         <div class="content-block">
           <h4>Zakres projektu</h4>
-          <div class="scope-label">${sqm}m² · ${tier.scopeLabel}</div>
-          <div class="scope-bar"><div class="scope-fill" style="width:${tier.scope}%"></div></div>
-          <div class="scope-desc">${tier.scopeDesc}</div>
+          <div class="scope-label">${budgetSqm} m² · ${tier.tier}${budgetCoversAll ? ' · pełny metraż ✓' : ` · ${coverPct}% metrażu rodziny`}</div>
+          <div class="scope-bar"><div class="scope-fill" style="width:${coverPct}%"></div></div>
+          <div class="scope-desc">${scopeDescDynamic}</div>
         </div>
 
         <div class="content-block">
