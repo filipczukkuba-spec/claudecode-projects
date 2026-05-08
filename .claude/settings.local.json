@@ -94,7 +94,8 @@
       "WebFetch(domain:naszbiznes24.pl)",
       "WebFetch(domain:wenet.pl)",
       "WebFetch(domain:kobieta.rp.pl)",
-      "WebFetch(domain:mycompanypolska.pl)"
+      "WebFetch(domain:mycompanypolska.pl)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }
