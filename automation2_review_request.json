@@ -1,0 +1,82 @@
+{
+  "name": "Review Request Automation",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:getRows",
+      "version": 2,
+      "parameters": {},
+      "mapper": {
+        "spreadsheetId": "",
+        "sheetId": "",
+        "hasHeader": "yes",
+        "rangeA1": "",
+        "limit": 10
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "spreadsheetId": {
+              "label": "Demo Appointments"
+            },
+            "sheetId": {
+              "label": "Sheet1"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "spreadsheetId",
+            "type": "text",
+            "label": "Spreadsheet ID"
+          },
+          {
+            "name": "sheetId",
+            "type": "text",
+            "label": "Sheet Name"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "gmail:ActionSendEmail",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "to": "{{1.`Client Email`}}",
+        "subject": "How was your experience with us?",
+        "content": "Hi {{1.`Client Name`}},\n\nThank you for visiting us for your {{1.`Service`}} on {{1.`Appointment Date`}}!\n\nWe would love to hear your feedback. Could you take 30 seconds to leave us a Google review? It helps us a lot!\n\n👉 [Leave a Review Here] (paste your Google review link here)\n\nThank you so much!\n\nBest regards,\nThe Team",
+        "contentType": "text"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com"
+  }
+}

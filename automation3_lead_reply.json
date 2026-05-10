@@ -1,0 +1,82 @@
+{
+  "name": "New Lead Auto-Reply Automation",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:getRows",
+      "version": 2,
+      "parameters": {},
+      "mapper": {
+        "spreadsheetId": "",
+        "sheetId": "",
+        "hasHeader": "yes",
+        "rangeA1": "",
+        "limit": 10
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "spreadsheetId": {
+              "label": "Demo Leads"
+            },
+            "sheetId": {
+              "label": "Sheet1"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "spreadsheetId",
+            "type": "text",
+            "label": "Spreadsheet ID"
+          },
+          {
+            "name": "sheetId",
+            "type": "text",
+            "label": "Sheet Name"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "gmail:ActionSendEmail",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "to": "{{1.`Lead Email`}}",
+        "subject": "Thanks for reaching out — we'll be in touch shortly!",
+        "content": "Hi {{1.`Lead Name`}},\n\nThank you for contacting us! We received your message and one of our team members will get back to you within the next few hours.\n\nIn the meantime, here's what you can expect:\n✅ A personal response within 2-4 hours\n✅ A free consultation to discuss your needs\n✅ A clear quote with no hidden fees\n\nIf you need anything urgent feel free to reply to this email.\n\nLooking forward to working with you!\n\nBest regards,\nThe Team",
+        "contentType": "text"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com"
+  }
+}
