@@ -1,0 +1,67 @@
+{
+  "name": "Lead Capture - Auto Follow-up Email",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:getRange",
+      "version": 2,
+      "parameters": {},
+      "mapper": {
+        "spreadsheetId": "YOUR_SPREADSHEET_ID",
+        "sheetId": "Leads",
+        "includesHeaders": true
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {},
+        "parameters": [
+          {
+            "name": "spreadsheetId",
+            "type": "text",
+            "label": "Spreadsheet ID"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "gmail:ActionSendEmail",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "to": "{{1.Email}}",
+        "subject": "Thanks for reaching out, {{1.Name}}!",
+        "html": "<p>Hi {{1.Name}},</p><p>Thank you for your interest in our services!</p><p>I've received your message and will get back to you within 24 hours.</p><p>In the meantime, feel free to reply to this email with any questions.</p><p>Talk soon,<br>The Team</p>",
+        "from": "YOUR_GMAIL_ADDRESS"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "slots": null,
+      "confidential": false,
+      "dlt": false,
+      "dlq": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com"
+  }
+}
