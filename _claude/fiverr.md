@@ -141,9 +141,51 @@ Pierwsze 3 osoby otrzymają zniżkę. Napisz w komentarzu lub DM 👇
 
 ---
 
+## GIG 3 — Invoice & Payment Reminder (IN PROGRESS — building automation first)
+
+**What it does:**
+- Watches Google Sheet "Invoices" for unpaid rows
+- Sends payment reminder email automatically
+- Updates sheet: Reminder Sent = Yes + timestamp
+
+**Google Sheet columns:**
+A: Client Name | B: Client Email | C: Invoice Amount | D: Due Date | E: Status | F: Reminder Sent
+
+**Make.com modules:**
+1. Google Sheets → Watch New Rows
+2. Filter → Status = Unpaid
+3. Gmail → Send reminder email
+4. Google Sheets → Update Row (Reminder Sent = Yes, Sent At = now)
+
+**Status:** Building automation, not yet published
+
+---
+
+## Facebook Marketing
+
+- Posted in "Moja Firma — Mój Biznes" group in Polish
+- Got comment: "2 dni? To jest darmowe przecież w ustawieniach business suite i zajmuje 5 sek"
+- Reply used: Explained difference between Meta auto-replies vs full email automation with personalisation
+
+**Polish post templates saved above in "Getting First Orders" section**
+
+---
+
+## Scam Warning
+
+New accounts get flooded with scams. Pattern:
+- External link (Google Docs, random site) in first message = scam
+- "I already paid" with no real order = scam
+- Fake payment forms = phishing
+- Action: Report → spam/scam → Block. Never click links.
+
+---
+
 ## Next Steps
+- [ ] Finish building Gig 3 automation in Make.com
+- [ ] Record demo video for Gig 3
+- [ ] Write and publish Gig 3 on Fiverr
 - [ ] Add text overlays to gig videos in CapCut
 - [ ] Get Make.com Foundations certificate at learn.make.com
-- [ ] Post in Polish Facebook groups
-- [ ] Build 3rd gig (next automation idea TBD)
-- [ ] Get first review — offer discounted/free order to someone known
+- [ ] Convert Facebook comment leads to Fiverr orders
+- [ ] Get first real review
