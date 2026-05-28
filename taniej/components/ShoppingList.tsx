@@ -357,15 +357,6 @@ export default function ShoppingList({ items, setItems, onSearch }: Props) {
           </ul>
         )}
 
-        {/* Compare button — shown inline only when there are results already (re-compare) */}
-        {items.length > 0 && (
-          <button
-            onClick={onSearch}
-            className="w-full mt-4 bg-gray-900 hover:bg-gray-800 active:bg-black active:scale-[0.99] text-white font-semibold rounded-xl py-3.5 transition-all text-sm"
-          >
-            Zaktualizuj wyniki →
-          </button>
-        )}
       </div>
     </div>
   );

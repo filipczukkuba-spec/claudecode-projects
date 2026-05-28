@@ -121,17 +121,21 @@ export default function Home() {
         </p>
       </div>
 
-      {/* ── Floating Compare CTA ── */}
-      {items.length > 0 && !searched && (
+      {/* ── Floating Compare / Re-compare CTA ── */}
+      {items.length > 0 && (
         <div className="fixed bottom-0 inset-x-0 pointer-events-none z-50">
           <div className="max-w-md mx-auto px-4 pointer-events-auto"
                style={{ paddingBottom: `calc(1.5rem + env(safe-area-inset-bottom))` }}>
             <div className="h-8 bg-gradient-to-t from-[#f0f0eb] to-transparent -mb-1" />
             <button
               onClick={handleSearch}
-              className="w-full bg-green-500 hover:bg-green-600 active:bg-green-700 active:scale-[0.98] text-white font-bold rounded-2xl py-4 text-base transition-all shadow-2xl shadow-green-500/40"
+              className={`w-full font-bold rounded-2xl py-4 text-base transition-all shadow-2xl active:scale-[0.98] ${
+                searched
+                  ? "bg-gray-900 hover:bg-gray-800 active:bg-black text-white shadow-gray-900/30"
+                  : "bg-green-500 hover:bg-green-600 active:bg-green-700 text-white shadow-green-500/40"
+              }`}
             >
-              Porównaj ceny w {STORES.length} sklepach →
+              {searched ? "Zaktualizuj wyniki →" : `Porównaj ceny w ${STORES.length} sklepach →`}
             </button>
           </div>
         </div>

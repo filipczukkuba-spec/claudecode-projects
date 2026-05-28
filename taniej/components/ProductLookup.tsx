@@ -2,18 +2,22 @@
 
 import { useState, useRef, useEffect } from "react";
 
-const STORE_STYLE: Record<string, { bar: string; text: string }> = {
-  Biedronka: { bar: "bg-red-500",    text: "text-red-600" },
-  Lidl:      { bar: "bg-blue-500",   text: "text-blue-600" },
-  Kaufland:  { bar: "bg-orange-500", text: "text-orange-600" },
-  Aldi:      { bar: "bg-indigo-500", text: "text-indigo-600" },
-  Netto:     { bar: "bg-yellow-400", text: "text-yellow-600" },
-  Auchan:    { bar: "bg-purple-500", text: "text-purple-600" },
-  Carrefour: { bar: "bg-sky-500",    text: "text-sky-600" },
+const STORE_STYLE: Record<string, { bar: string }> = {
+  Biedronka: { bar: "bg-red-500" },
+  Lidl:      { bar: "bg-blue-500" },
+  Kaufland:  { bar: "bg-orange-500" },
+  Aldi:      { bar: "bg-indigo-500" },
+  Netto:     { bar: "bg-yellow-400" },
+  Auchan:    { bar: "bg-purple-500" },
+  Carrefour: { bar: "bg-sky-500" },
 };
-const DEFAULT_STYLE = { bar: "bg-gray-400", text: "text-gray-600" };
+const DEFAULT_STYLE = { bar: "bg-gray-400" };
 
-interface StorePrice { name: string; logo: string; price: number | null }
+interface StorePrice { name: string; logo: string; price: number | null; promo_price: number | null; promo_label: string | null }
+
+function effectivePrice(p: StorePrice) {
+  return p.promo_price ?? p.price;
+}
 
 export default function ProductLookup() {
   const [query, setQuery] = useState("");
@@ -43,9 +47,10 @@ export default function ProductLookup() {
           name: s.name,
           logo: s.logo,
           price: s.prices[0]?.price ?? null,
+          promo_price: s.prices[0]?.promo_price ?? null,
+          promo_label: s.prices[0]?.promo_label ?? null,
         }));
-        prices.sort((a, b) => (a.price ?? 999) - (b.price ?? 999));
-        const found = prices.find(p => p.price !== null);
+        prices.sort((a, b) => (effectivePrice(a) ?? 999) - (effectivePrice(b) ?? 999));
         setProductName(data.results[0]?.prices[0]?.item || q);
         setResults(prices);
       } else {
@@ -55,15 +60,15 @@ export default function ProductLookup() {
     finally { setLoading(false); }
   }
 
-  const withPrice = results?.filter(r => r.price !== null) ?? [];
+  const withPrice = results?.filter(r => effectivePrice(r) !== null) ?? [];
   const cheapest = withPrice[0];
-  const maxPrice = Math.max(...withPrice.map(r => r.price!), 0.01);
+  const maxPrice = Math.max(...withPrice.map(r => effectivePrice(r)!), 0.01);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
       <button
         className="w-full flex items-center justify-between p-5 text-left"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen((o) => !o)}
       >
         <div>
           <p className="text-sm font-semibold text-gray-800">Szukaj ceny produktu</p>
@@ -78,8 +83,9 @@ export default function ProductLookup() {
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors mt-4"
             placeholder="Np. Lay's Papryka, Milka, Coca-Cola..."
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
+            autoCorrect="off"
           />
 
           {loading && (
@@ -87,17 +93,19 @@ export default function ProductLookup() {
           )}
 
           {!loading && results !== null && results.length === 0 && (
-            <p className="text-xs text-gray-400 mt-3 text-center">Brak wyników</p>
+            <p className="text-xs text-gray-400 mt-3 text-center">Brak wyników dla &quot;{query}&quot;</p>
           )}
 
           {!loading && results && results.length > 0 && (
             <div className="mt-4">
-              <p className="text-xs font-semibold text-gray-500 mb-3">{productName}</p>
+              <p className="text-xs font-semibold text-gray-500 mb-3 truncate">{productName}</p>
               <div className="space-y-2.5">
                 {results.map((store, i) => {
                   const style = STORE_STYLE[store.name] ?? DEFAULT_STYLE;
-                  const isCheapest = i === 0 && store.price !== null;
-                  const widthPct = store.price ? (store.price / maxPrice) * 100 : 0;
+                  const ep = effectivePrice(store);
+                  const isCheapest = i === 0 && ep !== null;
+                  const widthPct = ep ? (ep / maxPrice) * 100 : 0;
+                  const hasPromo = store.promo_price !== null;
                   return (
                     <div key={store.name} className="flex items-center gap-3">
                       <div className={`w-7 h-7 rounded-lg ${style.bar} flex items-center justify-center text-white text-xs font-black shrink-0`}>
@@ -106,25 +114,37 @@ export default function ProductLookup() {
                       <span className="text-xs text-gray-600 w-20 shrink-0 truncate">{store.name}</span>
                       <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${style.bar} transition-all duration-500`}
+                          className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
                           style={{ width: `${widthPct}%` }}
                         />
                       </div>
-                      {store.price !== null ? (
-                        <span className={`text-xs font-bold w-14 text-right shrink-0 ${isCheapest ? "text-green-600" : "text-gray-500"}`}>
-                          {store.price.toFixed(2)} zł
-                          {isCheapest && " ✓"}
-                        </span>
+                      {ep !== null ? (
+                        <div className="flex items-center gap-1 w-20 justify-end shrink-0">
+                          {hasPromo && store.price !== null && (
+                            <span className="text-xs text-gray-300 line-through">{store.price.toFixed(2)}</span>
+                          )}
+                          <span className={`text-xs font-bold ${hasPromo ? "text-orange-600" : isCheapest ? "text-green-600" : "text-gray-500"}`}>
+                            {ep.toFixed(2)} zł{isCheapest && !hasPromo && " ✓"}
+                          </span>
+                          {hasPromo && (
+                            <span className="text-xs bg-orange-100 text-orange-600 font-bold px-1 rounded">
+                              {store.promo_label ?? "PROMO"}
+                            </span>
+                          )}
+                        </div>
                       ) : (
-                        <span className="text-xs text-gray-300 w-14 text-right shrink-0">brak</span>
+                        <span className="text-xs text-gray-300 w-20 text-right shrink-0">brak</span>
                       )}
                     </div>
                   );
                 })}
               </div>
               {cheapest && (
-                <p className="text-xs text-green-600 font-medium mt-3 text-center">
-                  Najtaniej w {cheapest.name} — {cheapest.price?.toFixed(2)} zł
+                <p className="text-xs font-medium mt-3 text-center">
+                  <span className={cheapest.promo_price !== null ? "text-orange-600" : "text-green-600"}>
+                    Najtaniej w {cheapest.name} — {effectivePrice(cheapest)?.toFixed(2)} zł
+                    {cheapest.promo_price !== null && ` (${cheapest.promo_label ?? "PROMO"})`}
+                  </span>
                 </p>
               )}
             </div>
