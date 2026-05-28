@@ -95,7 +95,8 @@
       "WebFetch(domain:wenet.pl)",
       "WebFetch(domain:kobieta.rp.pl)",
       "WebFetch(domain:mycompanypolska.pl)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "PowerShell(New-Item *)"
     ]
   }
 }
