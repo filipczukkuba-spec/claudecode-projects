@@ -16,22 +16,25 @@ async function searchLidl(query: string): Promise<number | null> {
       searchQuery: query,
       country: "PL",
       sort: "relevance",
-      maxResults: 3,
+      maxResults: 5,
     });
 
     const { items } = await client.dataset(run.defaultDatasetId).listItems();
+    console.log(`[Lidl] query="${query}" items=${items?.length ?? 0}`, JSON.stringify(items?.[0] ?? {}));
+
     if (!items || items.length === 0) return null;
 
     const prices = items
       .map((item: Record<string, unknown>) => {
-        const price = item.price ?? item.currentPrice ?? item.regularPrice;
+        const price = item.price ?? item.currentPrice ?? item.regularPrice ?? item.normalPrice;
         return typeof price === "number" ? price : null;
       })
       .filter((p): p is number => p !== null);
 
     if (prices.length === 0) return null;
     return Math.min(...prices);
-  } catch {
+  } catch (e) {
+    console.error(`[Lidl] error for "${query}":`, e);
     return null;
   }
 }
