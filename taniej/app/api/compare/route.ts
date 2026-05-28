@@ -90,5 +90,5 @@ export async function POST(req: NextRequest) {
     return { ...store, prices: filledPrices };
   });
 
-  return NextResponse.json({ results });
+  return NextResponse.json({ results, _debug: { matchedIds, promoCount: (promosResult.data ?? []).length, promoError: promosResult.error?.message ?? null } });
 }
