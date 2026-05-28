@@ -97,7 +97,13 @@
       "WebFetch(domain:mycompanypolska.pl)",
       "Bash(echo \"exit: $?\")",
       "PowerShell(New-Item *)",
-      "WebFetch(domain:apify.com)"
+      "WebFetch(domain:apify.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:prices.openfoodfacts.org)",
+      "WebFetch(domain:www.kaufland.pl)",
+      "WebFetch(domain:www.pepesto.com)",
+      "WebFetch(domain:www.frisco.pl)",
+      "WebFetch(domain:zakupy.biedronka.pl)"
     ]
   }
 }
