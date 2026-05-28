@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import ShoppingList from "@/components/ShoppingList";
 import StoreComparison from "@/components/StoreComparison";
 import RecipeInput from "@/components/RecipeInput";
+import ProductLookup from "@/components/ProductLookup";
 import { Item } from "@/types";
 
 const STORES = [
@@ -56,7 +57,7 @@ export default function Home() {
           <div className="relative">
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-5xl font-black tracking-tight leading-none">taniejkupuj.</h1>
+                <h1 className="text-5xl font-black tracking-tight leading-none">taniejkupuj</h1>
                 <p className="text-green-100 text-base font-medium mt-2">
                   Najtańszy koszyk zakupów w Polsce
                 </p>
@@ -125,12 +126,13 @@ export default function Home() {
         </div>
 
         {/* App */}
+        <ProductLookup />
         <RecipeInput items={items} setItems={setItems} />
         <ShoppingList items={items} setItems={setItems} onSearch={() => setSearched(true)} />
         {searched && items.length > 0 && <StoreComparison items={items} />}
 
         <p className="text-center text-xs text-gray-300 mt-10">
-          taniejkupuj. · porównywarka cen w polskich sklepach
+          taniejkupuj · porównywarka cen w polskich sklepach
         </p>
       </div>
     </main>

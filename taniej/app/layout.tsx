@@ -5,13 +5,13 @@ import "./globals.css";
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "taniejkupuj.",
+  title: "taniejkupuj",
   description: "Porównaj ceny w 7 sklepach - Biedronka, Lidl, Kaufland, Aldi, Netto, Auchan, Carrefour. Znajdź najtańszy koszyk zakupów.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "taniejkupuj.",
+    title: "taniejkupuj",
   },
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
