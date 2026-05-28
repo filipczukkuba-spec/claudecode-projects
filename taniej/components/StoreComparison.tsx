@@ -80,8 +80,16 @@ export default function StoreComparison({ items }: Props) {
   if (loading) {
     return (
       <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-        <div className="text-3xl mb-3 animate-bounce">🔍</div>
-        <p className="text-gray-700 font-medium text-sm">Sprawdzam ceny w sklepach...</p>
+        <div className="flex justify-center gap-1.5 mb-4">
+          {["bg-red-400", "bg-blue-400", "bg-orange-400", "bg-indigo-400", "bg-yellow-400", "bg-purple-400", "bg-sky-400"].map((c, i) => (
+            <div
+              key={i}
+              className={`w-2 h-2 rounded-full ${c} animate-bounce`}
+              style={{ animationDelay: `${i * 80}ms` }}
+            />
+          ))}
+        </div>
+        <p className="text-gray-700 font-semibold text-sm">Sprawdzam ceny w 7 sklepach...</p>
         <p className="text-gray-400 text-xs mt-1">To może zająć chwilę</p>
       </div>
     );
@@ -261,9 +269,10 @@ export default function StoreComparison({ items }: Props) {
         );
       })}
 
-      <p className="text-center text-xs text-gray-400 py-2">
-        Ceny aktualizowane regularnie • Promocje oznaczone osobno
-      </p>
+      <div className="text-center py-2 space-y-0.5">
+        <p className="text-xs text-gray-400">Ceny aktualizowane regularnie</p>
+        <p className="text-xs text-gray-300">Promocje oznaczone pomarańczowo • Dane poglądowe</p>
+      </div>
     </div>
   );
 }
