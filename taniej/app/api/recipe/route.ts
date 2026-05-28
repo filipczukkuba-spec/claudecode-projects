@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { supabase } from "@/lib/supabase";
 
 export const maxDuration = 30;
 
@@ -12,6 +13,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No URL provided" }, { status: 400 });
   }
 
+  // Fetch known products so Claude can map to exact names
+  const { data: products } = await supabase.from("products").select("name");
+  const knownProducts = products?.map((p) => p.name) ?? [];
+
   let html: string;
   try {
     const res = await fetch(url, {
@@ -23,7 +28,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Could not fetch URL: ${e.message}` }, { status: 400 });
   }
 
-  // Strip HTML tags and trim to keep prompt small
   const text = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -37,7 +41,18 @@ export async function POST(req: NextRequest) {
     messages: [
       {
         role: "user",
-        content: `Extract the list of ingredients from this recipe page. Return ONLY a JSON array of strings, each being a single ingredient name in Polish (translate if needed). No quantities, no units, no explanations — just ingredient names. Example: ["Jajka","Mleko","Mąka"]\n\n${text}`,
+        content: `You are a grocery matching assistant. Extract ingredients from this recipe and map each one to the closest product from the known list below.
+
+Known products: ${knownProducts.join(", ")}
+
+Rules:
+- Return ONLY a JSON array of product names from the known list above
+- If an ingredient matches a known product closely, use the exact known product name
+- If no match exists, include the original ingredient name in Polish
+- No quantities, no units, no explanations
+
+Recipe page text:
+${text}`,
       },
     ],
   });

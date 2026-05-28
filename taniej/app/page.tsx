@@ -35,26 +35,51 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#f5f5f0] font-sans">
-      <div className="max-w-md mx-auto px-4 py-8">
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-green-600 tracking-tight">taniej.</h1>
-            <p className="text-sm text-gray-500 mt-1">Gdzie kupisz taniej? Sprawdź.</p>
+      <div className="max-w-md mx-auto px-4 pt-10 pb-16">
+
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-end justify-between">
+            <div>
+              <h1 className="text-4xl font-black text-green-500 tracking-tight leading-none">
+                taniej<span className="text-green-400">.</span>
+              </h1>
+              <p className="text-sm text-gray-400 mt-1.5">
+                Znajdź najtańszy koszyk zakupów
+              </p>
+            </div>
+            {items.length > 0 && (
+              <button
+                onClick={shareList}
+                className="text-xs text-gray-400 hover:text-green-500 transition-colors flex items-center gap-1 pb-1"
+              >
+                {copied ? "✓ Skopiowano!" : "🔗 Udostępnij"}
+              </button>
+            )}
           </div>
-          {items.length > 0 && (
-            <button
-              onClick={shareList}
-              className="text-xs text-gray-400 hover:text-green-600 transition-colors flex items-center gap-1 pb-1"
-            >
-              {copied ? "✓ Skopiowano!" : "🔗 Udostępnij listę"}
-            </button>
-          )}
+
+          {/* Feature pills */}
+          <div className="flex gap-2 mt-4 flex-wrap">
+            {["7 sklepów", "AI z przepisów", "Porównaj koszyk"].map((f) => (
+              <span
+                key={f}
+                className="text-xs bg-white text-gray-500 px-3 py-1 rounded-full shadow-sm border border-gray-100"
+              >
+                {f}
+              </span>
+            ))}
+          </div>
         </div>
 
         <RecipeInput items={items} setItems={setItems} />
         <ShoppingList items={items} setItems={setItems} onSearch={() => setSearched(true)} />
 
         {searched && items.length > 0 && <StoreComparison items={items} />}
+
+        {/* Footer */}
+        <p className="text-center text-xs text-gray-300 mt-10">
+          taniej. · porównywarka cen w polskich sklepach
+        </p>
       </div>
     </main>
   );
