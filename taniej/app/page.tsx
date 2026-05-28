@@ -3,6 +3,7 @@
 import { useState } from "react";
 import ShoppingList from "@/components/ShoppingList";
 import StoreComparison from "@/components/StoreComparison";
+import RecipeInput from "@/components/RecipeInput";
 import { Item } from "@/types";
 
 export default function Home() {
@@ -17,6 +18,7 @@ export default function Home() {
           <p className="text-sm text-gray-500 mt-1">Gdzie kupisz taniej? Sprawdź.</p>
         </div>
 
+        <RecipeInput items={items} setItems={setItems} />
         <ShoppingList items={items} setItems={setItems} onSearch={() => setSearched(true)} />
 
         {searched && items.length > 0 && (

@@ -103,7 +103,8 @@
       "WebFetch(domain:www.kaufland.pl)",
       "WebFetch(domain:www.pepesto.com)",
       "WebFetch(domain:www.frisco.pl)",
-      "WebFetch(domain:zakupy.biedronka.pl)"
+      "WebFetch(domain:zakupy.biedronka.pl)",
+      "Bash(npm install *)"
     ]
   }
 }
