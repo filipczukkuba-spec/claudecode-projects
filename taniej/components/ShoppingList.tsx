@@ -40,7 +40,6 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Śmietana 18%", unit: "200ml" },
   { name: "Śmietana 30%", unit: "200ml" },
   { name: "Śmietanka kremówka", unit: "200ml" },
-  { name: "Śmietanka do kawy", unit: "200ml" },
   { name: "Kefir", unit: "1L" },
   { name: "Maślanka", unit: "1L" },
   { name: "Ryż", unit: "1kg" },
@@ -52,11 +51,9 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Makaron spaghetti", unit: "500g" },
   { name: "Makaron lasagne", unit: "500g" },
   { name: "Mąka", unit: "1kg" },
-  { name: "Skrobia ziemniaczana", unit: "500g" },
   { name: "Bułka tarta", unit: "500g" },
   { name: "Cukier", unit: "1kg" },
   { name: "Cukier puder", unit: "400g" },
-  { name: "Cukier waniliowy", unit: "32g" },
   { name: "Sól", unit: "1kg" },
   { name: "Pieprz czarny", unit: "50g" },
   { name: "Papryka mielona", unit: "30g" },
@@ -64,19 +61,14 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Oregano", unit: "10g" },
   { name: "Bazylia", unit: "10g" },
   { name: "Kurkuma", unit: "50g" },
-  { name: "Imbir", unit: "100g" },
   { name: "Olej słonecznikowy", unit: "1L" },
   { name: "Olej rzepakowy", unit: "1L" },
-  { name: "Olej kokosowy", unit: "250ml" },
   { name: "Oliwa z oliwek", unit: "500ml" },
   { name: "Ocet", unit: "500ml" },
-  { name: "Ocet jabłkowy", unit: "500ml" },
   { name: "Sos sojowy", unit: "200ml" },
-  { name: "Sos BBQ", unit: "300ml" },
   { name: "Ketchup", unit: "450g" },
   { name: "Musztarda", unit: "185g" },
   { name: "Majonez", unit: "400ml" },
-  { name: "Majonez light", unit: "400ml" },
   { name: "Hummus", unit: "200g" },
   { name: "Pesto", unit: "190g" },
   { name: "Koncentrat pomidorowy", unit: "200g" },
@@ -85,14 +77,9 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Fasola w puszce", unit: "400g" },
   { name: "Groszek konserwowy", unit: "400g" },
   { name: "Mleko kokosowe", unit: "400ml" },
-  { name: "Bulion warzywny", unit: "4 szt." },
-  { name: "Zupa w proszku", unit: "60g" },
   { name: "Miód", unit: "400g" },
   { name: "Dżem", unit: "280g" },
   { name: "Nutella", unit: "400g" },
-  { name: "Proszek do pieczenia", unit: "30g" },
-  { name: "Soda oczyszczona", unit: "200g" },
-  { name: "Drożdże", unit: "100g" },
   { name: "Pomidory", unit: "1kg" },
   { name: "Ogórki", unit: "1kg" },
   { name: "Papryka", unit: "1kg" },
@@ -105,13 +92,6 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Szpinak", unit: "300g" },
   { name: "Brokuły", unit: "1 szt." },
   { name: "Kapusta biała", unit: "1kg" },
-  { name: "Por", unit: "1 szt." },
-  { name: "Pietruszka", unit: "1 pęczek" },
-  { name: "Seler korzeniowy", unit: "1 szt." },
-  { name: "Burak", unit: "1kg" },
-  { name: "Cukinia", unit: "1 szt." },
-  { name: "Bakłażan", unit: "1 szt." },
-  { name: "Szparagi", unit: "300g" },
   { name: "Pieczarki", unit: "400g" },
   { name: "Groszek mrożony", unit: "400g" },
   { name: "Mrożone warzywa mix", unit: "400g" },
@@ -120,17 +100,11 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Banany", unit: "1kg" },
   { name: "Pomarańcze", unit: "1kg" },
   { name: "Cytryny", unit: "1kg" },
-  { name: "Grejpfrut", unit: "1kg" },
   { name: "Kiwi", unit: "1kg" },
   { name: "Truskawki", unit: "500g" },
   { name: "Maliny", unit: "250g" },
   { name: "Borówki", unit: "250g" },
-  { name: "Porzeczki", unit: "500g" },
   { name: "Winogrona", unit: "1kg" },
-  { name: "Gruszki", unit: "1kg" },
-  { name: "Śliwki", unit: "1kg" },
-  { name: "Nektarynki", unit: "1kg" },
-  { name: "Brzoskwinie", unit: "1kg" },
   { name: "Mango", unit: "1 szt." },
   { name: "Awokado", unit: "1 szt." },
   { name: "Mrożone truskawki", unit: "500g" },
@@ -143,17 +117,10 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Kiełbasa", unit: "1kg" },
   { name: "Parówki", unit: "500g" },
   { name: "Szynka", unit: "300g" },
-  { name: "Wędlina drobiowa", unit: "300g" },
-  { name: "Wątroba drobiowa", unit: "500g" },
   { name: "Łosoś świeży", unit: "1kg" },
   { name: "Łosoś wędzony", unit: "100g" },
-  { name: "Makrela wędzona", unit: "250g" },
-  { name: "Śledź", unit: "300g" },
   { name: "Tuńczyk w puszce", unit: "170g" },
   { name: "Sardynki w puszce", unit: "120g" },
-  { name: "Paluszki rybne", unit: "400g" },
-  { name: "Krewetki", unit: "500g" },
-  { name: "Filet z dorsza", unit: "1kg" },
   { name: "Pierogi mrożone", unit: "500g" },
   { name: "Mrożona pizza", unit: "1 szt." },
   { name: "Lody", unit: "500ml" },
@@ -161,14 +128,10 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Woda gazowana", unit: "1.5L" },
   { name: "Sok pomarańczowy", unit: "1L" },
   { name: "Sok jabłkowy", unit: "1L" },
-  { name: "Sok z cytryny", unit: "200ml" },
   { name: "Cola", unit: "1.5L" },
   { name: "Piwo", unit: "0.5L" },
-  { name: "Wino", unit: "0.75L" },
   { name: "Herbata", unit: "100 torebek" },
-  { name: "Herbata zielona", unit: "50 torebek" },
   { name: "Kawa mielona", unit: "250g" },
-  { name: "Kawa ziarnista", unit: "250g" },
   { name: "Kawa instant", unit: "100g" },
   { name: "Kakao", unit: "200g" },
   { name: "Płatki owsiane", unit: "500g" },
@@ -176,173 +139,28 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Musli", unit: "500g" },
   { name: "Kasza gryczana", unit: "500g" },
   { name: "Kasza jaglana", unit: "500g" },
-  { name: "Kasza bulgur", unit: "500g" },
   { name: "Soczewica", unit: "500g" },
   { name: "Ciecierzyca", unit: "500g" },
-  { name: "Fasola sucha", unit: "500g" },
-  { name: "Komosa ryżowa", unit: "500g" },
-  { name: "Nasiona chia", unit: "200g" },
-  { name: "Siemię lniane", unit: "500g" },
-  { name: "Otręby pszenne", unit: "500g" },
   { name: "Orzechy włoskie", unit: "200g" },
-  { name: "Orzechy nerkowca", unit: "150g" },
   { name: "Migdały", unit: "200g" },
-  { name: "Rodzynki", unit: "200g" },
-  { name: "Czekolada", unit: "100g" },
-  { name: "Czekolada gorzka", unit: "100g" },
   { name: "Chipsy", unit: "150g" },
   { name: "Ciastka", unit: "200g" },
-  { name: "Baton czekoladowy", unit: "50g" },
-  { name: "Żelki", unit: "100g" },
-  { name: "Popcorn", unit: "100g" },
-  { name: "Precelki", unit: "150g" },
-  { name: "Papier toaletowy", unit: "8 rolek" },
-  { name: "Ręczniki papierowe", unit: "2 rolki" },
-  { name: "Płyn do naczyń", unit: "1L" },
-  { name: "Proszek do prania", unit: "3kg" },
-  { name: "Płyn do podłóg", unit: "1L" },
-  { name: "Proszek do zmywarki", unit: "1kg" },
-  { name: "Worki na śmieci", unit: "20 szt." },
-  { name: "Szampon", unit: "400ml" },
-  { name: "Mydło w kostce", unit: "100g" },
-  { name: "Pasta do zębów", unit: "75ml" },
+  { name: "Czekolada", unit: "100g" },
   { name: "Nachos", unit: "200g" },
   { name: "Krakersy", unit: "100g" },
-  { name: "Paluszki chlebowe", unit: "200g" },
-  { name: "Wafelki", unit: "150g" },
-  { name: "Wafle ryżowe", unit: "130g" },
-  { name: "Chrupki kukurydziane", unit: "100g" },
-  { name: "Orzeszki solone", unit: "200g" },
-  { name: "Pistacje", unit: "150g" },
-  { name: "Mix orzechów", unit: "200g" },
-  { name: "Biszkopty", unit: "200g" },
-  { name: "Budyń", unit: "40g" },
-  { name: "Kisiel", unit: "77g" },
-  { name: "Galaretka", unit: "75g" },
-  { name: "Pierniki", unit: "400g" },
-  { name: "Wafle", unit: "200g" },
-  { name: "Ptasie mleczko", unit: "340g" },
-  { name: "Lody na patyku", unit: "110ml" },
-  { name: "Karmelki", unit: "100g" },
-  { name: "Sos tzatziki", unit: "200g" },
-  { name: "Sos chilli", unit: "200ml" },
-  { name: "Tahini", unit: "250g" },
-  { name: "Tofu", unit: "200g" },
-  { name: "Sos Worcester", unit: "150ml" },
-  { name: "Pasta curry", unit: "100g" },
-  { name: "Zupka instant", unit: "65g" },
-  { name: "Makaron instant", unit: "70g" },
+  { name: "Granola", unit: "400g" },
+  { name: "Papier toaletowy", unit: "8 rolek" },
+  { name: "Płyn do naczyń", unit: "1L" },
+  { name: "Proszek do prania", unit: "3kg" },
+  { name: "Szampon", unit: "400ml" },
+  { name: "Pasta do zębów", unit: "75ml" },
   { name: "Tortilla wrap", unit: "8 szt." },
-  { name: "Naleśniki mrożone", unit: "400g" },
-  { name: "Placki ziemniaczane mrożone", unit: "400g" },
-  { name: "Kopytka mrożone", unit: "500g" },
-  { name: "Gołąbki mrożone", unit: "500g" },
   { name: "Red Bull", unit: "250ml" },
   { name: "Sprite", unit: "1.5L" },
   { name: "Fanta", unit: "1.5L" },
   { name: "Pepsi", unit: "1.5L" },
-  { name: "Sok multivitaminowy", unit: "1L" },
-  { name: "Syrop owocowy", unit: "400ml" },
-  { name: "Napój izotoniczny", unit: "500ml" },
-  { name: "Ser topiony", unit: "140g" },
-  { name: "Koktajl mleczny", unit: "400ml" },
   { name: "Karma dla psa", unit: "400g" },
   { name: "Karma dla kota", unit: "400g" },
-  { name: "Drożdżówka", unit: "1 szt." },
-  { name: "Pączek", unit: "1 szt." },
-  { name: "Croissant", unit: "1 szt." },
-  { name: "Chipsy paprykowe", unit: "130g" },
-  { name: "Chipsy solone", unit: "130g" },
-  { name: "Chipsy serowe", unit: "130g" },
-  { name: "Chipsy pikantne", unit: "130g" },
-  { name: "Chipsy cebulowe", unit: "130g" },
-  { name: "Chipsy tortilla", unit: "200g" },
-  { name: "Chipsy warzywne", unit: "80g" },
-  { name: "Chipsy batatowe", unit: "80g" },
-  { name: "Chipsy pełnoziarniste", unit: "130g" },
-  { name: "Chipsy pita", unit: "150g" },
-  { name: "Czekolada mleczna", unit: "100g" },
-  { name: "Czekolada biała", unit: "100g" },
-  { name: "Czekolada z orzechami", unit: "100g" },
-  { name: "Czekolada z migdałami", unit: "100g" },
-  { name: "Czekolada z rodzynkami", unit: "100g" },
-  { name: "Czekolada deserowa 70%", unit: "100g" },
-  { name: "Czekolada karmelowa", unit: "100g" },
-  { name: "Czekolada z truskawkami", unit: "100g" },
-  { name: "Czekolada bez cukru", unit: "100g" },
-  { name: "Czekolada z kokosem", unit: "100g" },
-  { name: "Baton z orzechami", unit: "50g" },
-  { name: "Baton karmelowy", unit: "50g" },
-  { name: "Baton kokosowy", unit: "50g" },
-  { name: "Baton waflowy", unit: "45g" },
-  { name: "Baton musli", unit: "40g" },
-  { name: "Baton proteinowy", unit: "60g" },
-  { name: "Baton owocowy", unit: "40g" },
-  { name: "Baton daktylowy", unit: "45g" },
-  { name: "Żelki misie", unit: "100g" },
-  { name: "Żelki kwaśne", unit: "100g" },
-  { name: "Żelki cola", unit: "100g" },
-  { name: "Cukierki krówki", unit: "100g" },
-  { name: "Cukierki miętowe", unit: "50g" },
-  { name: "Cukierki owocowe", unit: "100g" },
-  { name: "Lizaki", unit: "5 szt." },
-  { name: "Guma do żucia", unit: "17g" },
-  { name: "Landrynki", unit: "100g" },
-  { name: "Dropsy miętowe", unit: "50g" },
-  { name: "Karmelki krówkowe", unit: "100g" },
-  { name: "Ciastka maślane", unit: "150g" },
-  { name: "Ciastka owsiane", unit: "200g" },
-  { name: "Ciastka z kremem", unit: "150g" },
-  { name: "Ciastka kakaowe", unit: "150g" },
-  { name: "Ciastka kokosowe", unit: "150g" },
-  { name: "Ciastka z dżemem", unit: "200g" },
-  { name: "Ciastka zbożowe", unit: "200g" },
-  { name: "Ciastka z owocami", unit: "150g" },
-  { name: "Delicje", unit: "175g" },
-  { name: "Wafle z kremem", unit: "200g" },
-  { name: "Wafle czekoladowe", unit: "200g" },
-  { name: "Herbatniki", unit: "200g" },
-  { name: "Orzeszki ziemne", unit: "200g" },
-  { name: "Orzeszki w czekoladzie", unit: "200g" },
-  { name: "Orzeszki miodowe", unit: "150g" },
-  { name: "Orzechy laskowe", unit: "200g" },
-  { name: "Orzechy makadamia", unit: "150g" },
-  { name: "Mix bakaliów", unit: "200g" },
-  { name: "Słonecznik prażony", unit: "200g" },
-  { name: "Dynia prażona", unit: "100g" },
-  { name: "Suszone morele", unit: "200g" },
-  { name: "Suszone śliwki", unit: "200g" },
-  { name: "Suszone mango", unit: "100g" },
-  { name: "Suszone banany", unit: "100g" },
-  { name: "Suszone jabłka", unit: "100g" },
-  { name: "Suszone figi", unit: "200g" },
-  { name: "Popcorn słony", unit: "100g" },
-  { name: "Popcorn maślany", unit: "100g" },
-  { name: "Popcorn karmelowy", unit: "100g" },
-  { name: "Popcorn serowy", unit: "100g" },
-  { name: "Lody czekoladowe", unit: "500ml" },
-  { name: "Lody waniliowe", unit: "500ml" },
-  { name: "Lody truskawkowe", unit: "500ml" },
-  { name: "Lody Magnum style", unit: "110ml" },
-  { name: "Lody rożek", unit: "110ml" },
-  { name: "Sorbet owocowy", unit: "500ml" },
-  { name: "Wafle ryżowe solone", unit: "130g" },
-  { name: "Chrupki ryżowe", unit: "100g" },
-  { name: "Grissini", unit: "125g" },
-  { name: "Kabanosy", unit: "100g" },
-  { name: "Paluszki mięsne", unit: "100g" },
-  { name: "Suszone mięso wołowe", unit: "50g" },
-  { name: "Krakersy pełnoziarniste", unit: "100g" },
-  { name: "Krakersy z ziarnami", unit: "100g" },
-  { name: "Granola", unit: "400g" },
-  { name: "Precelki solone", unit: "200g" },
-  { name: "Paluszki z sezamem", unit: "200g" },
-  { name: "Chrupki zbożowe", unit: "100g" },
-  { name: "Pianka cukrowa", unit: "100g" },
-  { name: "Chałwa", unit: "200g" },
-  { name: "Nugat", unit: "100g" },
-  { name: "Muffin czekoladowy", unit: "1 szt." },
-  { name: "Brownie", unit: "1 szt." },
   // Brands
   { name: "Lay's Papryka", unit: "130g" },
   { name: "Lay's Solone", unit: "130g" },
@@ -360,29 +178,23 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Kit Kat", unit: "41g" },
   { name: "Kinder Bueno", unit: "43g" },
   { name: "Kinder czekolada", unit: "100g" },
-  { name: "Milky Way", unit: "26g" },
   { name: "Lion", unit: "42g" },
   { name: "Prince Polo", unit: "35g" },
   { name: "Milka Mleczna", unit: "100g" },
   { name: "Milka Oreo", unit: "100g" },
   { name: "Milka Karmel", unit: "100g" },
-  { name: "Milka Strawberry", unit: "100g" },
-  { name: "Milka White", unit: "100g" },
   { name: "Wedel Czekolada", unit: "100g" },
   { name: "Wawel Czekolada Mleczna", unit: "100g" },
   { name: "Ferrero Rocher", unit: "3 szt." },
   { name: "Raffaello", unit: "3 szt." },
   { name: "Toblerone", unit: "100g" },
-  { name: "After Eight", unit: "200g" },
   { name: "Oreo", unit: "176g" },
   { name: "Oreo Double Stuf", unit: "157g" },
-  { name: "Delicje", unit: "175g" },
   { name: "Leibniz", unit: "200g" },
   { name: "BelVita", unit: "225g" },
   { name: "Activia jogurt", unit: "150g" },
   { name: "Actimel", unit: "100ml" },
   { name: "Danio serek", unit: "140g" },
-  { name: "Zott Monte", unit: "100g" },
   { name: "Łaciate mleko", unit: "1L" },
   { name: "President masło", unit: "200g" },
   { name: "Alpro sojowe", unit: "1L" },
@@ -390,18 +202,15 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Coca-Cola", unit: "0.5L" },
   { name: "Coca-Cola Zero", unit: "0.5L" },
   { name: "Pepsi Max", unit: "0.5L" },
-  { name: "Red Bull", unit: "250ml" },
   { name: "Monster Energy", unit: "500ml" },
   { name: "Tiger Energy", unit: "250ml" },
   { name: "Tymbark sok", unit: "1L" },
   { name: "Hortex sok", unit: "1L" },
   { name: "Cisowianka", unit: "1.5L" },
   { name: "Żywiec Zdrój", unit: "1.5L" },
-  { name: "Nutella", unit: "200g" },
   { name: "Lotus Biscoff", unit: "400g" },
   { name: "Magnum Classic", unit: "110ml" },
   { name: "Magnum Almond", unit: "110ml" },
-  { name: "Cornetto", unit: "120ml" },
   { name: "Ben & Jerry's", unit: "465ml" },
   { name: "Winiary majonez", unit: "400ml" },
   { name: "Kielecki majonez", unit: "400ml" },
@@ -424,10 +233,7 @@ export default function ShoppingList({ items, setItems, onSearch }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (input.trim().length === 0) {
-      setSuggestions([]);
-      return;
-    }
+    if (input.trim().length === 0) { setSuggestions([]); return; }
     const q = input.toLowerCase();
     const matches = COMMON_PRODUCTS.filter(
       (p) =>
@@ -441,10 +247,7 @@ export default function ShoppingList({ items, setItems, onSearch }: Props) {
     const name = product?.name ?? input.trim();
     if (!name) return;
     if (items.find((i) => i.name.toLowerCase() === name.toLowerCase())) return;
-    // Try to find a matching unit from the product list even for manual entries
-    const matched = COMMON_PRODUCTS.find(
-      (p) => p.name.toLowerCase() === name.toLowerCase()
-    );
+    const matched = COMMON_PRODUCTS.find((p) => p.name.toLowerCase() === name.toLowerCase());
     const unit = product?.unit ?? matched?.unit ?? "";
     setItems([...items, { id: crypto.randomUUID(), name, unit }]);
     setInput("");
@@ -462,84 +265,108 @@ export default function ShoppingList({ items, setItems, onSearch }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-5 mb-4">
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">
-        Twoja lista
-      </h2>
-
-      <div className="relative mb-4">
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors"
-            placeholder="Np. mleko, chleb, jajka..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKey}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setTimeout(() => setFocused(false), 150)}
-            autoComplete="off"
-          />
-          <button
-            onClick={() => addItem()}
-            className="bg-green-500 hover:bg-green-600 text-white rounded-xl px-4 py-3 text-xl font-bold transition-colors"
-          >
-            +
-          </button>
+    <div className="bg-white rounded-2xl shadow-sm overflow-visible mb-4">
+      <div className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
+            Twoja lista
+          </h2>
+          {items.length > 1 && (
+            <button
+              onClick={() => setItems([])}
+              className="text-xs text-gray-300 hover:text-red-400 transition-colors"
+            >
+              Wyczyść
+            </button>
+          )}
         </div>
 
-        {focused && suggestions.length > 0 && (
-          <ul className="absolute left-0 right-10 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-10 overflow-hidden">
-            {suggestions.map((s) => (
+        {/* Input */}
+        <div className="relative mb-3">
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors"
+              placeholder="Np. mleko, chleb, Lay's..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setTimeout(() => setFocused(false), 150)}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+            />
+            <button
+              onClick={() => addItem()}
+              className="bg-green-500 hover:bg-green-600 active:bg-green-700 active:scale-95 text-white rounded-xl px-4 py-3 text-xl font-bold transition-all"
+            >
+              +
+            </button>
+          </div>
+
+          {focused && suggestions.length > 0 && (
+            <ul className="absolute left-0 right-10 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl z-20 overflow-hidden">
+              {suggestions.map((s) => (
+                <li
+                  key={s.name}
+                  onMouseDown={() => addItem(s)}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-green-50 active:bg-green-100 cursor-pointer border-b border-gray-50 last:border-0 transition-colors"
+                >
+                  <span className="text-gray-800 text-sm font-medium">{s.name}</span>
+                  <span className="text-gray-400 text-xs">{s.unit}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Empty state */}
+        {items.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-2xl mb-2">🛒</p>
+            <p className="text-gray-400 text-sm">Dodaj produkty, żeby porównać ceny</p>
+            <p className="text-gray-300 text-xs mt-1">Wpisz nazwę lub wklej przepis powyżej</p>
+          </div>
+        )}
+
+        {/* Items */}
+        {items.length > 0 && (
+          <ul className="space-y-1.5">
+            {items.map((item, idx) => (
               <li
-                key={s.name}
-                onMouseDown={() => addItem(s)}
-                className="flex items-center justify-between px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors"
+                key={item.id}
+                className="flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-xl px-4 py-3 transition-colors group animate-slide-up"
+                style={{ animationDelay: `${idx * 30}ms` }}
               >
-                <span className="text-gray-800 text-sm">{s.name}</span>
-                <span className="text-gray-400 text-xs ml-2">{s.unit}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                  <span className="text-gray-800 text-sm font-medium truncate">{item.name}</span>
+                  {item.unit && (
+                    <span className="text-gray-400 text-xs shrink-0">{item.unit}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => removeItem(item.id)}
+                  className="text-gray-300 hover:text-red-400 active:text-red-600 transition-colors text-lg leading-none ml-3 shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                >
+                  ×
+                </button>
               </li>
             ))}
           </ul>
         )}
-      </div>
 
-      {items.length === 0 && (
-        <p className="text-gray-400 text-sm text-center py-4">
-          Dodaj produkty, żeby porównać ceny
-        </p>
-      )}
-
-      <ul className="space-y-2 mb-4">
-        {items.map((item) => (
-          <li
-            key={item.id}
-            className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3"
+        {/* Compare button — shown inline only when there are results already (re-compare) */}
+        {items.length > 0 && (
+          <button
+            onClick={onSearch}
+            className="w-full mt-4 bg-gray-900 hover:bg-gray-800 active:bg-black active:scale-[0.99] text-white font-semibold rounded-xl py-3.5 transition-all text-sm"
           >
-            <div>
-              <span className="text-gray-800 text-sm">{item.name}</span>
-              {item.unit && (
-                <span className="text-gray-400 text-xs ml-2">{item.unit}</span>
-              )}
-            </div>
-            <button
-              onClick={() => removeItem(item.id)}
-              className="text-gray-300 hover:text-red-400 transition-colors text-lg leading-none"
-            >
-              ×
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      {items.length > 0 && (
-        <button
-          onClick={onSearch}
-          className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold rounded-xl py-4 transition-colors text-base"
-        >
-          Porównaj ceny →
-        </button>
-      )}
+            Zaktualizuj wyniki →
+          </button>
+        )}
+      </div>
     </div>
   );
 }

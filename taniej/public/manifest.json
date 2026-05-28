@@ -1,17 +1,33 @@
 {
   "name": "taniejkupuj",
   "short_name": "taniejkupuj",
-  "description": "Gdzie kupisz taniej? Sprawdź.",
+  "description": "Porównaj ceny w 7 sklepach i znajdź najtańszy koszyk zakupów w Polsce",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f5f0",
+  "orientation": "portrait-primary",
+  "background_color": "#f0f0eb",
   "theme_color": "#22c55e",
+  "categories": ["shopping", "utilities"],
+  "lang": "pl",
   "icons": [
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Porównaj koszyk",
+      "url": "/",
+      "description": "Porównaj ceny produktów"
     }
   ]
 }

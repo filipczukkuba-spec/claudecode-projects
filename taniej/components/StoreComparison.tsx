@@ -186,7 +186,7 @@ export default function StoreComparison({ items }: Props) {
         return (
           <div
             key={store.name}
-            className={`bg-white rounded-2xl shadow-sm border ${isCheapest ? style.border : "border-transparent"} overflow-hidden`}
+            className={`bg-white rounded-2xl shadow-sm border animate-slide-up ${isCheapest ? style.border : "border-transparent"} overflow-hidden`}
           >
             <button
               className="w-full flex items-center justify-between p-5 text-left"
