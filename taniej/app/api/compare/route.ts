@@ -15,7 +15,7 @@ async function searchLidl(query: string): Promise<number | null> {
     const run = await client.actor("studio-amba/lidl-scraper").call({
       searchQuery: query,
       country: "PL",
-      sort: "relevance",
+      sort: "relevancy",
       maxResults: 5,
     });
 
