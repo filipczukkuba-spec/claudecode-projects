@@ -179,8 +179,10 @@ export default function StoreComparison({ items }: Props) {
               className="w-full flex items-center justify-between p-5 text-left"
               onClick={() => setExpanded((e) => ({ ...e, [store.name]: !e[store.name] }))}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{store.logo}</span>
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-xl ${style.bar} flex items-center justify-center text-white text-sm font-black shadow-sm`}>
+                  {store.name[0]}
+                </div>
                 <span className="font-semibold text-gray-800">{store.name}</span>
                 {isCheapest && results.length > 1 && (
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${style.tag}`}>
