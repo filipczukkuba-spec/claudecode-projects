@@ -1,35 +1,53 @@
-import { ApifyClient } from "apify-client";
 import { NextRequest, NextResponse } from "next/server";
 
-export const maxDuration = 120;
-
-const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
+export const maxDuration = 60;
 
 interface RequestItem {
   name: string;
   unit: string;
 }
 
+interface LidlProduct {
+  name: string;
+  price: number;
+  currency: string;
+  category: string;
+}
+
 async function searchLidl(query: string): Promise<number | null> {
   try {
-    const run = await client.actor("studio-amba/lidl-scraper").call({
-      searchQuery: query,
-      country: "PL",
-      sort: "relevancy",
-      maxResults: 5,
+    const url = `https://www.lidl.pl/q/api/search?assortment=PL&locale=pl_PL&version=v2.0.0&offset=0&limit=10&sort=relevancy&query=${encodeURIComponent(query)}`;
+
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+        "Accept-Language": "pl-PL,pl;q=0.9",
+        "Referer": "https://www.lidl.pl/",
+      },
+      next: { revalidate: 3600 },
     });
 
-    const { items } = await client.dataset(run.defaultDatasetId).listItems();
-    console.log(`[Lidl] query="${query}" items=${items?.length ?? 0}`, JSON.stringify(items?.[0] ?? {}));
+    if (!res.ok) {
+      console.error(`[Lidl] HTTP ${res.status} for "${query}"`);
+      return null;
+    }
 
-    if (!items || items.length === 0) return null;
+    const data = await res.json();
+    console.log(`[Lidl] "${query}" → total=${data.pagination?.total}, first="${data.results?.[0]?.name}"`);
 
-    const prices = items
-      .map((item: Record<string, unknown>) => {
-        const price = item.price ?? item.currentPrice ?? item.regularPrice ?? item.normalPrice;
-        return typeof price === "number" ? price : null;
-      })
-      .filter((p): p is number => p !== null);
+    const results: LidlProduct[] = data.results ?? [];
+    if (results.length === 0) return null;
+
+    // Filter to food/grocery category — skip clothes, electronics etc.
+    const foodCategories = ["spożywcze", "owoce", "warzywa", "nabiał", "pieczywo", "napoje", "mięso", "ryby", "słodycze", "przekąski", "kawa", "herbata", "oleje", "przyprawy", "chemia", "higiena"];
+    const foodResults = results.filter((r) => {
+      const cat = (r.category ?? "").toLowerCase();
+      return foodCategories.some((fc) => cat.includes(fc));
+    });
+
+    const pool = foodResults.length > 0 ? foodResults : results;
+    const prices = pool.map((r) => r.price).filter((p): p is number => typeof p === "number" && p > 0);
 
     if (prices.length === 0) return null;
     return Math.min(...prices);
@@ -46,10 +64,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No items provided" }, { status: 400 });
   }
 
-  // Search all items in parallel
-  const lidlPrices = await Promise.all(
-    items.map((item) => searchLidl(item.name))
-  );
+  const lidlPrices = await Promise.all(items.map((item) => searchLidl(item.name)));
 
   const results = [
     {

@@ -111,9 +111,13 @@ export default function ShoppingList({ items, setItems, onSearch }: Props) {
 
   function addItem(product?: Product) {
     const name = product?.name ?? input.trim();
-    const unit = product?.unit ?? "";
     if (!name) return;
     if (items.find((i) => i.name.toLowerCase() === name.toLowerCase())) return;
+    // Try to find a matching unit from the product list even for manual entries
+    const matched = COMMON_PRODUCTS.find(
+      (p) => p.name.toLowerCase() === name.toLowerCase()
+    );
+    const unit = product?.unit ?? matched?.unit ?? "";
     setItems([...items, { id: crypto.randomUUID(), name, unit }]);
     setInput("");
     setSuggestions([]);
