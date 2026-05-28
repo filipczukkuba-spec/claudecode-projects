@@ -223,10 +223,9 @@ const COMMON_PRODUCTS: Product[] = [
 interface Props {
   items: Item[];
   setItems: (items: Item[]) => void;
-  onSearch: () => void;
 }
 
-export default function ShoppingList({ items, setItems, onSearch }: Props) {
+export default function ShoppingList({ items, setItems }: Props) {
   const [input, setInput] = useState("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [focused, setFocused] = useState(false);

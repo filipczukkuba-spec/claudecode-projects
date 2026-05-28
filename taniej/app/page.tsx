@@ -109,7 +109,7 @@ export default function Home() {
         <RecipeInput items={items} setItems={setItems} />
 
         {/* ── Shopping list ── */}
-        <ShoppingList items={items} setItems={setItems} onSearch={handleSearch} />
+        <ShoppingList items={items} setItems={setItems} />
 
         {/* ── Results ── */}
         {searched && items.length > 0 && (

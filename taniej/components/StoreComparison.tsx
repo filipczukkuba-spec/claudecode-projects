@@ -108,7 +108,16 @@ export default function StoreComparison({ items }: Props) {
     );
   }
 
-  if (results.length === 0) return null;
+  if (results.length === 0) return (
+    <div className="bg-white rounded-2xl shadow-sm p-8 text-center animate-slide-up">
+      <p className="text-3xl mb-3">😕</p>
+      <p className="text-gray-700 font-semibold text-sm">Brak wyników</p>
+      <p className="text-gray-400 text-xs mt-1.5 leading-relaxed">
+        Nie znaleźliśmy cen tych produktów w bazie.<br />
+        Spróbuj użyć prostszych nazw (np. &quot;chipsy&quot; zamiast &quot;Lay&apos;s Max&quot;).
+      </p>
+    </div>
+  );
 
   const cheapest = results[0];
   const mostExpensive = results[results.length - 1];
