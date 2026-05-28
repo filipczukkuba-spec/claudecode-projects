@@ -31,6 +31,10 @@ const STORE_STYLE: Record<string, { border: string; tag: string; bar: string; te
 
 const DEFAULT_STYLE = { border: "border-gray-200", tag: "bg-gray-50 text-gray-700", bar: "bg-gray-400", text: "text-gray-600" };
 
+function fmt(n: number) {
+  return n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function effectivePrice(p: PriceRow): number | null {
   if (p.promo_price !== null) return p.promo_price;
   return p.price;
@@ -139,10 +143,10 @@ export default function StoreComparison({ items }: Props) {
             <div>
               <p className="text-2xl font-bold">{cheapest.name}</p>
               <p className="text-green-100 text-sm mt-0.5">
-                Oszczędzasz {savings.toFixed(2)} zł ({savingsPct}%) vs najdroższy
+                Oszczędzasz {fmt(savings)} zł ({savingsPct}%) vs najdroższy
               </p>
             </div>
-            <p className="text-3xl font-bold">{cheapest.total} zł</p>
+            <p className="text-3xl font-bold">{fmt(cheapest.total)} zł</p>
           </div>
         </div>
       )}
@@ -173,7 +177,7 @@ export default function StoreComparison({ items }: Props) {
                     </span>
                   )}
                   <span className={`text-xs font-bold ${i === 0 ? "text-green-600" : "text-gray-500"}`}>
-                    {store.total} zł
+                    {fmt(store.total)} zł
                   </span>
                 </div>
               </div>
@@ -213,7 +217,7 @@ export default function StoreComparison({ items }: Props) {
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <p className="font-bold text-lg text-gray-900">{store.total} zł</p>
+                  <p className="font-bold text-lg text-gray-900">{fmt(store.total)} zł</p>
                   {!isCheapest && results.length > 1 && (
                     <p className="text-xs text-red-400 font-medium">+{diffPct}% drożej</p>
                   )}
@@ -244,11 +248,11 @@ export default function StoreComparison({ items }: Props) {
                           <div className="flex items-center gap-1.5">
                             {hasPromo && p.price !== null && (
                               <span className="text-xs text-gray-300 line-through">
-                                {p.price.toFixed(2)}
+                                {fmt(p.price)}
                               </span>
                             )}
                             <span className={`font-medium ${hasPromo ? "text-orange-600" : isCheapestItem ? "text-green-600" : "text-gray-500"}`}>
-                              {ep.toFixed(2)} zł
+                              {fmt(ep)} zł
                             </span>
                           </div>
                         ) : (

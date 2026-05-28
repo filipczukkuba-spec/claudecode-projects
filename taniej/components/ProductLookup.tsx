@@ -15,6 +15,10 @@ const DEFAULT_STYLE = { bar: "bg-gray-400" };
 
 interface StorePrice { name: string; logo: string; price: number | null; promo_price: number | null; promo_label: string | null }
 
+function fmt(n: number) {
+  return n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function effectivePrice(p: StorePrice) {
   return p.promo_price ?? p.price;
 }
@@ -121,10 +125,10 @@ export default function ProductLookup() {
                       {ep !== null ? (
                         <div className="flex items-center gap-1 w-20 justify-end shrink-0">
                           {hasPromo && store.price !== null && (
-                            <span className="text-xs text-gray-300 line-through">{store.price.toFixed(2)}</span>
+                            <span className="text-xs text-gray-300 line-through">{fmt(store.price)}</span>
                           )}
                           <span className={`text-xs font-bold ${hasPromo ? "text-orange-600" : isCheapest ? "text-green-600" : "text-gray-500"}`}>
-                            {ep.toFixed(2)} zł{isCheapest && !hasPromo && " ✓"}
+                            {fmt(ep)} zł{isCheapest && !hasPromo && " ✓"}
                           </span>
                           {hasPromo && (
                             <span className="text-xs bg-orange-100 text-orange-600 font-bold px-1 rounded">
@@ -142,7 +146,7 @@ export default function ProductLookup() {
               {cheapest && (
                 <p className="text-xs font-medium mt-3 text-center">
                   <span className={cheapest.promo_price !== null ? "text-orange-600" : "text-green-600"}>
-                    Najtaniej w {cheapest.name} — {effectivePrice(cheapest)?.toFixed(2)} zł
+                    Najtaniej w {cheapest.name} — {fmt(effectivePrice(cheapest)!)} zł
                     {cheapest.promo_price !== null && ` (${cheapest.promo_label ?? "PROMO"})`}
                   </span>
                 </p>
