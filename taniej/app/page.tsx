@@ -78,7 +78,7 @@ export default function Home() {
             <div className="flex gap-3 mt-6">
               {[
                 { value: "7", label: "sklepów" },
-                { value: "140+", label: "produktów" },
+                { value: "400+", label: "produktów" },
                 { value: "0 zł", label: "za darmo" },
               ].map((s) => (
                 <div key={s.label} className="bg-white/20 rounded-2xl px-4 py-2.5 text-center flex-1">
