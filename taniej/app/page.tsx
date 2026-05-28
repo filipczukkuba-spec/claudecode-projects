@@ -56,7 +56,7 @@ export default function Home() {
           <div className="relative">
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-5xl font-black tracking-tight leading-none">taniej.</h1>
+                <h1 className="text-5xl font-black tracking-tight leading-none">taniejkupuj.</h1>
                 <p className="text-green-100 text-base font-medium mt-2">
                   Najtańszy koszyk zakupów w Polsce
                 </p>
@@ -130,7 +130,7 @@ export default function Home() {
         {searched && items.length > 0 && <StoreComparison items={items} />}
 
         <p className="text-center text-xs text-gray-300 mt-10">
-          taniej. · porównywarka cen w polskich sklepach
+          taniejkupuj. · porównywarka cen w polskich sklepach
         </p>
       </div>
     </main>
