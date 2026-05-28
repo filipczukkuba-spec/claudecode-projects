@@ -5,6 +5,7 @@ import ShoppingList from "@/components/ShoppingList";
 import StoreComparison from "@/components/StoreComparison";
 import RecipeInput from "@/components/RecipeInput";
 import ProductLookup from "@/components/ProductLookup";
+import InstallBanner from "@/components/InstallBanner";
 import { Item } from "@/types";
 
 const STORES = [
@@ -48,11 +49,12 @@ export default function Home() {
     setSearched(true);
     setTimeout(() => {
       document.getElementById("wyniki")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
+    }, 350);
   }
 
   return (
     <main className="min-h-screen bg-[#f0f0eb] font-sans">
+      <InstallBanner />
       <div className="max-w-md mx-auto px-4 pt-6 pb-36">
 
         {/* ── App Header ── */}
