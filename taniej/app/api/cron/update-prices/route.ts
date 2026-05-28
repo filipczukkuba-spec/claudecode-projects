@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import Anthropic from "@anthropic-ai/sdk";
 
 export const maxDuration = 60;
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const STORE_PAGES: { store: string; url: string }[] = [
   { store: "Biedronka", url: "https://www.biedronka.pl/pl/oferta-tygodnia" },
@@ -91,6 +88,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Load all products + stores from DB
+  const Anthropic = (await import("@anthropic-ai/sdk")).default;
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
   const [{ data: products }, { data: stores }] = await Promise.all([
     supabase.from("products").select("id, name"),
     supabase.from("stores").select("id, name"),
