@@ -336,8 +336,7 @@ export default function ShoppingList({ items, setItems, onSearch }: Props) {
             {items.map((item, idx) => (
               <li
                 key={item.id}
-                className="flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-xl px-4 py-3 transition-colors animate-slide-up"
-                style={{ animationDelay: `${idx * 30}ms` }}
+                className="flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-xl px-4 py-2.5 transition-colors animate-slide-up"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
@@ -348,7 +347,8 @@ export default function ShoppingList({ items, setItems, onSearch }: Props) {
                 </div>
                 <button
                   onClick={() => removeItem(item.id)}
-                  className="text-gray-300 hover:text-red-400 active:text-red-600 transition-colors text-lg leading-none ml-3 shrink-0"
+                  className="text-gray-300 hover:text-red-400 active:text-red-600 active:scale-90 transition-all text-xl ml-2 shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl"
+                  aria-label="Usuń"
                 >
                   ×
                 </button>
