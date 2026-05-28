@@ -7,6 +7,8 @@ interface PriceRow {
   item: string;
   unit: string;
   price: number | null;
+  promo_price: number | null;
+  promo_label: string | null;
 }
 
 interface StoreResult {
@@ -28,6 +30,11 @@ const STORE_STYLE: Record<string, { border: string; tag: string; bar: string; te
 };
 
 const DEFAULT_STYLE = { border: "border-gray-200", tag: "bg-gray-50 text-gray-700", bar: "bg-gray-400", text: "text-gray-600" };
+
+function effectivePrice(p: PriceRow): number | null {
+  if (p.promo_price !== null) return p.promo_price;
+  return p.price;
+}
 
 interface Props { items: Item[] }
 
@@ -52,15 +59,14 @@ export default function StoreComparison({ items }: Props) {
 
         const processed: StoreResult[] = data.results.map(
           (store: { name: string; logo: string; prices: PriceRow[] }) => {
-            const found = store.prices.filter((p) => p.price !== null).length;
-            const total = store.prices.reduce((sum, p) => sum + (p.price ?? 0), 0);
+            const found = store.prices.filter((p) => effectivePrice(p) !== null).length;
+            const total = store.prices.reduce((sum, p) => sum + (effectivePrice(p) ?? 0), 0);
             return { ...store, total: parseFloat(total.toFixed(2)), found };
           }
         );
 
         processed.sort((a, b) => a.total - b.total);
 
-        // auto-expand the cheapest store
         if (processed.length > 0) {
           setExpanded({ [processed[0].name]: true });
         }
@@ -99,13 +105,13 @@ export default function StoreComparison({ items }: Props) {
     ? ((savings / mostExpensive.total) * 100).toFixed(0)
     : "0";
 
-  // cheapest price per item across all stores
   const cheapestPerItem: Record<string, number> = {};
   for (const store of results) {
     for (const p of store.prices) {
-      if (p.price !== null) {
-        if (cheapestPerItem[p.item] === undefined || p.price < cheapestPerItem[p.item]) {
-          cheapestPerItem[p.item] = p.price;
+      const ep = effectivePrice(p);
+      if (ep !== null) {
+        if (cheapestPerItem[p.item] === undefined || ep < cheapestPerItem[p.item]) {
+          cheapestPerItem[p.item] = ep;
         }
       }
     }
@@ -142,6 +148,7 @@ export default function StoreComparison({ items }: Props) {
           {results.map((store, i) => {
             const style = STORE_STYLE[store.name] ?? DEFAULT_STYLE;
             const widthPct = maxTotal > 0 ? (store.total / maxTotal) * 100 : 0;
+            const hasPromos = store.prices.some(p => p.promo_price !== null);
             return (
               <div key={store.name} className="flex items-center gap-3">
                 <span className="text-xs text-gray-500 w-20 shrink-0 truncate">{store.name}</span>
@@ -151,9 +158,16 @@ export default function StoreComparison({ items }: Props) {
                     style={{ width: `${widthPct}%` }}
                   />
                 </div>
-                <span className={`text-xs font-bold w-16 text-right shrink-0 ${i === 0 ? "text-green-600" : "text-gray-500"}`}>
-                  {store.total} zł
-                </span>
+                <div className="flex items-center gap-1.5 w-20 justify-end shrink-0">
+                  {hasPromos && (
+                    <span className="text-xs bg-orange-100 text-orange-600 font-bold px-1 py-0.5 rounded">
+                      PROMO
+                    </span>
+                  )}
+                  <span className={`text-xs font-bold ${i === 0 ? "text-green-600" : "text-gray-500"}`}>
+                    {store.total} zł
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -174,7 +188,6 @@ export default function StoreComparison({ items }: Props) {
             key={store.name}
             className={`bg-white rounded-2xl shadow-sm border ${isCheapest ? style.border : "border-transparent"} overflow-hidden`}
           >
-            {/* Card header — always visible, tap to expand */}
             <button
               className="w-full flex items-center justify-between p-5 text-left"
               onClick={() => setExpanded((e) => ({ ...e, [store.name]: !e[store.name] }))}
@@ -201,22 +214,35 @@ export default function StoreComparison({ items }: Props) {
               </div>
             </button>
 
-            {/* Expandable item list */}
             {isOpen && (
               <div className="px-5 pb-4 border-t border-gray-50">
                 <div className="space-y-1.5 mt-3">
                   {store.prices.map((p) => {
-                    const isCheapestItem = p.price !== null && p.price === cheapestPerItem[p.item];
+                    const ep = effectivePrice(p);
+                    const isCheapestItem = ep !== null && ep === cheapestPerItem[p.item];
+                    const hasPromo = p.promo_price !== null;
                     return (
-                      <div key={p.item} className="flex justify-between text-sm">
-                        <div className="text-gray-600">
+                      <div key={p.item} className="flex justify-between items-center text-sm">
+                        <div className="text-gray-600 flex items-center gap-1.5">
                           <span>{p.item}</span>
-                          {p.unit && <span className="text-gray-300 text-xs ml-1">({p.unit})</span>}
+                          {p.unit && <span className="text-gray-300 text-xs">({p.unit})</span>}
+                          {hasPromo && (
+                            <span className="text-xs bg-orange-100 text-orange-600 font-bold px-1.5 py-0.5 rounded-full">
+                              {p.promo_label ?? "PROMO"}
+                            </span>
+                          )}
                         </div>
-                        {p.price !== null ? (
-                          <span className={`font-medium ${isCheapestItem ? "text-green-600" : "text-gray-500"}`}>
-                            {p.price.toFixed(2)} zł
-                          </span>
+                        {ep !== null ? (
+                          <div className="flex items-center gap-1.5">
+                            {hasPromo && p.price !== null && (
+                              <span className="text-xs text-gray-300 line-through">
+                                {p.price.toFixed(2)}
+                              </span>
+                            )}
+                            <span className={`font-medium ${hasPromo ? "text-orange-600" : isCheapestItem ? "text-green-600" : "text-gray-500"}`}>
+                              {ep.toFixed(2)} zł
+                            </span>
+                          </div>
                         ) : (
                           <span className="text-gray-300 text-xs">brak danych</span>
                         )}
@@ -236,7 +262,7 @@ export default function StoreComparison({ items }: Props) {
       })}
 
       <p className="text-center text-xs text-gray-400 py-2">
-        Przybliżone ceny • aktualizowane regularnie
+        Ceny aktualizowane regularnie • Promocje oznaczone osobno
       </p>
     </div>
   );
