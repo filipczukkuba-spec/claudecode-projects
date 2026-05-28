@@ -24,9 +24,14 @@ export async function POST(req: NextRequest) {
 
   if (prodError) return NextResponse.json({ error: prodError.message }, { status: 500 });
 
+  console.log("[DB] all products:", products?.map(p => p.name));
+  console.log("[DB] searching for:", itemNames);
+
   const matchedProducts = products!.filter((p) =>
     itemNames.some((n) => p.name.toLowerCase().includes(n) || n.includes(p.name.toLowerCase()))
   );
+
+  console.log("[DB] matched:", matchedProducts.map(p => p.name));
 
   const matchedIds = matchedProducts.map((p) => p.id);
 
@@ -37,6 +42,8 @@ export async function POST(req: NextRequest) {
     .in("product_id", matchedIds.length > 0 ? matchedIds : [-1]);
 
   if (priceError) return NextResponse.json({ error: priceError.message }, { status: 500 });
+
+  console.log("[DB] prices rows:", prices?.length, JSON.stringify(prices?.[0]));
 
   // Group by store
   const storeMap: Record<number, { name: string; logo: string; prices: { item: string; unit: string; price: number | null }[] }> = {};
