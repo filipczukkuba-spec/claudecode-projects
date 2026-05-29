@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     await Promise.all([
       supabase.from("products").select("id, name, unit").order("name"),
       supabase.from("stores").select("id, name").order("name"),
-      supabase.from("prices").select("product_id, store_id, price, app_price"),
+      supabase.from("prices").select("product_id, store_id, price, app_price").limit(10000),
     ]);
 
   if (pe) return NextResponse.json({ error: pe.message }, { status: 500 });
