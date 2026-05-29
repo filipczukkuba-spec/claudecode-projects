@@ -106,7 +106,8 @@
       "WebFetch(domain:zakupy.biedronka.pl)",
       "Bash(npm install *)",
       "Bash(git commit *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(curl *)"
     ]
   }
 }
