@@ -87,7 +87,7 @@ function ReportModal({ item, storeName, productId, storeId, currentPrice, onClos
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 z-[200] flex items-end justify-center" onClick={onClose}>
       <div
         className="bg-white rounded-t-3xl w-full max-w-md p-6 pb-8"
         style={{ paddingBottom: `calc(2rem + env(safe-area-inset-bottom))` }}

@@ -5,50 +5,83 @@ import { sendEmail } from "@/lib/email";
 
 export const maxDuration = 60;
 
-// Category pages per store — more products than promo-only pages
+// Browser-like headers to avoid bot detection
+const HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xhtml+xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+};
+
+// Pages to fetch per store — start with lightweight promotion pages
 const STORE_PAGES: Record<string, string[]> = {
   Biedronka: [
+    "https://www.biedronka.pl/pl/oferta-tygodnia",
     "https://www.biedronka.pl/pl/products?category=nabia%C5%82-i-jajka",
     "https://www.biedronka.pl/pl/products?category=mi%C4%99so-i-w%C4%99dliny",
-    "https://www.biedronka.pl/pl/products?category=pieczywo",
-    "https://www.biedronka.pl/pl/products?category=napoje",
-    "https://www.biedronka.pl/pl/products?category=warzywa-i-owoce",
-    "https://www.biedronka.pl/pl/oferta-tygodnia",
   ],
   Lidl: [
+    "https://www.lidl.pl/c/oferta-tygodnia/a10007519",
     "https://www.lidl.pl/c/nabiaal-i-jajka/c600",
     "https://www.lidl.pl/c/mieso-i-wedliny/c800",
-    "https://www.lidl.pl/c/pieczywo/c700",
-    "https://www.lidl.pl/c/oferta-tygodnia/a10007519",
   ],
   Kaufland: [
-    "https://www.kaufland.pl/produkty/nabiaal-i-jajka.html",
-    "https://www.kaufland.pl/produkty/mieso-i-wedliny.html",
     "https://www.kaufland.pl/oferty/aktualne.html",
+    "https://www.kaufland.pl/produkty/nabiaal-i-jajka.html",
   ],
   Aldi: [
     "https://www.aldi.pl/oferta-tygodnia.html",
     "https://www.aldi.pl/nabiaal.html",
   ],
   Netto: [
-    "https://www.netto.pl/art-spozywcze-i-napoje/nabiaal",
     "https://www.netto.pl/gazetka-i-promocje/gazetka-tygodniowa",
+    "https://www.netto.pl/art-spozywcze-i-napoje/nabiaal",
   ],
   Auchan: [
-    "https://www.auchan.pl/pl/produkty/nabiaal-i-jajka",
     "https://www.auchan.pl/pl/promocje",
+    "https://www.auchan.pl/pl/produkty/nabiaal-i-jajka",
   ],
   Carrefour: [
-    "https://www.carrefour.pl/marka/nabiaal-i-jajka",
     "https://www.carrefour.pl/promocje",
+    "https://www.carrefour.pl/marka/nabiaal-i-jajka",
   ],
 };
 
-// Apify cheerio-scraper: fetches pages with rotating proxies, returns clean text
-async function fetchPagesViaApify(urls: string[]): Promise<{ url: string; text: string }[]> {
+async function fetchPage(url: string): Promise<string> {
+  try {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 12000);
+    const res = await fetch(url, {
+      headers: HEADERS,
+      signal: ctrl.signal,
+      redirect: "follow",
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return "";
+    const html = await res.text();
+    // Strip tags, collapse whitespace, cap at 20k chars
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+      .slice(0, 20000);
+  } catch {
+    return "";
+  }
+}
+
+// If direct fetch fails, try Apify as fallback (requires paid plan)
+async function fetchViaApify(urls: string[]): Promise<{ url: string; text: string }[]> {
   const token = process.env.APIFY_TOKEN;
   if (!token || urls.length === 0) return [];
-
   try {
     const res = await fetch(
       `https://api.apify.com/v2/acts/apify~cheerio-scraper/run-sync-get-dataset-items?token=${token}&timeout=45&memory=256`,
@@ -59,7 +92,7 @@ async function fetchPagesViaApify(urls: string[]): Promise<{ url: string; text: 
           startUrls: urls.map((url) => ({ url })),
           pageFunction: `async function pageFunction(context) {
             const { $, request } = context;
-            $('script, style, nav, footer, header, .menu, .navigation, .cookie, .banner').remove();
+            $('script, style, nav, footer, header, .menu, .navigation, .cookie').remove();
             const text = $('body').text().replace(/\\s{2,}/g, ' ').trim().slice(0, 18000);
             return { url: request.url, text };
           }`,
@@ -75,7 +108,6 @@ async function fetchPagesViaApify(urls: string[]): Promise<{ url: string; text: 
     return [];
   }
 }
-
 
 async function extractPrices(
   pageTexts: { url: string; text: string }[],
@@ -95,25 +127,24 @@ async function extractPrices(
       messages: [
         {
           role: "user",
-          content: `You are extracting grocery prices from a Polish supermarket (${storeName}).
+          content: `Extract grocery prices from Polish supermarket "${storeName}".
 
-Known products in our database:
+Known products (use exact names):
 ${knownList}
 
-Page content from ${storeName}:
+Page content:
 ${combined}
 
-Extract prices for as many known products as possible.
-Return ONLY a JSON array, no explanation:
-[{"product":"exact name from known list","price":4.99,"is_promo":false,"label":null}]
+Return ONLY a JSON array:
+[{"product":"exact name from list","price":4.99,"is_promo":false,"label":null}]
 
 Rules:
-- "product" must be the exact string from the known products list
-- "price" is a decimal number (use the lowest/sale price if multiple)
-- "is_promo" is true if it's a promotional/sale price
-- "label" is the promo label (e.g. "-20%", "2+1") or null
+- product = exact string from known list above
+- price = decimal number, use promo/sale price if shown
+- is_promo = true if promotional/sale price
+- label = promo label like "-20%", "2+1", or null
 - Skip products not in the known list
-- Return [] if nothing matches`,
+- Return [] if nothing found`,
         },
       ],
     });
@@ -147,9 +178,11 @@ export async function POST(req: NextRequest) {
   const today = new Date().toISOString().split("T")[0];
   const validUntil = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
 
-  const report: Record<string, { pages: number; extracted: number; updated: number; promos: number; error?: string }> = {};
+  const report: Record<string, {
+    pages: number; fetched: number; extracted: number;
+    updated: number; promos: number; method: string; error?: string;
+  }> = {};
 
-  // Process stores in batches of 2 to stay within 60s
   const storeEntries = Object.entries(STORE_PAGES);
 
   for (const [storeName, urls] of storeEntries) {
@@ -157,15 +190,30 @@ export async function POST(req: NextRequest) {
     if (!storeId) continue;
 
     try {
-      // Fetch pages via Apify
-      const pageTexts = await fetchPagesViaApify(urls.slice(0, 3)); // max 3 pages per store per run
+      // Try direct fetch first (free, no proxy needed)
+      let pageTexts: { url: string; text: string }[] = [];
+      let method = "direct";
+
+      const directResults = await Promise.all(
+        urls.slice(0, 2).map(async (url) => {
+          const text = await fetchPage(url);
+          return text ? { url, text } : null;
+        })
+      );
+
+      pageTexts = directResults.filter((r): r is { url: string; text: string } => r !== null && r.text.length > 500);
+
+      // Fallback to Apify if direct fetch got nothing useful
+      if (pageTexts.length === 0) {
+        method = "apify";
+        pageTexts = await fetchViaApify(urls.slice(0, 2));
+      }
 
       if (pageTexts.length === 0) {
-        report[storeName] = { pages: 0, extracted: 0, updated: 0, promos: 0, error: "fetch_failed" };
+        report[storeName] = { pages: 0, fetched: 0, extracted: 0, updated: 0, promos: 0, method, error: "fetch_failed" };
         continue;
       }
 
-      // Extract prices with Claude
       const items = await extractPrices(pageTexts, storeName, productNames);
       let updated = 0;
       let promos = 0;
@@ -197,17 +245,23 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Bulk upsert
       if (priceUpdates.length > 0) {
         await supabase.from("prices").upsert(priceUpdates, { onConflict: "product_id,store_id" });
       }
       if (promoUpdates.length > 0) {
-        await (supabase as any).from("promotions").upsert(promoUpdates, { onConflict: "store_id,product_id" });
+        await supabase.from("promotions" as any).upsert(promoUpdates, { onConflict: "store_id,product_id" });
       }
 
-      report[storeName] = { pages: pageTexts.length, extracted: items.length, updated, promos };
+      report[storeName] = {
+        pages: urls.slice(0, 2).length,
+        fetched: pageTexts.length,
+        extracted: items.length,
+        updated,
+        promos,
+        method,
+      };
     } catch (e: any) {
-      report[storeName] = { pages: 0, extracted: 0, updated: 0, promos: 0, error: e.message };
+      report[storeName] = { pages: 0, fetched: 0, extracted: 0, updated: 0, promos: 0, method: "error", error: e.message };
     }
   }
 
