@@ -223,7 +223,7 @@ export async function POST(req: NextRequest) {
           promos: promoUpdates.length,
         };
       } catch (e: any) {
-        report[storeName] = { pagesOk: 0, textChars: 0, extracted: 0, matched: 0, updated: 0, promos: 0, error: e.message };
+        report[storeName] = { pagesOk: 0, textChars: 0, textSample: "", extracted: 0, matched: 0, updated: 0, promos: 0, error: e.message };
       }
     })
   );
