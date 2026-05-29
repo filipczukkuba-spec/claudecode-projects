@@ -57,7 +57,6 @@ interface ClaudeItem {
 async function claudeExtract(
   texts: string[],
   storeName: string,
-  knownProducts: string[]
 ): Promise<ClaudeItem[]> {
   if (!process.env.ANTHROPIC_API_KEY || texts.length === 0) return [];
 
@@ -65,35 +64,35 @@ async function claudeExtract(
   const ai = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const combined = texts.join("\n\n---\n\n").slice(0, 24000);
-  const knownList = knownProducts.slice(0, 400).join(", ");
 
   try {
     const msg = await ai.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 3000,
+      max_tokens: 4000,
       messages: [
         {
           role: "user",
-          content: `You are extracting grocery prices from a Polish supermarket website (${storeName}).
+          content: `Extract ALL grocery product prices from this ${storeName} page content.
 
-The page content below was fetched from the store's website. Find all product prices.
-
-Known product names (match scraped names to these exactly):
-${knownList}
-
-Page content:
+Page content (rendered text from store website):
 ${combined}
 
-Return ONLY a JSON array. Each object must have:
-- product: exact string from the known list above (skip if no close match)
-- price: current price as decimal (use promo/sale price if available)
-- is_promo: true if it's a promotional/discounted price
-- label: promo label string like "-20%", "2+1", "Okazja tygodnia" or null
-- original_price: the original price before promo, or null
+Return a JSON array of every product+price pair you can find. Use Polish product names as shown on the page.
 
-Example: [{"product":"Mleko","price":3.49,"is_promo":false,"label":null,"original_price":null}]
+Each object:
+- product: product name as shown (Polish, e.g. "Mleko 3,2% 1L", "Pierś z kurczaka")
+- price: current price as number (e.g. 3.49) — use promo/sale price if available
+- is_promo: true if this is a promotional/sale price
+- label: promo label like "-20%", "2+1", "Okazja tygodnia", or null
+- original_price: regular price before discount as number, or null
 
-Return [] if you find no prices. Do NOT invent prices — only extract what is clearly shown.`,
+Rules:
+- Extract EVERYTHING with a clear price — do not limit to specific products
+- Prices must be in PLN (złoty), typically 0.50–500 range
+- Skip items that are clearly not grocery products (store hours, addresses, etc.)
+- Return [] if the page has no product prices (e.g. cookie consent / error page)
+
+[{"product":"Mleko 3,2% 1L","price":3.49,"is_promo":false,"label":null,"original_price":null}]`,
         },
       ],
     });
@@ -133,7 +132,7 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
 
   const report: Record<string, {
-    pagesOk: number; textChars: number;
+    pagesOk: number; textChars: number; textSample: string;
     extracted: number; matched: number;
     updated: number; promos: number; error?: string;
   }> = {};
@@ -154,13 +153,15 @@ export async function POST(req: NextRequest) {
         const pagesOk = texts.length;
         const textChars = texts.reduce((s, t) => s + t.length, 0);
 
+        const textSample = texts[0]?.slice(0, 300) ?? "";
+
         if (pagesOk === 0) {
-          report[storeName] = { pagesOk: 0, textChars: 0, extracted: 0, matched: 0, updated: 0, promos: 0, error: "all_pages_empty" };
+          report[storeName] = { pagesOk: 0, textChars: 0, textSample: "", extracted: 0, matched: 0, updated: 0, promos: 0, error: "all_pages_empty" };
           return;
         }
 
         // Claude extracts prices from the page text
-        const items = await claudeExtract(texts, storeName, productNames);
+        const items = await claudeExtract(texts, storeName);
 
         const priceUpdates: { product_id: number; store_id: number; price: number; source: string; scraped_at: string }[] = [];
         const promoUpdates: any[] = [];
@@ -215,6 +216,7 @@ export async function POST(req: NextRequest) {
         report[storeName] = {
           pagesOk,
           textChars,
+          textSample,
           extracted: items.length,
           matched: priceUpdates.length + promoUpdates.length,
           updated: priceUpdates.length,
