@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
+import { matchScore } from "@/lib/matching";
+import { sendEmail } from "@/lib/email";
 
 export const maxDuration = 60;
 
@@ -74,28 +76,6 @@ async function fetchPagesViaApify(urls: string[]): Promise<{ url: string; text: 
   }
 }
 
-function norm(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/ą/g, "a").replace(/ć/g, "c").replace(/ę/g, "e")
-    .replace(/ł/g, "l").replace(/ń/g, "n").replace(/ó/g, "o")
-    .replace(/ś/g, "s").replace(/ź/g, "z").replace(/ż/g, "z")
-    .normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function matchScore(query: string, target: string): number {
-  const q = norm(query);
-  const t = norm(target);
-  if (q === t) return 1;
-  if (t.includes(q) || q.includes(t)) return 0.9;
-  const qTokens = q.split(" ").filter(Boolean);
-  const tTokens = t.split(" ").filter(Boolean);
-  const matched = qTokens.filter((qt) => tTokens.some((tt) => tt.includes(qt) || qt.includes(tt)));
-  return matched.length / qTokens.length;
-}
 
 async function extractPrices(
   pageTexts: { url: string; text: string }[],
@@ -230,6 +210,20 @@ export async function POST(req: NextRequest) {
       report[storeName] = { pages: 0, extracted: 0, updated: 0, promos: 0, error: e.message };
     }
   }
+
+  const totalUpdated = Object.values(report).reduce((s, r) => s + r.updated + r.promos, 0);
+  const successStores = Object.entries(report).filter(([, r]) => !r.error).map(([n]) => n);
+  const failedStores = Object.entries(report).filter(([, r]) => r.error).map(([n]) => n);
+
+  await sendEmail(
+    `taniejkupuj — sync zakończony (${totalUpdated} cen)`,
+    `<h2>Sync cen zakończony</h2>
+    <p><b>Zaktualizowano:</b> ${totalUpdated} cen</p>
+    <p><b>Sklepy OK:</b> ${successStores.join(", ") || "brak"}</p>
+    ${failedStores.length > 0 ? `<p><b>Błędy:</b> ${failedStores.join(", ")}</p>` : ""}
+    <pre style="background:#f5f5f5;padding:12px;border-radius:8px;font-size:12px">${JSON.stringify(report, null, 2)}</pre>
+    <p style="color:#999;font-size:12px">taniejkupuj.pl · ${new Date().toLocaleString("pl-PL")}</p>`
+  );
 
   return NextResponse.json({ ok: true, report, ran_at: new Date().toISOString() });
 }

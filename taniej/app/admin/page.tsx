@@ -5,6 +5,8 @@ import { useState, useRef } from "react";
 interface Product { id: number; name: string; unit: string; }
 interface Store { id: number; name: string; }
 
+type EditMode = "price" | "app_price";
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -13,7 +15,10 @@ export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [priceMap, setPriceMap] = useState<Map<string, number>>(new Map());
+  const [appPriceMap, setAppPriceMap] = useState<Map<string, number>>(new Map());
   const [edits, setEdits] = useState<Map<string, number>>(new Map());
+  const [editMode, setEditMode] = useState<EditMode>("price");
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -39,13 +44,21 @@ export default function AdminPage() {
     const data = await res.json();
     setProducts(data.products ?? []);
     setStores(data.stores ?? []);
-    const map = new Map<string, number>();
+
+    const pMap = new Map<string, number>();
+    const aMap = new Map<string, number>();
     for (const p of data.prices ?? []) {
-      map.set(`${p.product_id}-${p.store_id}`, p.price);
+      if (p.price != null) pMap.set(`${p.product_id}-${p.store_id}`, p.price);
+      if (p.app_price != null) aMap.set(`${p.product_id}-${p.store_id}`, p.app_price);
     }
-    setPriceMap(map);
+    setPriceMap(pMap);
+    setAppPriceMap(aMap);
     setAuthed(true);
     setLoading(false);
+  }
+
+  function currentMap(): Map<string, number> {
+    return editMode === "price" ? priceMap : appPriceMap;
   }
 
   function handlePriceChange(productId: number, storeId: number, value: string) {
@@ -61,24 +74,36 @@ export default function AdminPage() {
   async function saveAll() {
     if (edits.size === 0) return;
     setSaving(true);
-    const updates = Array.from(edits.entries()).map(([key, price]) => {
+
+    const field = editMode === "price" ? "price" : "app_price";
+    const updates = Array.from(edits.entries()).map(([key, val]) => {
       const [product_id, store_id] = key.split("-").map(Number);
-      return { product_id, store_id, price };
+      return { product_id, store_id, [field]: val };
     });
+
     const res = await fetch("/api/admin/prices", {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token.current}`,
       },
-      body: JSON.stringify({ updates }),
+      body: JSON.stringify({ updates, field }),
     });
+
     if (res.ok) {
-      setPriceMap((prev) => {
-        const m = new Map(prev);
-        for (const [k, v] of edits) m.set(k, v);
-        return m;
-      });
+      if (editMode === "price") {
+        setPriceMap((prev) => {
+          const m = new Map(prev);
+          for (const [k, v] of edits) m.set(k, v);
+          return m;
+        });
+      } else {
+        setAppPriceMap((prev) => {
+          const m = new Map(prev);
+          for (const [k, v] of edits) m.set(k, v);
+          return m;
+        });
+      }
       setSavedCount(edits.size);
       setEdits(new Map());
       setTimeout(() => setSavedCount(0), 3000);
@@ -86,22 +111,28 @@ export default function AdminPage() {
     setSaving(false);
   }
 
+  function switchMode(mode: EditMode) {
+    if (edits.size > 0 && !confirm("Masz niezapisane zmiany. Odrzucić?")) return;
+    setEditMode(mode);
+    setEdits(new Map());
+  }
+
   async function triggerSync() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/cron/update-prices", {
+      const res = await fetch("/api/admin/sync", {
         method: "POST",
-        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET ?? token.current}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${token.current}` },
       });
       const data = await res.json();
       if (data.ok) {
-        const total = Object.values(data.report as Record<string, {updated:number;promos:number}>).reduce(
-          (sum, s) => sum + s.updated + s.promos, 0
-        );
+        const total = Object.values(
+          data.report as Record<string, { updated: number; promos: number }>
+        ).reduce((sum, s) => sum + s.updated + s.promos, 0);
         setSyncResult(`✓ Zaktualizowano ${total} cen`);
       } else {
-        setSyncResult(`Błąd: ${data.error}`);
+        setSyncResult(`Błąd: ${data.error ?? "nieznany"}`);
       }
     } catch {
       setSyncResult("Błąd połączenia");
@@ -112,6 +143,9 @@ export default function AdminPage() {
   const filtered = search
     ? products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
     : products;
+
+  // Stores that have loyalty apps (show in app_price mode)
+  const APP_STORES = ["Biedronka", "Lidl", "Kaufland"];
 
   if (!authed) {
     return (
@@ -143,18 +177,21 @@ export default function AdminPage() {
     );
   }
 
+  const activeMap = currentMap();
+
   return (
     <main className="min-h-screen bg-[#f0f0eb] p-4">
       <div className="max-w-7xl mx-auto">
+
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h1 className="text-2xl font-black text-gray-900">Panel cen</h1>
             <p className="text-gray-400 text-sm">
               {products.length} produktów · {stores.length} sklepów
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {savedCount > 0 && (
               <span className="text-green-600 text-sm font-semibold">✓ Zapisano {savedCount}</span>
             )}
@@ -180,14 +217,40 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <input
-          type="text"
-          placeholder="Szukaj produktu..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-green-500 mb-3 bg-white"
-        />
+        {/* Mode toggle + Search */}
+        <div className="flex gap-3 mb-3">
+          <div className="flex bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+            <button
+              onClick={() => switchMode("price")}
+              className={`px-4 py-2.5 text-sm font-semibold transition-colors ${
+                editMode === "price" ? "bg-green-500 text-white" : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              Ceny regularne
+            </button>
+            <button
+              onClick={() => switchMode("app_price")}
+              className={`px-4 py-2.5 text-sm font-semibold transition-colors ${
+                editMode === "app_price" ? "bg-blue-500 text-white" : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              Z aplikacją
+            </button>
+          </div>
+          <input
+            type="text"
+            placeholder="Szukaj produktu..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-sm"
+          />
+        </div>
+
+        {editMode === "app_price" && (
+          <p className="text-xs text-blue-600 mb-2 bg-blue-50 rounded-xl px-4 py-2">
+            Tryb cen z aplikacją — wypełnij ceny dla Biedronka (app), Lidl Plus, Kaufland Card
+          </p>
+        )}
 
         <p className="text-xs text-amber-600 mb-2">
           Żółte pola = niezapisane zmiany · Kliknij &quot;Zapisz&quot; żeby zatwierdzić
@@ -195,20 +258,27 @@ export default function AdminPage() {
 
         {/* Table */}
         <div className="bg-white rounded-2xl shadow-sm overflow-auto">
-          <table className="w-full text-sm" style={{ minWidth: `${180 + 48 + stores.length * 110}px` }}>
+          <table className="w-full text-sm" style={{ minWidth: `${200 + 48 + stores.length * 110}px` }}>
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-4 py-3 font-semibold text-gray-500 sticky left-0 bg-gray-50 min-w-[180px]">
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 sticky left-0 bg-gray-50 min-w-[200px]">
                   Produkt
                 </th>
-                <th className="text-left px-3 py-3 font-semibold text-gray-500 w-12 min-w-[48px]">
-                  Jedn.
-                </th>
-                {stores.map((s) => (
-                  <th key={s.id} className="text-center px-2 py-3 font-semibold text-gray-500 w-[110px]">
-                    {s.name}
-                  </th>
-                ))}
+                <th className="text-left px-3 py-3 font-semibold text-gray-500 w-12">Jedn.</th>
+                {stores.map((s) => {
+                  const isAppStore = APP_STORES.includes(s.name);
+                  return (
+                    <th key={s.id} className="text-center px-2 py-3 font-semibold text-gray-500 w-[110px]">
+                      <span>{s.name}</span>
+                      {editMode === "app_price" && isAppStore && (
+                        <span className="block text-xs text-blue-400 font-normal">z app</span>
+                      )}
+                      {editMode === "app_price" && !isAppStore && (
+                        <span className="block text-xs text-gray-300 font-normal">brak app</span>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -217,32 +287,34 @@ export default function AdminPage() {
                   key={product.id}
                   className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/40"}`}
                 >
-                  <td
-                    className={`px-4 py-2 font-medium text-gray-800 sticky left-0 ${
-                      i % 2 === 0 ? "bg-white" : "bg-gray-50/40"
-                    }`}
-                  >
+                  <td className={`px-4 py-2 font-medium text-gray-800 sticky left-0 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}>
                     {product.name}
                   </td>
                   <td className="px-3 py-2 text-gray-400 text-xs">{product.unit}</td>
                   {stores.map((store) => {
                     const key = `${product.id}-${store.id}`;
-                    const current = priceMap.get(key);
+                    const isAppStore = APP_STORES.includes(store.name);
+                    const disabled = editMode === "app_price" && !isAppStore;
+                    const current = activeMap.get(key);
                     const isDirty = edits.has(key);
                     const displayValue = isDirty ? edits.get(key) : current;
+
                     return (
                       <td key={store.id} className="px-2 py-1.5 text-center">
                         <input
                           type="number"
                           step="0.01"
                           min="0"
-                          value={displayValue ?? ""}
-                          placeholder="—"
+                          value={disabled ? "" : (displayValue ?? "")}
+                          placeholder={disabled ? "—" : "—"}
+                          disabled={disabled}
                           onChange={(e) => handlePriceChange(product.id, store.id, e.target.value)}
-                          className={`w-[90px] text-center text-sm border rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-green-500 transition-colors ${
-                            isDirty
-                              ? "border-amber-300 bg-amber-50"
-                              : "border-gray-100 bg-transparent hover:border-gray-300"
+                          className={`w-[90px] text-center text-sm border rounded-lg px-2 py-1 outline-none transition-colors ${
+                            disabled
+                              ? "bg-gray-50 border-gray-100 text-gray-200 cursor-not-allowed"
+                              : isDirty
+                              ? "border-amber-300 bg-amber-50 focus:ring-1 focus:ring-amber-400"
+                              : "border-gray-100 bg-transparent hover:border-gray-300 focus:ring-1 focus:ring-green-500"
                           }`}
                         />
                       </td>
@@ -255,7 +327,7 @@ export default function AdminPage() {
         </div>
 
         <p className="text-center text-xs text-gray-300 mt-4">
-          Showing {filtered.length} of {products.length} products
+          {filtered.length} z {products.length} produktów
         </p>
       </div>
     </main>

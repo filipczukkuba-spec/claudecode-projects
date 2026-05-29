@@ -13,14 +13,32 @@ const STORE_STYLE: Record<string, { bar: string }> = {
 };
 const DEFAULT_STYLE = { bar: "bg-gray-400" };
 
-interface StorePrice { name: string; logo: string; price: number | null; promo_price: number | null; promo_label: string | null }
+interface StorePrice {
+  name: string;
+  logo: string;
+  price: number | null;
+  app_price: number | null;
+  promo_price: number | null;
+  promo_label: string | null;
+}
 
 function fmt(n: number) {
   return n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function effectivePrice(p: StorePrice) {
-  return p.promo_price ?? p.price;
+function effectivePrice(p: StorePrice): number | null {
+  const candidates = [p.promo_price, p.app_price, p.price].filter((v): v is number => v !== null);
+  return candidates.length > 0 ? Math.min(...candidates) : null;
+}
+
+function bestLabel(p: StorePrice): { tag: string; color: string } | null {
+  if (p.promo_price !== null && (p.app_price === null || p.promo_price <= p.app_price)) {
+    return { tag: p.promo_label ?? "PROMO", color: "text-orange-600 bg-orange-100" };
+  }
+  if (p.app_price !== null) {
+    return { tag: "z aplikacją", color: "text-blue-600 bg-blue-100" };
+  }
+  return null;
 }
 
 export default function ProductLookup() {
@@ -51,10 +69,11 @@ export default function ProductLookup() {
           name: s.name,
           logo: s.logo,
           price: s.prices[0]?.price ?? null,
+          app_price: s.prices[0]?.app_price ?? null,
           promo_price: s.prices[0]?.promo_price ?? null,
           promo_label: s.prices[0]?.promo_label ?? null,
         }));
-        prices.sort((a, b) => (effectivePrice(a) ?? 999) - (effectivePrice(b) ?? 999));
+        prices.sort((a, b) => (effectivePrice(a) ?? 9999) - (effectivePrice(b) ?? 9999));
         setProductName(data.results[0]?.prices[0]?.item || q);
         setResults(prices);
       } else {
@@ -85,7 +104,7 @@ export default function ProductLookup() {
         <div className="px-5 pb-5 border-t border-gray-50">
           <input
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors mt-4"
-            placeholder="Np. Lay's Papryka, Milka, Coca-Cola..."
+            placeholder="Np. mleko, Lay's, Coca-Cola..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
@@ -109,7 +128,7 @@ export default function ProductLookup() {
                   const ep = effectivePrice(store);
                   const isCheapest = i === 0 && ep !== null;
                   const widthPct = ep ? (ep / maxPrice) * 100 : 0;
-                  const hasPromo = store.promo_price !== null;
+                  const label = bestLabel(store);
                   return (
                     <div key={store.name} className="flex items-center gap-3">
                       <div className={`w-7 h-7 rounded-lg ${style.bar} flex items-center justify-center text-white text-xs font-black shrink-0`}>
@@ -123,21 +142,21 @@ export default function ProductLookup() {
                         />
                       </div>
                       {ep !== null ? (
-                        <div className="flex items-center gap-1 w-20 justify-end shrink-0">
-                          {hasPromo && store.price !== null && (
+                        <div className="flex items-center gap-1 w-28 justify-end shrink-0">
+                          {store.price !== null && label && (
                             <span className="text-xs text-gray-300 line-through">{fmt(store.price)}</span>
                           )}
-                          <span className={`text-xs font-bold ${hasPromo ? "text-orange-600" : isCheapest ? "text-green-600" : "text-gray-500"}`}>
-                            {fmt(ep)} zł{isCheapest && !hasPromo && " ✓"}
+                          <span className={`text-xs font-bold ${label ? (label.tag === "z aplikacją" ? "text-blue-600" : "text-orange-600") : isCheapest ? "text-green-600" : "text-gray-500"}`}>
+                            {fmt(ep)} zł{isCheapest && !label && " ✓"}
                           </span>
-                          {hasPromo && (
-                            <span className="text-xs bg-orange-100 text-orange-600 font-bold px-1 rounded">
-                              {store.promo_label ?? "PROMO"}
+                          {label && (
+                            <span className={`text-xs font-bold px-1 rounded ${label.color}`}>
+                              {label.tag}
                             </span>
                           )}
                         </div>
                       ) : (
-                        <span className="text-xs text-gray-300 w-20 text-right shrink-0">brak</span>
+                        <span className="text-xs text-gray-300 w-28 text-right shrink-0">brak</span>
                       )}
                     </div>
                   );
@@ -145,9 +164,10 @@ export default function ProductLookup() {
               </div>
               {cheapest && (
                 <p className="text-xs font-medium mt-3 text-center">
-                  <span className={cheapest.promo_price !== null ? "text-orange-600" : "text-green-600"}>
+                  <span className={cheapest.promo_price !== null ? "text-orange-600" : cheapest.app_price !== null ? "text-blue-600" : "text-green-600"}>
                     Najtaniej w {cheapest.name} — {fmt(effectivePrice(cheapest)!)} zł
                     {cheapest.promo_price !== null && ` (${cheapest.promo_label ?? "PROMO"})`}
+                    {cheapest.app_price !== null && cheapest.promo_price === null && " (z aplikacją)"}
                   </span>
                 </p>
               )}

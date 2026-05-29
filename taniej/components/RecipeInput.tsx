@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Item } from "@/types";
+import { norm } from "@/lib/matching";
 
 const COMMON_PRODUCTS = [
   { name: "Mleko", unit: "1L" }, { name: "Chleb", unit: "1 bochenek" },
@@ -56,11 +57,12 @@ export default function RecipeInput({ items, setItems }: Props) {
         if (items.find((i) => i.name.toLowerCase() === ingredient.toLowerCase())) continue;
         if (newItems.find((i) => i.name.toLowerCase() === ingredient.toLowerCase())) continue;
 
+        const ni = norm(ingredient);
         const matched = COMMON_PRODUCTS.find(
-          (p) =>
-            p.name.toLowerCase() === ingredient.toLowerCase() ||
-            ingredient.toLowerCase().includes(p.name.toLowerCase()) ||
-            p.name.toLowerCase().includes(ingredient.toLowerCase())
+          (p) => {
+            const np = norm(p.name);
+            return np === ni || ni.includes(np) || np.includes(ni);
+          }
         );
 
         newItems.push({ id: crypto.randomUUID(), name: matched?.name ?? ingredient, unit: matched?.unit ?? "" });

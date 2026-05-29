@@ -105,7 +105,8 @@
       "WebFetch(domain:www.frisco.pl)",
       "WebFetch(domain:zakupy.biedronka.pl)",
       "Bash(npm install *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(npm run *)"
     ]
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Item } from "@/types";
+import { norm } from "@/lib/matching";
 
 interface Product {
   name: string;
@@ -233,12 +234,19 @@ export default function ShoppingList({ items, setItems }: Props) {
 
   useEffect(() => {
     if (input.trim().length === 0) { setSuggestions([]); return; }
-    const q = input.toLowerCase();
+    const q = norm(input);
     const matches = COMMON_PRODUCTS.filter(
       (p) =>
-        p.name.toLowerCase().startsWith(q) &&
+        (norm(p.name).startsWith(q) || norm(p.name).includes(q)) &&
         !items.find((i) => i.name.toLowerCase() === p.name.toLowerCase())
-    ).slice(0, 6);
+    )
+      .sort((a, b) => {
+        const an = norm(a.name), bn = norm(b.name);
+        const aStarts = an.startsWith(q) ? 0 : 1;
+        const bStarts = bn.startsWith(q) ? 0 : 1;
+        return aStarts - bStarts;
+      })
+      .slice(0, 6);
     setSuggestions(matches);
   }, [input, items]);
 
