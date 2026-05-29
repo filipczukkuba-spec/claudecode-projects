@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 import { matchScore, MATCH_THRESHOLD } from "@/lib/matching";
 
 export const maxDuration = 10;
@@ -41,8 +42,9 @@ export async function POST(req: NextRequest) {
   const promoMap = new Map<string, { promo_price: number; promo_label: string | null }>();
   if (matchedIds.length > 0) {
     const today = new Date().toISOString().split("T")[0];
-    const { data: promoData } = await (supabase as any)
-      .from("promotions")
+    const admin = createAdminClient();
+    const { data: promoData } = await admin
+      .from("promotions" as any)
       .select("store_id, product_id, promo_price, promo_label")
       .in("product_id", matchedIds)
       .lte("valid_from", today)
