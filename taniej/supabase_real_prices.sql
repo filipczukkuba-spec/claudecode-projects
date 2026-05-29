@@ -32,9 +32,9 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- 3. Jajka
+  -- 3. Jajka (ściółkowe, 10 szt., cena regularna)
   SELECT id INTO v_product_id FROM products WHERE name = 'Jajka' LIMIT 1;
-  v_prices := '{"Biedronka":8.99,"Lidl":8.49,"Kaufland":9.49,"Aldi":7.99,"Netto":8.99,"Auchan":9.29,"Carrefour":9.99}';
+  v_prices := '{"Biedronka":8.50,"Lidl":9.49,"Kaufland":9.99,"Aldi":8.29,"Netto":9.29,"Auchan":9.99,"Carrefour":10.49}';
   FOR v_store IN SELECT id, name FROM stores LOOP
     IF (v_prices->>v_store.name) IS NOT NULL THEN
       UPDATE prices SET price = (v_prices->>v_store.name)::NUMERIC
@@ -192,9 +192,9 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- 19. Pierś z kurczaka
+  -- 19. Pierś z kurczaka (cena regularna/kg)
   SELECT id INTO v_product_id FROM products WHERE name = 'Pierś z kurczaka' LIMIT 1;
-  v_prices := '{"Biedronka":16.99,"Lidl":15.99,"Kaufland":18.99,"Aldi":15.49,"Netto":17.99,"Auchan":18.99,"Carrefour":19.99}';
+  v_prices := '{"Biedronka":24.90,"Lidl":23.99,"Kaufland":24.80,"Aldi":22.99,"Netto":23.99,"Auchan":25.99,"Carrefour":26.99}';
   FOR v_store IN SELECT id, name FROM stores LOOP
     IF (v_prices->>v_store.name) IS NOT NULL THEN
       UPDATE prices SET price = (v_prices->>v_store.name)::NUMERIC
