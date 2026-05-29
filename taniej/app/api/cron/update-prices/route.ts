@@ -12,35 +12,36 @@ export const maxDuration = 60;
 
 const STORE_URLS: Record<string, string[]> = {
   Biedronka: [
-    "https://www.biedronka.pl/pl/oferta-tygodnia",
-    "https://www.biedronka.pl/pl/products?category=nabia%C5%82-i-jajka",
-    "https://www.biedronka.pl/pl/products?category=napoje",
+    "https://www.biedronka.pl/pl/oferty",
+    "https://www.biedronka.pl/pl/gazetki",
+    "https://zakupy.biedronka.pl/",
   ],
   Lidl: [
-    "https://www.lidl.pl/c/oferta-tygodnia/a10007519",
-    "https://www.lidl.pl/c/nabiaal-i-jajka/c600",
-    "https://www.lidl.pl/c/napoje/c1100",
+    "https://www.lidl.pl/",
+    "https://www.lidl.pl/s?q=mleko+ser+jajka",
+    "https://www.lidl.pl/s?q=mieso+nabiał+owoce",
   ],
   Kaufland: [
-    "https://www.kaufland.pl/oferty/aktualne.html",
-    "https://www.kaufland.pl/produkty/nabiaal-i-jajka.html",
-    "https://www.kaufland.pl/produkty/napoje.html",
+    "https://www.kaufland.pl/",
+    "https://www.kaufland.pl/oferty/",
   ],
   Aldi: [
-    "https://www.aldi.pl/oferta-tygodnia.html",
-    "https://www.aldi.pl/nabiaal.html",
+    "https://www.aldi.pl/",
+    "https://www.aldi.pl/oferty/",
   ],
   Netto: [
-    "https://www.netto.pl/gazetka-i-promocje/gazetka-tygodniowa",
-    "https://www.netto.pl/art-spozywcze-i-napoje/nabiaal",
+    "https://www.netto.pl/",
+    "https://www.netto.pl/gazetka-i-promocje/",
+    "https://www.netto.pl/produkty/",
   ],
   Auchan: [
-    "https://www.auchan.pl/pl/promocje",
-    "https://www.auchan.pl/pl/produkty/nabiaal-i-jajka",
+    "https://www.auchan.pl/",
+    "https://www.auchan.pl/akcje-i-promocje/",
+    "https://www.auchan.pl/gazetki/",
   ],
   Carrefour: [
-    "https://www.carrefour.pl/promocje",
-    "https://www.carrefour.pl/marka/nabiaal-i-jajka",
+    "https://www.carrefour.pl/",
+    "https://www.carrefour.pl/oferty-specjalne/",
   ],
 };
 
