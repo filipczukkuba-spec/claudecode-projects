@@ -23,7 +23,13 @@ CREATE INDEX IF NOT EXISTS idx_ph_recorded      ON price_history(recorded_at DES
 
 -- RLS: public read, only service role can insert
 ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "price_history_read" ON price_history FOR SELECT USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'price_history' AND policyname = 'price_history_read'
+  ) THEN
+    CREATE POLICY "price_history_read" ON price_history FOR SELECT USING (true);
+  END IF;
+END $$;
 
 -- Verification
 SELECT
