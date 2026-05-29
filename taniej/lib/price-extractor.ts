@@ -13,29 +13,48 @@ export interface ExtractedItem {
 
 // ── Fetch ──────────────────────────────────────────────────────────────────
 
-export async function fetchPage(url: string, scraperApiKey?: string): Promise<string> {
-  const proxyUrl = scraperApiKey
-    ? `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&country_code=pl`
-    : url;
-
-  const headers: Record<string, string> = scraperApiKey
-    ? {}
-    : {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.7",
-        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-        "Cache-Control": "no-cache",
-      };
-
+// Jina.ai reader: renders JS, returns clean text. Free tier, no key needed.
+// With JINA_API_KEY env var: higher rate limits (get free key at jina.ai).
+export async function fetchViaJina(url: string): Promise<string> {
+  const jinaKey = process.env.JINA_API_KEY;
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 22000);
-    const res = await fetch(proxyUrl, { headers, signal: ctrl.signal, redirect: "follow" });
+    const t = setTimeout(() => ctrl.abort(), 35000);
+    const res = await fetch(`https://r.jina.ai/${url}`, {
+      headers: {
+        ...(jinaKey ? { Authorization: `Bearer ${jinaKey}` } : {}),
+        "X-Return-Format": "text",
+        "X-Timeout": "25",
+        "Accept": "text/plain",
+      },
+      signal: ctrl.signal,
+    });
     clearTimeout(t);
     if (!res.ok) return "";
     const text = await res.text();
-    // Bot-block detection: real pages are much longer than error pages
+    return text.length > 300 ? text.slice(0, 22000) : "";
+  } catch {
+    return "";
+  }
+}
+
+// Direct fetch fallback (no proxy, may get blocked)
+export async function fetchPage(url: string): Promise<string> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 20000);
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.7",
+        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+      },
+      signal: ctrl.signal,
+      redirect: "follow",
+    });
+    clearTimeout(t);
+    if (!res.ok) return "";
+    const text = await res.text();
     return text.length > 800 ? text : "";
   } catch {
     return "";
