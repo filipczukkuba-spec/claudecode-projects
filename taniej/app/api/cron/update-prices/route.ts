@@ -11,37 +11,43 @@ export const maxDuration = 60;
 // Keep to 2 per store so all 14 requests finish within 60s.
 
 const STORE_URLS: Record<string, string[]> = {
-  Biedronka: [
-    "https://www.biedronka.pl/pl/oferty",
-    "https://www.biedronka.pl/pl/gazetki",
-    "https://zakupy.biedronka.pl/",
-  ],
-  Lidl: [
-    "https://www.lidl.pl/",
-    "https://www.lidl.pl/s?q=mleko+ser+jajka",
-    "https://www.lidl.pl/s?q=mieso+nabiał+owoce",
-  ],
-  Kaufland: [
-    "https://www.kaufland.pl/",
-    "https://www.kaufland.pl/oferty/",
-  ],
+  // Aldi: main page has weekly deals with prices — confirmed working
   Aldi: [
     "https://www.aldi.pl/",
     "https://www.aldi.pl/oferty/",
   ],
+  // Lidl: search results include product names + prices
+  Lidl: [
+    "https://www.lidl.pl/s?q=mleko+ser+maslo+jajka",
+    "https://www.lidl.pl/s?q=chleb+wedlina+mieso+kurczak",
+    "https://www.lidl.pl/s?q=jogurt+smietana+napoje+woda",
+    "https://www.lidl.pl/s?q=chipsy+czekolada+slodycze",
+  ],
+  // Biedronka: all category URLs 404 — try root + their online shop
+  Biedronka: [
+    "https://www.biedronka.pl/",
+    "https://www.biedronka.pl/pl",
+    "https://zakupy.biedronka.pl/pl/",
+  ],
+  // Auchan: main page shows only nav; try offer/category pages
+  Auchan: [
+    "https://www.auchan.pl/oferty-tygodnia/",
+    "https://www.auchan.pl/artykuly-spozywcze/",
+    "https://www.auchan.pl/owoce-warzywa/",
+  ],
+  // Netto: try different URL patterns
   Netto: [
     "https://www.netto.pl/",
-    "https://www.netto.pl/gazetka-i-promocje/",
-    "https://www.netto.pl/produkty/",
+    "https://www.netto.pl/oferty/",
+    "https://www.netto.pl/sklep/artykuly-spozywcze/",
   ],
-  Auchan: [
-    "https://www.auchan.pl/",
-    "https://www.auchan.pl/akcje-i-promocje/",
-    "https://www.auchan.pl/gazetki/",
+  // Kaufland: Cloudflare blocks all requests — keep trying main page
+  Kaufland: [
+    "https://www.kaufland.pl/",
   ],
+  // Carrefour: completely blocked — keep for future
   Carrefour: [
     "https://www.carrefour.pl/",
-    "https://www.carrefour.pl/oferty-specjalne/",
   ],
 };
 
