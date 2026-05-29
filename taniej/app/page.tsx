@@ -65,13 +65,16 @@ export default function Home() {
 
           <div className="relative flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-4xl font-black text-white tracking-tight leading-none">taniejkupuj</h1>
-              <p className="text-green-100 text-sm mt-1.5 font-medium">Najtańszy koszyk zakupów w Polsce</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-4xl font-black text-white tracking-tight leading-none">taniejkupuj</h1>
+                <span className="text-2xl">🛒</span>
+              </div>
+              <p className="text-green-100 text-sm mt-1.5 font-medium">Znajdź najtańszy koszyk zakupów</p>
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {[
                   { v: "7", l: "sklepów" },
                   { v: "400+", l: "produktów" },
-                  { v: "0 zł", l: "za darmo" },
+                  { v: "gratis", l: "za darmo" },
                 ].map((s) => (
                   <div key={s.l} className="bg-white/20 rounded-full px-2.5 py-1 flex items-center gap-1">
                     <span className="text-white font-bold text-xs">{s.v}</span>
@@ -118,8 +121,9 @@ export default function Home() {
           </div>
         )}
 
-        <p className="text-center text-xs text-gray-300 mt-10 pb-2">
-          taniejkupuj · porównywarka cen w polskich sklepach
+        <p className="text-center text-xs text-gray-400 mt-10 pb-2 leading-relaxed">
+          taniejkupuj.pl · porównywarka cen w polskich sklepach<br />
+          <span className="text-gray-300">Ceny orientacyjne — zawsze sprawdź w sklepie przed zakupem</span>
         </p>
       </div>
 

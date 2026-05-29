@@ -2,16 +2,16 @@
 
 import { useState, useRef, useEffect } from "react";
 
-const STORE_STYLE: Record<string, { bar: string }> = {
-  Biedronka: { bar: "bg-red-500" },
-  Lidl:      { bar: "bg-blue-500" },
-  Kaufland:  { bar: "bg-orange-500" },
-  Aldi:      { bar: "bg-indigo-500" },
-  Netto:     { bar: "bg-yellow-400" },
-  Auchan:    { bar: "bg-purple-500" },
-  Carrefour: { bar: "bg-sky-500" },
+const STORE_STYLE: Record<string, { bar: string; bg: string }> = {
+  Biedronka: { bar: "bg-red-500",    bg: "bg-red-500" },
+  Lidl:      { bar: "bg-blue-500",   bg: "bg-blue-500" },
+  Kaufland:  { bar: "bg-orange-500", bg: "bg-orange-500" },
+  Aldi:      { bar: "bg-indigo-500", bg: "bg-indigo-500" },
+  Netto:     { bar: "bg-yellow-400", bg: "bg-yellow-400" },
+  Auchan:    { bar: "bg-purple-500", bg: "bg-purple-500" },
+  Carrefour: { bar: "bg-sky-500",    bg: "bg-sky-500" },
 };
-const DEFAULT_STYLE = { bar: "bg-gray-400" };
+const DEFAULT_STYLE = { bar: "bg-gray-400", bg: "bg-gray-400" };
 
 interface StorePrice {
   name: string;
@@ -46,7 +46,6 @@ export default function ProductLookup() {
   const [results, setResults] = useState<StorePrice[] | null>(null);
   const [productName, setProductName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -89,90 +88,102 @@ export default function ProductLookup() {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
-      <button
-        className="w-full flex items-center justify-between p-5 text-left"
-        onClick={() => setOpen((o) => !o)}
-      >
-        <div>
-          <p className="text-sm font-semibold text-gray-800">Szukaj ceny produktu</p>
-          <p className="text-xs text-gray-400 mt-0.5">Sprawdź cenę jednego produktu we wszystkich sklepach</p>
-        </div>
-        <span className="text-gray-300 text-sm ml-3">{open ? "▲" : "▼"}</span>
-      </button>
-
-      {open && (
-        <div className="px-5 pb-5 border-t border-gray-50">
+      <div className="p-4">
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Szybkie wyszukiwanie</p>
+        <div className="relative">
           <input
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors mt-4"
-            placeholder="Np. mleko, Lay's, Coca-Cola..."
+            className="w-full border border-gray-200 rounded-xl pl-4 pr-10 py-3 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-400 transition-colors bg-gray-50 focus:bg-white"
+            placeholder="Np. mleko, Coca-Cola, Lay's..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
             autoCorrect="off"
           />
-
-          {loading && (
-            <p className="text-xs text-gray-400 mt-3 text-center">Szukam...</p>
+          {loading ? (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : query ? (
+            <button
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors text-lg leading-none"
+              onClick={() => { setQuery(""); setResults(null); }}
+            >
+              ×
+            </button>
+          ) : (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 text-base">🔍</span>
           )}
+        </div>
+      </div>
 
-          {!loading && results !== null && results.length === 0 && (
-            <p className="text-xs text-gray-400 mt-3 text-center">Brak wyników dla &quot;{query}&quot;</p>
-          )}
+      {!loading && results !== null && results.length === 0 && (
+        <div className="px-4 pb-4 text-center">
+          <p className="text-xs text-gray-400">Brak wyników dla &quot;{query}&quot;</p>
+        </div>
+      )}
 
-          {!loading && results && results.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs font-semibold text-gray-500 mb-3 truncate">{productName}</p>
-              <div className="space-y-2.5">
-                {results.map((store, i) => {
-                  const style = STORE_STYLE[store.name] ?? DEFAULT_STYLE;
-                  const ep = effectivePrice(store);
-                  const isCheapest = i === 0 && ep !== null;
-                  const widthPct = ep ? (ep / maxPrice) * 100 : 0;
-                  const label = bestLabel(store);
-                  return (
-                    <div key={store.name} className="flex items-center gap-3">
-                      <div className={`w-7 h-7 rounded-lg ${style.bar} flex items-center justify-center text-white text-xs font-black shrink-0`}>
-                        {store.name[0]}
-                      </div>
-                      <span className="text-xs text-gray-600 w-20 shrink-0 truncate">{store.name}</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
-                          style={{ width: `${widthPct}%` }}
-                        />
-                      </div>
-                      {ep !== null ? (
-                        <div className="flex items-center gap-1 w-28 justify-end shrink-0">
-                          {store.price !== null && label && (
-                            <span className="text-xs text-gray-300 line-through">{fmt(store.price)}</span>
-                          )}
-                          <span className={`text-xs font-bold ${label ? (label.tag === "z aplikacją" ? "text-blue-600" : "text-orange-600") : isCheapest ? "text-green-600" : "text-gray-500"}`}>
-                            {fmt(ep)} zł{isCheapest && !label && " ✓"}
-                          </span>
-                          {label && (
-                            <span className={`text-xs font-bold px-1 rounded ${label.color}`}>
-                              {label.tag}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-300 w-28 text-right shrink-0">brak</span>
+      {!loading && results && results.length > 0 && (
+        <div className="border-t border-gray-50">
+          {/* Product name header */}
+          <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+            <p className="text-sm font-bold text-gray-700 truncate">{productName}</p>
+            {cheapest && (
+              <span className={`text-xs font-bold px-2 py-1 rounded-full shrink-0 ml-2 ${
+                cheapest.promo_price !== null ? "bg-orange-100 text-orange-700" :
+                cheapest.app_price !== null ? "bg-blue-100 text-blue-700" :
+                "bg-green-100 text-green-700"
+              }`}>
+                od {fmt(effectivePrice(cheapest)!)} zł
+              </span>
+            )}
+          </div>
+
+          <div className="px-4 pb-4 space-y-2.5">
+            {results.map((store, i) => {
+              const style = STORE_STYLE[store.name] ?? DEFAULT_STYLE;
+              const ep = effectivePrice(store);
+              const isCheapest = i === 0 && ep !== null;
+              const widthPct = ep ? (ep / maxPrice) * 100 : 0;
+              const label = bestLabel(store);
+              return (
+                <div key={store.name} className="flex items-center gap-2.5">
+                  <div className={`w-7 h-7 rounded-lg ${style.bg} flex items-center justify-center text-white text-xs font-black shrink-0 shadow-sm`}>
+                    {store.name[0]}
+                  </div>
+                  <span className="text-xs font-medium text-gray-600 w-18 shrink-0 truncate" style={{ width: "72px" }}>{store.name}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
+                      style={{ width: `${widthPct}%` }}
+                    />
+                  </div>
+                  {ep !== null ? (
+                    <div className="flex items-center gap-1 shrink-0" style={{ minWidth: "80px", justifyContent: "flex-end" }}>
+                      {store.price !== null && label && (
+                        <span className="text-xs text-gray-300 line-through">{fmt(store.price)}</span>
+                      )}
+                      <span className={`text-xs font-black ${
+                        label ? (label.tag === "z aplikacją" ? "text-blue-600" : "text-orange-600") :
+                        isCheapest ? "text-green-600" : "text-gray-500"
+                      }`}>
+                        {fmt(ep)} zł
+                      </span>
+                      {label && (
+                        <span className={`text-[9px] font-bold px-1 py-0.5 rounded leading-none ${label.color}`}>
+                          {label.tag.startsWith("-") || label.tag === "PROMO" ? label.tag : label.tag === "z aplikacją" ? "APP" : label.tag}
+                        </span>
+                      )}
+                      {isCheapest && !label && (
+                        <span className="text-green-500 text-xs">✓</span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-              {cheapest && (
-                <p className="text-xs font-medium mt-3 text-center">
-                  <span className={cheapest.promo_price !== null ? "text-orange-600" : cheapest.app_price !== null ? "text-blue-600" : "text-green-600"}>
-                    Najtaniej w {cheapest.name} — {fmt(effectivePrice(cheapest)!)} zł
-                    {cheapest.promo_price !== null && ` (${cheapest.promo_label ?? "PROMO"})`}
-                    {cheapest.app_price !== null && cheapest.promo_price === null && " (z aplikacją)"}
-                  </span>
-                </p>
-              )}
-            </div>
-          )}
+                  ) : (
+                    <span className="text-xs text-gray-300 shrink-0" style={{ minWidth: "80px", textAlign: "right" }}>brak</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
