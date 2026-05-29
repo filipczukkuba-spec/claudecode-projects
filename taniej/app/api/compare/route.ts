@@ -8,6 +8,34 @@ interface RequestItem {
   unit: string;
 }
 
+// Remove Polish diacritics and normalise to lowercase a-z0-9 tokens
+function norm(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/ą/g, "a").replace(/ć/g, "c").replace(/ę/g, "e")
+    .replace(/ł/g, "l").replace(/ń/g, "n").replace(/ó/g, "o")
+    .replace(/ś/g, "s").replace(/ź/g, "z").replace(/ż/g, "z")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function matchScore(query: string, target: string): number {
+  const q = norm(query);
+  const t = norm(target);
+  if (q === t) return 1;
+  if (t.includes(q) || q.includes(t)) return 0.9;
+  const qTokens = q.split(" ").filter(Boolean);
+  const tTokens = t.split(" ").filter(Boolean);
+  const matched = qTokens.filter((qt) =>
+    tTokens.some((tt) => tt.includes(qt) || qt.includes(tt))
+  );
+  return matched.length / qTokens.length;
+}
+
+const MATCH_THRESHOLD = 0.6;
+
 export async function POST(req: NextRequest) {
   const { items }: { items: RequestItem[] } = await req.json();
 
@@ -24,14 +52,14 @@ export async function POST(req: NextRequest) {
   if (prodError) return NextResponse.json({ error: prodError.message }, { status: 500 });
 
   const matchedProducts = products!.filter((p) =>
-    itemNames.some((n) => p.name.toLowerCase().includes(n) || n.includes(p.name.toLowerCase()))
+    itemNames.some((n) => matchScore(n, p.name) >= MATCH_THRESHOLD)
   );
 
   const matchedIds = matchedProducts.map((p) => p.id);
 
   const { data: prices, error: priceError } = await supabase
     .from("prices")
-    .select("store_id, product_id, price, stores(name, logo), products(name, unit)")
+    .select("store_id, product_id, price, app_price, stores(name, logo), products(name, unit)")
     .in("product_id", matchedIds.length > 0 ? matchedIds : [-1]);
 
   if (priceError) return NextResponse.json({ error: priceError.message }, { status: 500 });
@@ -69,6 +97,7 @@ export async function POST(req: NextRequest) {
       item: row.products.name,
       unit: row.products.unit,
       price: row.price,
+      app_price: row.app_price ?? null,
       promo_price: promo?.promo_price ?? null,
       promo_label: promo?.promo_label ?? null,
     });
@@ -76,15 +105,15 @@ export async function POST(req: NextRequest) {
 
   const results = Object.values(storeMap).map((store) => {
     const filledPrices = items.map((item) => {
-      const found = store.prices.find(
-        (p: any) =>
-          p.item.toLowerCase().includes(item.name.toLowerCase()) ||
-          item.name.toLowerCase().includes(p.item.toLowerCase())
-      );
+      const found = store.prices
+        .map((p: any) => ({ p, score: matchScore(item.name, p.item) }))
+        .filter(({ score }) => score >= MATCH_THRESHOLD)
+        .sort((a: any, b: any) => b.score - a.score)[0]?.p;
       return {
         item: item.name,
         unit: item.unit || found?.unit || "",
         price: found?.price ?? null,
+        app_price: found?.app_price ?? null,
         promo_price: found?.promo_price ?? null,
         promo_label: found?.promo_label ?? null,
       };

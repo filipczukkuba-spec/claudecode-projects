@@ -16,6 +16,8 @@ export default function AdminPage() {
   const [edits, setEdits] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
   const [savedCount, setSavedCount] = useState(0);
   const [search, setSearch] = useState("");
 
@@ -84,6 +86,29 @@ export default function AdminPage() {
     setSaving(false);
   }
 
+  async function triggerSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/cron/update-prices", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_CRON_SECRET ?? token.current}`, "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const total = Object.values(data.report as Record<string, {updated:number;promos:number}>).reduce(
+          (sum, s) => sum + s.updated + s.promos, 0
+        );
+        setSyncResult(`✓ Zaktualizowano ${total} cen`);
+      } else {
+        setSyncResult(`Błąd: ${data.error}`);
+      }
+    } catch {
+      setSyncResult("Błąd połączenia");
+    }
+    setSyncing(false);
+  }
+
   const filtered = search
     ? products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
     : products;
@@ -131,10 +156,20 @@ export default function AdminPage() {
           </div>
           <div className="flex items-center gap-3">
             {savedCount > 0 && (
-              <span className="text-green-600 text-sm font-semibold animate-pulse">
-                ✓ Zapisano {savedCount}
+              <span className="text-green-600 text-sm font-semibold">✓ Zapisano {savedCount}</span>
+            )}
+            {syncResult && (
+              <span className={`text-sm font-semibold ${syncResult.startsWith("✓") ? "text-blue-600" : "text-red-500"}`}>
+                {syncResult}
               </span>
             )}
+            <button
+              onClick={triggerSync}
+              disabled={syncing}
+              className="bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-all"
+            >
+              {syncing ? "Syncowanie..." : "Sync ceny"}
+            </button>
             <button
               onClick={saveAll}
               disabled={edits.size === 0 || saving}

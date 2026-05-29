@@ -7,6 +7,7 @@ interface PriceRow {
   item: string;
   unit: string;
   price: number | null;
+  app_price: number | null;
   promo_price: number | null;
   promo_label: string | null;
 }
@@ -36,8 +37,8 @@ function fmt(n: number) {
 }
 
 function effectivePrice(p: PriceRow): number | null {
-  if (p.promo_price !== null) return p.promo_price;
-  return p.price;
+  const candidates = [p.promo_price, p.app_price, p.price].filter((v): v is number => v !== null);
+  return candidates.length > 0 ? Math.min(...candidates) : null;
 }
 
 interface Props { items: Item[] }
@@ -242,6 +243,8 @@ export default function StoreComparison({ items }: Props) {
                     const ep = effectivePrice(p);
                     const isCheapestItem = ep !== null && ep === cheapestPerItem[p.item];
                     const hasPromo = p.promo_price !== null;
+                    const hasApp = p.app_price !== null;
+                    const isAppCheapest = hasApp && (!hasPromo || p.app_price! <= (p.promo_price ?? Infinity));
                     return (
                       <div key={p.item} className="flex justify-between items-center text-sm">
                         <div className="text-gray-600 flex items-center gap-1.5">
@@ -252,15 +255,20 @@ export default function StoreComparison({ items }: Props) {
                               {p.promo_label ?? "PROMO"}
                             </span>
                           )}
+                          {hasApp && isAppCheapest && (
+                            <span className="text-xs bg-blue-100 text-blue-600 font-bold px-1.5 py-0.5 rounded-full">
+                              z aplikacją
+                            </span>
+                          )}
                         </div>
                         {ep !== null ? (
-                          <div className="flex items-center gap-1.5">
-                            {hasPromo && p.price !== null && (
-                              <span className="text-xs text-gray-300 line-through">
+                          <div className="flex flex-col items-end gap-0.5">
+                            {(hasPromo || hasApp) && p.price !== null && (
+                              <span className="text-xs text-gray-300 line-through leading-none">
                                 {fmt(p.price)}
                               </span>
                             )}
-                            <span className={`font-medium ${hasPromo ? "text-orange-600" : isCheapestItem ? "text-green-600" : "text-gray-500"}`}>
+                            <span className={`font-medium leading-none ${hasPromo ? "text-orange-600" : hasApp && isAppCheapest ? "text-blue-600" : isCheapestItem ? "text-green-600" : "text-gray-500"}`}>
                               {fmt(ep)} zł
                             </span>
                           </div>
@@ -283,7 +291,7 @@ export default function StoreComparison({ items }: Props) {
       })}
 
       <div className="text-center py-2">
-        <p className="text-xs text-gray-400">Ceny aktualizowane co tydzień • Promocje oznaczone pomarańczowo</p>
+        <p className="text-xs text-gray-400">Ceny aktualizowane co tydzień • Promocje: pomarańczowo • Z aplikacją: niebiesko</p>
       </div>
     </div>
   );
