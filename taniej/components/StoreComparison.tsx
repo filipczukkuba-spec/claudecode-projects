@@ -282,9 +282,8 @@ export default function StoreComparison({ items }: Props) {
         );
       })}
 
-      <div className="text-center py-2 space-y-0.5">
-        <p className="text-xs text-gray-400">Ceny aktualizowane regularnie</p>
-        <p className="text-xs text-gray-300">Promocje oznaczone pomarańczowo • Dane poglądowe</p>
+      <div className="text-center py-2">
+        <p className="text-xs text-gray-400">Ceny aktualizowane co tydzień • Promocje oznaczone pomarańczowo</p>
       </div>
     </div>
   );
