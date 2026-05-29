@@ -14,7 +14,7 @@ BEGIN
 
   -- 1. Mleko
   SELECT id INTO v_product_id FROM products WHERE name = 'Mleko' LIMIT 1;
-  v_prices := '{"Biedronka":2.89,"Lidl":2.79,"Kaufland":2.99,"Aldi":2.69,"Netto":2.99,"Auchan":2.89,"Carrefour":3.19}';
+  v_prices := '{"Biedronka":3.29,"Lidl":3.99,"Kaufland":3.49,"Aldi":3.19,"Netto":3.39,"Auchan":3.59,"Carrefour":3.79}';
   FOR v_store IN SELECT id, name FROM stores LOOP
     IF (v_prices->>v_store.name) IS NOT NULL THEN
       UPDATE prices SET price = (v_prices->>v_store.name)::NUMERIC
