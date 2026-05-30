@@ -19,26 +19,27 @@ const STORE_URLS: Record<string, string[]> = {
     "https://www.aldi.pl/produkty/swieze-produkty/mieso-i-wedliny.html",
     "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
   ],
-  // Lidl: main page + offers (search queries 404, gazetki.pl redirects back to lidl.pl)
+  // Lidl: main page buries food — target food/drinks category + weekly offers directly
   Lidl: [
-    "https://www.lidl.pl/",
+    "https://www.lidl.pl/c/ywno-i-napoje/c9200",
+    "https://www.lidl.pl/c/nabiał-i-jajka/c9201",
+    "https://www.lidl.pl/c/mieso-i-wedliny/c9202",
     "https://www.lidl.pl/oferty",
   ],
-  // Biedronka: root page works — add category pages using nav category names
+  // Biedronka: zakupy subdomain blocks Jina — try main website + gazetka
   Biedronka: [
-    "https://zakupy.biedronka.pl/pl/",
-    "https://zakupy.biedronka.pl/pl/nabial/",
-    "https://zakupy.biedronka.pl/pl/mieso/",
-    "https://zakupy.biedronka.pl/pl/piekarnia/",
-    "https://zakupy.biedronka.pl/pl/napoje/",
-    "https://zakupy.biedronka.pl/pl/warzywa/",
-    "https://zakupy.biedronka.pl/pl/owoce/",
+    "https://www.biedronka.pl/pl/",
+    "https://www.biedronka.pl/pl/oferty/",
+    "https://www.biedronka.pl/pl/gazetka/",
+    "https://zakupy.biedronka.pl/pl/search?q=mleko",
+    "https://zakupy.biedronka.pl/pl/search?q=mieso+kurczak",
   ],
-  // Auchan: try search since category pages are blocked
+  // Auchan: main page loads but prices lazy-loaded — try search results which pre-render prices
   Auchan: [
-    "https://www.auchan.pl/",
-    "https://www.auchan.pl/szukaj/?q=mleko+ser+maslo+jajka",
-    "https://www.auchan.pl/szukaj/?q=mieso+kurczak+wedlina",
+    "https://www.auchan.pl/szukaj/?q=mleko",
+    "https://www.auchan.pl/szukaj/?q=ser+jogurt+maslo+jajka",
+    "https://www.auchan.pl/szukaj/?q=kurczak+mieso+wedlina",
+    "https://www.auchan.pl/szukaj/?q=chleb+pieczywo",
   ],
   // Netto: try gazetka-specific page and main — /sklep/ and /oferty/ both 404
   Netto: [
@@ -153,7 +154,7 @@ export async function POST(req: NextRequest) {
           .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled" && r.value.length > 300)
           .map((r) => r.value)
           // Drop 404/block pages — they confuse Claude into extracting garbage
-          .filter(t => !/(strona nie istnieje|nie możemy znaleźć strony|404 uuuups|wymagana weryfikacja|ray id:|cloudflare|ta strona nie istnieje)/i.test(t.slice(0, 600)));
+          .filter(t => !/(niestety nie istnieje|coś poszło nie tak|strona nie istnieje|nie możemy znaleźć strony|404 uuuups|wymagana weryfikacja|ray id:|cloudflare)/i.test(t.slice(0, 800)));
 
         const pagesOk = texts.length;
         const textChars = texts.reduce((s, t) => s + t.length, 0);
