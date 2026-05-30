@@ -204,8 +204,14 @@ export default function StoreComparison({ items }: Props) {
             return { ...store, total: parseFloat(total.toFixed(2)), found };
           }
         );
-        processed.sort((a, b) => a.total - b.total);
-        if (processed.length > 0) setExpanded({ [processed[0].name]: true });
+        // Sort by: most products found first, then by total. A store with
+        // zero priced items must never win — its 0,00 zł is "no data", not free.
+        processed.sort((a, b) => {
+          if (a.found !== b.found) return b.found - a.found;
+          return a.total - b.total;
+        });
+        const firstWithData = processed.find((s) => s.found > 0);
+        if (firstWithData) setExpanded({ [firstWithData.name]: true });
         setResults(processed);
       })
       .catch((e) => setError(e.message))
@@ -256,8 +262,11 @@ export default function StoreComparison({ items }: Props) {
     </div>
   );
 
-  const cheapest = results[0];
-  const mostExpensive = results[results.length - 1];
+  // Cheapest = the first store with at least one priced product.
+  // Stores with `found === 0` have no data and must not be ranked as winners.
+  const withData = results.filter((s) => s.found > 0);
+  const cheapest = withData[0] ?? results[0];
+  const mostExpensive = withData[withData.length - 1] ?? results[results.length - 1];
   const savings = mostExpensive.total - cheapest.total;
   const savingsPct = mostExpensive.total > 0 ? ((savings / mostExpensive.total) * 100).toFixed(0) : "0";
   const cheapestStyle = STORE_STYLE[cheapest.name] ?? DEFAULT_STYLE;
@@ -331,10 +340,12 @@ export default function StoreComparison({ items }: Props) {
       <div className="bg-white rounded-2xl shadow-sm p-5">
         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Porównanie cen koszyka</p>
         <div className="space-y-3">
-          {results.map((store, i) => {
+          {results.map((store) => {
             const style = STORE_STYLE[store.name] ?? DEFAULT_STYLE;
+            const isWinner = store.name === cheapest.name && store.found > 0;
+            const noData = store.found === 0;
             const diff = store.total - cheapest.total;
-            const widthPct = Math.max(20, (store.total / (mostExpensive.total || 1)) * 100);
+            const widthPct = noData ? 5 : Math.max(20, (store.total / (mostExpensive.total || 1)) * 100);
             const hasPromos = store.prices.some(p => p.promo_price !== null);
             const hasApp = store.prices.some(p => p.app_price !== null);
             const hasReports = store.prices.some(p => p.reported_price !== null);
@@ -349,17 +360,17 @@ export default function StoreComparison({ items }: Props) {
                     {hasReports && <span className="text-[10px] bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full leading-none">z półki</span>}
                     {hasPromos && <span className="text-[10px] bg-orange-100 text-orange-600 font-bold px-1.5 py-0.5 rounded-full leading-none">PROMO</span>}
                     {hasApp && <span className="text-[10px] bg-blue-100 text-blue-600 font-bold px-1.5 py-0.5 rounded-full leading-none">APP</span>}
-                    <span className={`text-xs font-black ${i === 0 ? "text-green-600" : "text-gray-500"}`}>
-                      {allEstimated ? "~" : ""}{fmt(store.total)} zł
+                    <span className={`text-xs font-black ${noData ? "text-gray-300" : isWinner ? "text-green-600" : "text-gray-500"}`}>
+                      {noData ? "brak danych" : `${allEstimated ? "~" : ""}${fmt(store.total)} zł`}
                     </span>
-                    {i > 0 && diff > 0.01 && (
+                    {!noData && !isWinner && diff > 0.01 && (
                       <span className="text-[10px] text-red-400 font-bold">+{fmt(diff)}</span>
                     )}
-                    {i === 0 && <span className="text-[10px] text-green-600 font-bold">✓</span>}
+                    {isWinner && <span className="text-[10px] text-green-600 font-bold">✓</span>}
                   </div>
                 </div>
                 <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-700 ease-out ${style.bar}`} style={{ width: `${widthPct}%` }} />
+                  <div className={`h-full rounded-full transition-all duration-700 ease-out ${noData ? "bg-gray-200" : style.bar}`} style={{ width: `${widthPct}%` }} />
                 </div>
               </div>
             );
@@ -368,9 +379,10 @@ export default function StoreComparison({ items }: Props) {
       </div>
 
       {/* Store cards */}
-      {results.map((store, i) => {
+      {results.map((store) => {
         const style = STORE_STYLE[store.name] ?? DEFAULT_STYLE;
-        const isCheapest = i === 0;
+        const isCheapest = store.name === cheapest.name && store.found > 0;
+        const noData = store.found === 0;
         const diff = store.total - cheapest.total;
         const diffPct = cheapest.total > 0 ? (((store.total - cheapest.total) / cheapest.total) * 100).toFixed(0) : "0";
         const isOpen = expanded[store.name] ?? false;
@@ -415,9 +427,15 @@ export default function StoreComparison({ items }: Props) {
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <p className="font-black text-xl text-gray-900 leading-tight">{storeAllEstimated ? "~" : ""}{fmt(store.total)} zł</p>
-                  {!isCheapest && results.length > 1 && diff > 0.01 && (
-                    <p className="text-xs text-red-400 font-semibold leading-tight">+{fmt(diff)} zł ({diffPct}%)</p>
+                  {noData ? (
+                    <p className="font-bold text-sm text-gray-300 leading-tight">brak danych</p>
+                  ) : (
+                    <>
+                      <p className="font-black text-xl text-gray-900 leading-tight">{storeAllEstimated ? "~" : ""}{fmt(store.total)} zł</p>
+                      {!isCheapest && results.length > 1 && diff > 0.01 && (
+                        <p className="text-xs text-red-400 font-semibold leading-tight">+{fmt(diff)} zł ({diffPct}%)</p>
+                      )}
+                    </>
                   )}
                 </div>
                 <span className="text-gray-300">{isOpen ? "▲" : "▼"}</span>
