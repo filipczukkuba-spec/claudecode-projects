@@ -23,13 +23,12 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
     ],
   },
-  // Lidl: weekly offers page readable via Jina
+  // Lidl: Jina blocked, use Firecrawl
   Lidl: {
-    fetcher: "jina",
+    fetcher: "firecrawl",
     urls: [
       "https://www.lidl.pl/oferty",
       "https://www.lidl.pl/c/oferta-tygodnia/s10042553",
-      "https://www.lidl.pl/c/swiezosci/s10042560",
     ],
   },
   // Netto: Jina gazetka working
@@ -40,12 +39,12 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.netto.pl/gazetka-tygodniowa/",
     ],
   },
-  // Biedronka: mobile overlay — Firecrawl clicks it away before scraping
+  // Biedronka: close button is an <a href="...#"> link, not a button
   Biedronka: {
     fetcher: "firecrawl",
     actions: [
       { type: "wait", milliseconds: 3000 },
-      { type: "click", selector: "button[class*='close'], [class*='modal'] button, [class*='banner'] button, [aria-label*='zamknij'], [aria-label*='close'], .app-banner__close, [data-dismiss]" },
+      { type: "click", selector: "a[href$='#']" },
       { type: "wait", milliseconds: 2000 },
     ],
     urls: [
@@ -186,7 +185,7 @@ export async function POST(req: NextRequest) {
           .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled" && r.value.length > 300)
           .map((r) => r.value)
           // Drop 404/block/overlay pages — they confuse Claude into extracting garbage
-          .filter(t => !/(niestety nie istnieje|coś poszło nie tak|już nie istnieje|strona nie istnieje|nie możemy znaleźć strony|404 uuuups|wymagana weryfikacja|ray id:|cloudflare|pobierz aplikację i oszczędzaj)/i.test(t.slice(0, 800)));
+          .filter(t => !/(niestety nie istnieje|coś poszło nie tak|już nie istnieje|strona nie istnieje|nie możemy znaleźć strony|404 uuuups|wymagana weryfikacja|ray id:|cloudflare|pobierz aplikację i oszczędzaj)/i.test(t.slice(0, 3000)));
 
         const pagesOk = texts.length;
         const textChars = texts.reduce((s, t) => s + t.length, 0);
