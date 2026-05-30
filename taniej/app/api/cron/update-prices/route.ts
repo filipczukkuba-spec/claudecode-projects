@@ -23,7 +23,15 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
     ],
   },
-  // Lidl: both Jina and Firecrawl returning empty — skip until better approach found
+  // Lidl: weekly offers page readable via Jina
+  Lidl: {
+    fetcher: "jina",
+    urls: [
+      "https://www.lidl.pl/oferty",
+      "https://www.lidl.pl/c/oferta-tygodnia/s10042553",
+      "https://www.lidl.pl/c/swiezosci/s10042560",
+    ],
+  },
   // Netto: Jina gazetka working
   Netto: {
     fetcher: "jina",
@@ -32,21 +40,21 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.netto.pl/gazetka-tygodniowa/",
     ],
   },
-  // Biedronka: mobile overlay on every page — use Firecrawl actions to click close first
+  // Biedronka: mobile overlay — Firecrawl clicks it away before scraping
   Biedronka: {
     fetcher: "firecrawl",
     actions: [
-      { type: "click", selector: "a[href$='#'], button.close, .modal-close" },
+      { type: "wait", milliseconds: 3000 },
+      { type: "click", selector: "button[class*='close'], [class*='modal'] button, [class*='banner'] button, [aria-label*='zamknij'], [aria-label*='close'], .app-banner__close, [data-dismiss]" },
       { type: "wait", milliseconds: 2000 },
     ],
     urls: [
+      "https://www.biedronka.pl/pl/oferty-tygodnia",
+      "https://www.biedronka.pl/pl/gazetka",
       "https://www.biedronka.pl/pl/",
-      "https://www.biedronka.pl/pl/oferty/",
-      "https://zakupy.biedronka.pl/pl/",
     ],
   },
-  // Kaufland: category pages all fail, main page intermittent — keep trying
-  // Kaufland: category pages all fail, main page intermittent — keep trying
+  // Kaufland: main page intermittent — keep trying
   Kaufland: {
     fetcher: "firecrawl",
     urls: [
@@ -158,7 +166,7 @@ export async function POST(req: NextRequest) {
   }> = {};
 
   await Promise.allSettled(
-    Object.entries(STORES).map(async ([storeName, { urls, fetcher }]) => {
+    Object.entries(STORES).map(async ([storeName, { urls, fetcher, actions }]) => {
       const storeId = storeIdMap[storeName];
       if (!storeId) return;
 
