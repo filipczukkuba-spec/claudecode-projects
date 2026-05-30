@@ -23,14 +23,13 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
     ],
   },
-  // Lidl: Jina, search + offers
+  // Lidl: Jina dead — switch to Firecrawl
   Lidl: {
-    fetcher: "jina",
+    fetcher: "firecrawl",
     urls: [
+      "https://www.lidl.pl/oferty",
       "https://www.lidl.pl/s?q=mleko+ser+jajka",
       "https://www.lidl.pl/s?q=kurczak+mieso+wedlina",
-      "https://www.lidl.pl/s?q=chleb+maslo+jogurt",
-      "https://www.lidl.pl/oferty",
     ],
   },
   // Netto: Jina, gazetka working
@@ -41,37 +40,42 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.netto.pl/gazetka-tygodniowa/",
     ],
   },
-  // Biedronka: Cloudflare + JS grid — Firecrawl
+  // Biedronka: oferty page shows mobile app banner — use online store category pages
   Biedronka: {
     fetcher: "firecrawl",
     urls: [
-      "https://www.biedronka.pl/pl/oferty/",
+      "https://zakupy.biedronka.pl/pl/",
       "https://zakupy.biedronka.pl/pl/nabial/",
       "https://zakupy.biedronka.pl/pl/mieso/",
+      "https://zakupy.biedronka.pl/pl/owoce-i-warzywa/",
     ],
   },
-  // Kaufland: Cloudflare — Firecrawl
+  // Kaufland: Cloudflare very aggressive — try more category pages
   Kaufland: {
     fetcher: "firecrawl",
     urls: [
       "https://www.kaufland.pl/angebote/aktuelle-woche/",
-      "https://www.kaufland.pl/produkte/kategorien/kuehlprodukte.html",
+      "https://www.kaufland.pl/angebote/",
+      "https://www.kaufland.pl/",
     ],
   },
-  // Carrefour: blocked — Firecrawl
+  // Carrefour: Firecrawl working great — expand to more categories
   Carrefour: {
     fetcher: "firecrawl",
     urls: [
       "https://www.carrefour.pl/artykuly-spozywcze/",
       "https://www.carrefour.pl/mieso-ryby-i-owoce-morza/",
+      "https://www.carrefour.pl/nabiał-i-jajka/",
+      "https://www.carrefour.pl/pieczywo-i-ciasta/",
     ],
   },
-  // Auchan: JS-rendered — Firecrawl
+  // Auchan: try main page + search
   Auchan: {
     fetcher: "firecrawl",
     urls: [
-      "https://www.auchan.pl/artykuly-spozywcze/nabiał-i-jajka/",
-      "https://www.auchan.pl/artykuly-spozywcze/mieso-i-drob/",
+      "https://www.auchan.pl/",
+      "https://www.auchan.pl/artykuly-spozywcze/",
+      "https://www.auchan.pl/oferty-tygodnia/",
     ],
   },
 };
