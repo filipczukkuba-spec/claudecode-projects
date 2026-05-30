@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { track } from "@vercel/analytics";
 
 interface AcceptedItem { product: string; price: number; unit_type: string | null; is_promo: boolean }
 interface RejectedItem { raw: string; reason: string }
@@ -72,9 +73,15 @@ export default function ReceiptScanner() {
       const res = await fetch("/api/scan-receipt", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) {
+        track("receipt_scan_failed", { reason: (data.error ?? "unknown").slice(0, 60) });
         setError(data.error ?? "Coś poszło nie tak");
         return;
       }
+      track("receipt_scanned", {
+        store: (data as ScanResult).store,
+        saved: (data as ScanResult).saved,
+        rejected: (data as ScanResult).rejected.length,
+      });
       setResult(data as ScanResult);
     } catch {
       setError("Błąd połączenia");

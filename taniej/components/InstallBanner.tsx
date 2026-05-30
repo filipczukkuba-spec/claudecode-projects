@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { track } from "@vercel/analytics";
 
 export default function InstallBanner() {
   const [prompt, setPrompt] = useState<any>(null);
@@ -33,9 +34,13 @@ export default function InstallBanner() {
 
   async function install() {
     if (!prompt) return;
+    track("install_clicked");
     prompt.prompt();
     const { outcome } = await prompt.userChoice;
-    if (outcome === "accepted") setInstalled(true);
+    if (outcome === "accepted") {
+      track("install_accepted");
+      setInstalled(true);
+    }
     setShow(false);
   }
 

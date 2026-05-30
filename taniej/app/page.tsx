@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { track } from "@vercel/analytics";
 import ShoppingList from "@/components/ShoppingList";
 import StoreComparison from "@/components/StoreComparison";
 import RecipeInput from "@/components/RecipeInput";
@@ -74,6 +75,7 @@ export default function Home() {
           text: `Porównaj ceny ${items.length} produktów w 7 sklepach`,
           url,
         });
+        track("list_shared", { items: items.length, source: "header_native" });
         return;
       } catch {
         // user cancelled — fall through to clipboard
@@ -81,6 +83,7 @@ export default function Home() {
     }
     try {
       await navigator.clipboard.writeText(url);
+      track("list_shared", { items: items.length, source: "header_clipboard" });
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {}

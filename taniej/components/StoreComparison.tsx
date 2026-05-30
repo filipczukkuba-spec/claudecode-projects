@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { track } from "@vercel/analytics";
 import { Item } from "@/types";
 
 interface PriceRow {
@@ -188,6 +189,7 @@ export default function StoreComparison({ items }: Props) {
   function load() {
     setLoading(true);
     setError(null);
+    track("search_submitted", { items: items.length });
     fetch("/api/compare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -223,6 +225,7 @@ export default function StoreComparison({ items }: Props) {
     const encoded = btoa(JSON.stringify(items));
     const url = `${window.location.origin}/?l=${encoded}`;
     navigator.clipboard.writeText(url).then(() => {
+      track("list_shared", { items: items.length, source: "results" });
       setShared(true);
       setTimeout(() => setShared(false), 2500);
     });
