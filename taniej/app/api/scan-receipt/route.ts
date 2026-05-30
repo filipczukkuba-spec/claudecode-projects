@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { matchScore, MATCH_THRESHOLD } from "@/lib/matching";
+import { matchScore } from "@/lib/matching";
 import { createHash } from "crypto";
 
 export const maxDuration = 60;
@@ -10,17 +10,22 @@ const TOTAL_TOLERANCE_PLN = 2.0;
 const HARD_MAX_PRICE = 500;
 const OUTLIER_MULTIPLIER = 5;
 const MAX_SCANS_PER_HOUR = 10;
+const DUP_WINDOW_DAYS = 30;
+const STRICT_MATCH_THRESHOLD = 0.75; // higher = less guessing
 
 interface ExtractedItem {
   raw_name: string;
   matched_name: string | null;   // closest known product name
-  price: number;
+  quantity: number;              // 1 for piece-sold, weight in kg for loose produce
+  unit_type: "szt" | "kg" | "l" | null;
+  unit_price: number;            // PRICE PER UNIT (per kg, per litre, per piece)
+  line_total: number;            // total paid on this line
   is_promo: boolean;             // line was discounted (coupon, * marker, RABAT line)
 }
 
 interface VisionResult {
-  store: string | null;          // detected store name
-  receipt_date: string | null;   // YYYY-MM-DD
+  store: string | null;
+  receipt_date: string | null;
   total: number | null;
   items: ExtractedItem[];
   unreadable: boolean;
@@ -31,7 +36,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "AI niedostępne" }, { status: 503 });
   }
 
-  // Parse multipart form (image upload)
   const form = await req.formData().catch(() => null);
   const file = form?.get("receipt");
   const city = (form?.get("city") as string | null)?.trim().slice(0, 50) || null;
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Crude IP-based rate limiting
+  // Rate limit per IP
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const ipHash = createHash("sha256").update(ip).digest("hex").slice(0, 32);
   const hourAgo = new Date(Date.now() - 3600_000).toISOString();
@@ -64,7 +68,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Load reference data once
   const [{ data: products }, { data: stores }] = await Promise.all([
     admin.from("products").select("id, name, unit"),
     admin.from("stores").select("id, name"),
@@ -73,12 +76,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Błąd bazy danych" }, { status: 500 });
   }
 
-  // Convert image → base64 for the Anthropic SDK
   const bytes = new Uint8Array(await file.arrayBuffer());
   const base64 = Buffer.from(bytes).toString("base64");
 
-  // Build a compact reference list so Claude can map abbreviated receipt lines
-  // (e.g. "PATYCZKI SZAS") to canonical product names.
   const productList = products
     .map((p) => `${p.id}: ${p.name}${p.unit ? ` (${p.unit})` : ""}`)
     .join("\n");
@@ -101,34 +101,59 @@ export async function POST(req: NextRequest) {
             },
             {
               type: "text",
-              text: `You are extracting grocery items from a Polish supermarket receipt (paragon fiskalny).
+              text: `You are extracting items from a Polish supermarket receipt (paragon fiskalny).
 
-Known stores (pick one, exact spelling):
+Known stores (return exact spelling):
 ${storeList}
 
-Known products (id: name (unit)):
+Known products catalogue (id: name (unit)):
 ${productList.slice(0, 25000)}
 
-Receipt instructions:
-- Identify the store from the header (logo or address line).
-- Find the receipt date — usually printed near "DATA" or as YYYY-MM-DD at the bottom.
-- Find the final total — usually labeled "SUMA PLN" or "DO ZAPŁATY".
-- For each item line:
-    • raw_name = the exact abbreviated text on the receipt (e.g. "PATYCZKI SZAS")
-    • matched_name = the CLOSEST product name from the known list above, or null if no good match
-    • price = the price for that line in PLN (the per-unit price × qty as printed)
-    • is_promo = true if the line has a sale marker like "*", "RABAT", "PROMO", "1+1", "-X%", or a discount row immediately after it; false otherwise
-- Coupon/loyalty discounts: if the receipt shows a separate "RABAT" or negative discount row, mark the affected items as is_promo=true and use the FINAL price after discount.
-- Skip: deposit fees ("OPŁATA SKARBOWA"), bag charges, NIP lines, copy markers, blank rows.
-- If the receipt is unreadable (blurry, cut off, not a Polish receipt) return unreadable=true.
+CRITICAL RULES — read carefully:
 
-Respond with ONLY a JSON object in this exact shape (no markdown):
+1. STORE: identify from the header, logo, or address. Use exact spelling from the list above.
+
+2. DATE: find the receipt date (near "DATA" or YYYY-MM-DD format).
+
+3. TOTAL: find the final total at "SUMA PLN" or "DO ZAPŁATY".
+
+4. FOR EACH ITEM LINE:
+   - raw_name: the exact abbreviated Polish text on the receipt
+   - matched_name: the EXACT name from the catalogue above ONLY IF you are confident.
+     DO NOT GUESS. If the receipt says "PATYCZKI SZAS" and there is no Patyczki product
+     in the catalogue, return matched_name = null. NEVER pick a different product just
+     because it has similar letters. "FILET DORSZ" must NOT be matched to "Filet z indyka".
+   - quantity: how many units were bought. For piece-sold items = the count (1, 2, ...).
+     For weight-sold items the receipt shows "0.63 x 14.99 = 9.44" — here quantity = 0.63 (kg).
+   - unit_type: "szt" (piece), "kg" (kilogram), or "l" (litre). null if unclear.
+   - unit_price: the PRICE PER UNIT as shown on the receipt — i.e. price per kg for
+     weight-sold items, price per piece for piece-sold items.
+       Example "0.63 x 14.99 = 9.44 papryka": unit_price = 14.99 (not 9.44!)
+       Example "2 x 3.99 = 7.98 cola": unit_price = 3.99 (not 7.98)
+       Example "Cebula 6.99": unit_price = 6.99, quantity = 1, unit_type = "szt"
+   - line_total: the total paid on this line (used for SUMA reconciliation).
+   - is_promo: true if the line shows "*", "RABAT", "PROMO", "1+1", "-X%", or has a
+     discount row right after it.
+
+5. SKIP: deposit fees ("OPŁATA SKARBOWA"), bag charges, NIP, copy markers, blank rows.
+
+6. If receipt is blurry, cut off, or not a Polish receipt: return unreadable=true.
+
+Respond with ONLY a JSON object (no markdown):
 {
   "store": "Lidl" | "Biedronka" | ... | null,
   "receipt_date": "2026-05-30" | null,
   "total": 51.86 | null,
   "items": [
-    { "raw_name": "...", "matched_name": "..." | null, "price": 0.00, "is_promo": false }
+    {
+      "raw_name": "PAPRYKA CZERW LUZ",
+      "matched_name": "Papryka" | null,
+      "quantity": 0.63,
+      "unit_type": "kg",
+      "unit_price": 14.99,
+      "line_total": 9.44,
+      "is_promo": false
+    }
   ],
   "unreadable": false
 }`,
@@ -142,37 +167,30 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("invalid_json");
     vision = JSON.parse(match[0]) as VisionResult;
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { error: "Nie udało się odczytać paragonu — spróbuj wyraźniejsze zdjęcie" },
       { status: 422 }
     );
   }
 
-  // ── Validation pipeline ─────────────────────────────────────────────
+  // ── Validation ──────────────────────────────────────────────────────
 
   if (vision.unreadable) {
     await admin.from("receipt_scans").insert({
-      status: "rejected",
-      reject_reason: "unreadable",
-      ip_hash: ipHash,
-      city,
+      status: "rejected", reject_reason: "unreadable", ip_hash: ipHash, city,
     });
     return NextResponse.json({ error: "Paragon nieczytelny — zrób wyraźniejsze zdjęcie" }, { status: 422 });
   }
 
-  // Store match
   const storeRow = vision.store
     ? stores.find((s) => s.name.toLowerCase() === vision.store!.toLowerCase())
     : null;
   if (!storeRow) {
     await admin.from("receipt_scans").insert({
-      status: "rejected",
-      reject_reason: "unknown_store",
-      extracted_total: vision.total,
-      receipt_date: vision.receipt_date,
-      ip_hash: ipHash,
-      city,
+      status: "rejected", reject_reason: "unknown_store",
+      extracted_total: vision.total, receipt_date: vision.receipt_date,
+      ip_hash: ipHash, city,
     });
     return NextResponse.json(
       { error: `Nie rozpoznano sklepu (${vision.store ?? "nieznany"})` },
@@ -180,15 +198,10 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
     );
   }
 
-  // Date check
   if (!vision.receipt_date) {
     await admin.from("receipt_scans").insert({
-      status: "rejected",
-      reject_reason: "no_date",
-      store_id: storeRow.id,
-      extracted_total: vision.total,
-      ip_hash: ipHash,
-      city,
+      status: "rejected", reject_reason: "no_date",
+      store_id: storeRow.id, extracted_total: vision.total, ip_hash: ipHash, city,
     });
     return NextResponse.json({ error: "Nie znaleziono daty na paragonie" }, { status: 422 });
   }
@@ -199,12 +212,9 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
   const ageDays = (Date.now() - receiptMs) / 86400_000;
   if (ageDays > MAX_RECEIPT_AGE_DAYS) {
     await admin.from("receipt_scans").insert({
-      status: "rejected",
-      reject_reason: "too_old",
-      store_id: storeRow.id,
-      receipt_date: vision.receipt_date,
-      ip_hash: ipHash,
-      city,
+      status: "rejected", reject_reason: "too_old",
+      store_id: storeRow.id, receipt_date: vision.receipt_date,
+      ip_hash: ipHash, city,
     });
     return NextResponse.json(
       { error: `Paragon starszy niż ${MAX_RECEIPT_AGE_DAYS} dni — pokazujemy aktualne ceny` },
@@ -215,26 +225,49 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
     return NextResponse.json({ error: "Data paragonu jest w przyszłości" }, { status: 422 });
   }
 
-  // Items sanity
   const items = Array.isArray(vision.items) ? vision.items : [];
   if (items.length === 0) {
     return NextResponse.json({ error: "Nie znaleziono produktów na paragonie" }, { status: 422 });
   }
 
-  // Total reconciliation — defense against bad OCR & manipulation
+  // Duplicate detection — fingerprint = store + date + total + sorted line totals
+  const fingerprintInput =
+    `${storeRow.id}|${vision.receipt_date}|${(vision.total ?? 0).toFixed(2)}|` +
+    items
+      .map((i) => (Number.isFinite(i.line_total) ? i.line_total : 0).toFixed(2))
+      .sort()
+      .join(",");
+  const fingerprint = createHash("sha256").update(fingerprintInput).digest("hex").slice(0, 32);
+
+  const dupSince = new Date(Date.now() - DUP_WINDOW_DAYS * 86400_000).toISOString();
+  const { count: dupCount } = await admin
+    .from("receipt_scans")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "ok")
+    .eq("fingerprint", fingerprint)
+    .gte("scanned_at", dupSince);
+
+  if ((dupCount ?? 0) > 0) {
+    await admin.from("receipt_scans").insert({
+      status: "rejected", reject_reason: "duplicate",
+      store_id: storeRow.id, receipt_date: vision.receipt_date,
+      ip_hash: ipHash, city,
+    });
+    return NextResponse.json(
+      { error: "Ten paragon już został zeskanowany. Dziękujemy!" },
+      { status: 409 }
+    );
+  }
+
+  // Total reconciliation using line_total values
   if (vision.total != null && Number.isFinite(vision.total)) {
-    const sum = items.reduce((s, i) => s + (Number.isFinite(i.price) ? i.price : 0), 0);
+    const sum = items.reduce((s, i) => s + (Number.isFinite(i.line_total) ? i.line_total : 0), 0);
     if (Math.abs(sum - vision.total) > TOTAL_TOLERANCE_PLN) {
       await admin.from("receipt_scans").insert({
-        status: "rejected",
-        reject_reason: "total_mismatch",
-        store_id: storeRow.id,
-        receipt_date: vision.receipt_date,
-        receipt_total: vision.total,
-        extracted_total: parseFloat(sum.toFixed(2)),
-        item_count: items.length,
-        ip_hash: ipHash,
-        city,
+        status: "rejected", reject_reason: "total_mismatch",
+        store_id: storeRow.id, receipt_date: vision.receipt_date,
+        receipt_total: vision.total, extracted_total: parseFloat(sum.toFixed(2)),
+        item_count: items.length, ip_hash: ipHash, city,
       });
       return NextResponse.json(
         { error: `Suma produktów (${sum.toFixed(2)} zł) nie zgadza się z paragonem (${vision.total.toFixed(2)} zł)` },
@@ -243,7 +276,7 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
     }
   }
 
-  // Outlier reference: median price for this product across stores
+  // Outlier reference: median per-product price across stores
   const { data: refPrices } = await admin.from("prices").select("product_id, price");
   const medianByProduct = new Map<number, number>();
   if (refPrices) {
@@ -260,15 +293,18 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
     }
   }
 
-  // Record the scan first so we can attach reports to it
+  // Record the scan first so we can attach reports to it.
   const { data: scanRow, error: scanErr } = await admin
     .from("receipt_scans")
     .insert({
       status: "ok",
+      fingerprint,
       store_id: storeRow.id,
       receipt_date: vision.receipt_date,
       receipt_total: vision.total ?? null,
-      extracted_total: parseFloat(items.reduce((s, i) => s + (i.price || 0), 0).toFixed(2)),
+      extracted_total: parseFloat(
+        items.reduce((s, i) => s + (i.line_total || 0), 0).toFixed(2)
+      ),
       item_count: items.length,
       ip_hash: ipHash,
       city,
@@ -280,18 +316,19 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
     return NextResponse.json({ error: "Błąd zapisu" }, { status: 500 });
   }
 
-  // Map each line to a known product + insert into price_reports
+  // Process items: strict match + per-unit price
   const reportRows: any[] = [];
-  const accepted: { product: string; price: number; is_promo: boolean }[] = [];
+  const accepted: { product: string; price: number; unit_type: string | null; is_promo: boolean }[] = [];
   const rejected: { raw: string; reason: string }[] = [];
 
   for (const item of items) {
-    if (!item || !Number.isFinite(item.price) || item.price <= 0 || item.price > HARD_MAX_PRICE) {
+    const unitPrice = Number.isFinite(item.unit_price) ? item.unit_price : NaN;
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0 || unitPrice > HARD_MAX_PRICE) {
       rejected.push({ raw: item.raw_name ?? "?", reason: "invalid_price" });
       continue;
     }
 
-    // Try Claude's match first, fall back to fuzzy match
+    // Strict match: prefer Claude's matched_name; only fall back to fuzzy if very high score
     let best = item.matched_name
       ? products.find((p) => p.name.toLowerCase() === item.matched_name!.toLowerCase())
       : undefined;
@@ -299,7 +336,7 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
     if (!best) {
       const candidates = products
         .map((p) => ({ p, score: matchScore(item.raw_name, p.name) }))
-        .filter(({ score }) => score >= MATCH_THRESHOLD)
+        .filter(({ score }) => score >= STRICT_MATCH_THRESHOLD)
         .sort((a, b) => b.score - a.score);
       best = candidates[0]?.p;
     }
@@ -309,9 +346,8 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
       continue;
     }
 
-    // Outlier guard
     const median = medianByProduct.get(best.id);
-    if (median && item.price >= median * OUTLIER_MULTIPLIER) {
+    if (median && unitPrice >= median * OUTLIER_MULTIPLIER) {
       rejected.push({ raw: item.raw_name, reason: "outlier" });
       continue;
     }
@@ -319,13 +355,18 @@ Respond with ONLY a JSON object in this exact shape (no markdown):
     reportRows.push({
       product_id: best.id,
       store_id: storeRow.id,
-      price: parseFloat(item.price.toFixed(2)),
+      price: parseFloat(unitPrice.toFixed(2)),
       source: "receipt",
       scan_id: scanRow.id,
       is_promo: !!item.is_promo,
       city,
     });
-    accepted.push({ product: best.name, price: item.price, is_promo: !!item.is_promo });
+    accepted.push({
+      product: best.name,
+      price: unitPrice,
+      unit_type: item.unit_type ?? null,
+      is_promo: !!item.is_promo,
+    });
   }
 
   if (reportRows.length > 0) {

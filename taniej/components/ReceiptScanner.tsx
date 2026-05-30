@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 
-interface AcceptedItem { product: string; price: number; is_promo: boolean }
+interface AcceptedItem { product: string; price: number; unit_type: string | null; is_promo: boolean }
 interface RejectedItem { raw: string; reason: string }
 interface ScanResult {
   ok: true;
@@ -190,19 +190,28 @@ export default function ReceiptScanner() {
                     Zapisane ceny
                   </p>
                   <ul className="divide-y divide-gray-50">
-                    {result.accepted.map((a, i) => (
-                      <li key={i} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                        <span className="text-gray-700 truncate">{a.product}</span>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {a.is_promo && (
-                            <span className="text-[10px] bg-orange-100 text-orange-600 font-bold px-1.5 py-0.5 rounded-full leading-none">
-                              PROMO
+                    {result.accepted.map((a, i) => {
+                      const unitLabel =
+                        a.unit_type === "kg" ? "/kg" :
+                        a.unit_type === "l"  ? "/l"  :
+                        a.unit_type === "szt" ? "/szt" : "";
+                      return (
+                        <li key={i} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                          <span className="text-gray-700 truncate">{a.product}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {a.is_promo && (
+                              <span className="text-[10px] bg-orange-100 text-orange-600 font-bold px-1.5 py-0.5 rounded-full leading-none">
+                                PROMO
+                              </span>
+                            )}
+                            <span className="font-bold text-gray-900">
+                              {fmt(a.price)} zł
+                              {unitLabel && <span className="text-xs text-gray-400 font-normal">{unitLabel}</span>}
                             </span>
-                          )}
-                          <span className="font-bold text-gray-900">{fmt(a.price)} zł</span>
-                        </div>
-                      </li>
-                    ))}
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
