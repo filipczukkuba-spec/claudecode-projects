@@ -17,6 +17,9 @@ const STORE_URLS: Record<string, string[]> = {
     "https://www.aldi.pl/produkty/swieze-produkty/nabiał-i-jajka.html",
     "https://www.aldi.pl/produkty/swieze-produkty/mieso-i-wedliny.html",
     "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
+    // aggregator fallback — gazetki.pl shows real Aldi flyer prices
+    "https://www.gazetki.pl/gazetki/aldi/",
+    "https://promocjusz.pl/sklepy/aldi/",
   ],
   Lidl: [
     "https://www.lidl.pl/s?q=mleko+maslo+ser+jajka+jogurt+smietana",
@@ -25,21 +28,23 @@ const STORE_URLS: Record<string, string[]> = {
     "https://www.lidl.pl/s?q=woda+sok+napoje+piwo+cola",
     "https://www.lidl.pl/s?q=ryz+makaron+kasza+platki+musli",
     "https://www.lidl.pl/s?q=chipsy+czekolada+ciastka+slodycze",
+    "https://www.gazetki.pl/gazetki/lidl/",
   ],
+  // Biedronka main site blocks scrapers — use their online store + aggregators
   Biedronka: [
-    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/",
     "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/nabiał-i-jajka/",
     "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/mieso-i-wedliny/",
     "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/pieczywo-i-ciasta/",
     "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/napoje/",
-    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/owoce-i-warzywa/",
+    "https://www.gazetki.pl/gazetki/biedronka/",
+    "https://promocjusz.pl/sklepy/biedronka/",
   ],
   Auchan: [
     "https://www.auchan.pl/artykuly-spozywcze/nabiał-i-jajka/",
     "https://www.auchan.pl/artykuly-spozywcze/mieso-i-drob/",
     "https://www.auchan.pl/artykuly-spozywcze/pieczywo/",
-    "https://www.auchan.pl/artykuly-spozywcze/napoje/",
-    "https://www.auchan.pl/oferty-tygodnia/",
+    "https://www.gazetki.pl/gazetki/auchan/",
+    "https://promocjusz.pl/sklepy/auchan/",
   ],
   Netto: [
     "https://www.netto.pl/sklep/artykuly-spozywcze/mleczarskie/",
@@ -47,19 +52,21 @@ const STORE_URLS: Record<string, string[]> = {
     "https://www.netto.pl/sklep/artykuly-spozywcze/pieczywo/",
     "https://www.netto.pl/sklep/artykuly-spozywcze/napoje/",
     "https://www.netto.pl/oferty/gazetka-tygodniowa/",
+    "https://www.gazetki.pl/gazetki/netto/",
   ],
+  // Kaufland: Cloudflare on main site — aggregators have their real flyer prices
   Kaufland: [
     "https://www.kaufland.pl/angebote/aktuelle-woche/",
-    "https://www.kaufland.pl/produkte/kategorien/kuehlprodukte.html",
-    "https://www.kaufland.pl/produkte/kategorien/fleisch--wurst--geflügel.html",
-    "https://www.kaufland.pl/produkte/kategorien/backwaren.html",
+    "https://www.gazetki.pl/gazetki/kaufland/",
+    "https://promocjusz.pl/sklepy/kaufland/",
+    "https://www.superoferty.pl/kaufland/",
   ],
+  // Carrefour: completely blocked — aggregators only
   Carrefour: [
     "https://www.carrefour.pl/artykuly-spozywcze/",
-    "https://www.carrefour.pl/mieso-ryby-i-owoce-morza/",
-    "https://www.carrefour.pl/nabiał-i-jajka/",
-    "https://www.carrefour.pl/pieczywo-i-ciasta/",
-    "https://www.carrefour.pl/napoje/",
+    "https://www.gazetki.pl/gazetki/carrefour/",
+    "https://promocjusz.pl/sklepy/carrefour/",
+    "https://www.superoferty.pl/carrefour/",
   ],
 };
 
