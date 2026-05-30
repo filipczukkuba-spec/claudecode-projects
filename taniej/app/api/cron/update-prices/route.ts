@@ -12,44 +12,41 @@ export const maxDuration = 60;
 // Limit: each store runs its URLs in parallel; all stores run in parallel.
 
 const STORE_URLS: Record<string, string[]> = {
-  // Aldi: direct website working well
+  // Aldi: direct website working well — keep what works
   Aldi: [
     "https://www.aldi.pl/oferty/",
     "https://www.aldi.pl/produkty/swieze-produkty/nabiał-i-jajka.html",
     "https://www.aldi.pl/produkty/swieze-produkty/mieso-i-wedliny.html",
-    "https://www.gazetki.pl/gazetki/aldi/",
+    "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
   ],
-  // Lidl: search queries return 404 — use main + offers page + gazeta aggregator
+  // Lidl: main page + offers (search queries 404, gazetki.pl redirects back to lidl.pl)
   Lidl: [
     "https://www.lidl.pl/",
     "https://www.lidl.pl/oferty",
-    "https://www.gazetki.pl/gazetki/lidl/",
   ],
-  // Biedronka: zakupy category pages 404 — use root + gazetki.pl (active gazeta confirmed)
+  // Biedronka: root page works — add category pages using nav category names
   Biedronka: [
     "https://zakupy.biedronka.pl/pl/",
-    "https://www.gazetki.pl/gazetki/biedronka/",
+    "https://zakupy.biedronka.pl/pl/nabial/",
+    "https://zakupy.biedronka.pl/pl/mieso/",
+    "https://zakupy.biedronka.pl/pl/piekarnia/",
+    "https://zakupy.biedronka.pl/pl/napoje/",
+    "https://zakupy.biedronka.pl/pl/warzywa/",
+    "https://zakupy.biedronka.pl/pl/owoce/",
   ],
-  // Auchan: no active gazeta on gazetki.pl — scrape direct website
+  // Auchan: try search since category pages are blocked
   Auchan: [
     "https://www.auchan.pl/",
-    "https://www.auchan.pl/oferty-tygodnia/",
-    "https://www.auchan.pl/artykuly-spozywcze/",
+    "https://www.auchan.pl/szukaj/?q=mleko+ser+maslo+jajka",
+    "https://www.auchan.pl/szukaj/?q=mieso+kurczak+wedlina",
   ],
-  // Netto: /sklep/ URLs all 404 — use root + offers + gazetki.pl
+  // Netto: try gazetka-specific page and main — /sklep/ and /oferty/ both 404
   Netto: [
     "https://www.netto.pl/",
-    "https://www.netto.pl/oferty/",
-    "https://www.gazetki.pl/gazetki/netto/",
+    "https://www.netto.pl/gazetka-tygodniowa/",
   ],
-  // Kaufland: Cloudflare blocks direct — gazetki.pl has active Kaufland gazeta (confirmed)
-  Kaufland: [
-    "https://www.gazetki.pl/gazetki/kaufland/",
-  ],
-  // Carrefour: direct blocked, promocjusz.pl dead — gazetki.pl only
-  Carrefour: [
-    "https://www.gazetki.pl/gazetki/carrefour/",
-  ],
+  // Kaufland: Cloudflare blocks everything including gazetki.pl redirect — skip for now
+  // Carrefour: completely blocked — skip for now
 };
 
 // ── Claude extraction ────────────────────────────────────────────────────────
@@ -154,7 +151,9 @@ export async function POST(req: NextRequest) {
         const htmlResults = await Promise.allSettled(urls.map((u) => fetchViaJina(u)));
         const texts = htmlResults
           .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled" && r.value.length > 300)
-          .map((r) => r.value);
+          .map((r) => r.value)
+          // Drop 404/block pages — they confuse Claude into extracting garbage
+          .filter(t => !/(strona nie istnieje|nie możemy znaleźć strony|404 uuuups|wymagana weryfikacja|ray id:|cloudflare|ta strona nie istnieje)/i.test(t.slice(0, 600)));
 
         const pagesOk = texts.length;
         const textChars = texts.reduce((s, t) => s + t.length, 0);
@@ -225,8 +224,8 @@ export async function POST(req: NextRequest) {
   );
 
   const totalUpdated = Object.values(report).reduce((s, r) => s + r.updated + r.promos, 0);
-  const ok = Object.entries(report).filter(([, r]) => !r.error).map(([n]) => n);
-  const failed = Object.entries(report).filter(([, r]) => r.error).map(([n]) => n);
+  const ok = Object.entries(report).filter(([, r]) => !r.error && r.updated + r.promos > 0).map(([n]) => n);
+  const failed = Object.entries(report).filter(([, r]) => r.error || r.updated + r.promos === 0).map(([n]) => n);
 
   await sendEmail(
     `taniejkupuj — sync ${totalUpdated} cen (${new Date().toLocaleDateString("pl-PL")})`,
