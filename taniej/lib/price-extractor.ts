@@ -31,7 +31,7 @@ export async function fetchViaFirecrawl(url: string): Promise<string> {
         url,
         formats: ["markdown"],
         onlyMainContent: true,
-        waitFor: 3000,
+        waitFor: 5000,
       }),
       signal: ctrl.signal,
     });
