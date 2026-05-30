@@ -15,6 +15,17 @@ interface PriceRow {
   reported_price: number | null;
   reported_at: string | null;
   reported_city: string | null;
+  source: string | null;
+  scraped_at: string | null;
+}
+
+function isEstimated(p: PriceRow): boolean {
+  // A price is "real" if scraped, has a promo, has an app price, or has a user-reported price.
+  // Otherwise treat as estimate.
+  if (p.reported_price !== null) return false;
+  if (p.promo_price !== null) return false;
+  if (p.app_price !== null) return false;
+  return p.source !== "scraped";
 }
 
 interface StoreResult {
@@ -310,16 +321,19 @@ export default function StoreComparison({ items }: Props) {
             const hasPromos = store.prices.some(p => p.promo_price !== null);
             const hasApp = store.prices.some(p => p.app_price !== null);
             const hasReports = store.prices.some(p => p.reported_price !== null);
+            const pricedRows = store.prices.filter(p => effectivePrice(p) !== null);
+            const allEstimated = pricedRows.length > 0 && pricedRows.every(isEstimated);
             return (
               <div key={store.name}>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-semibold text-gray-700 w-20 shrink-0 truncate">{store.name}</span>
                   <div className="flex items-center gap-1 ml-auto">
+                    {allEstimated && <span className="text-[10px] bg-gray-100 text-gray-500 font-bold px-1.5 py-0.5 rounded-full leading-none" title="Ceny szacowane — sklep blokuje scraping">~ szac.</span>}
                     {hasReports && <span className="text-[10px] bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full leading-none">z półki</span>}
                     {hasPromos && <span className="text-[10px] bg-orange-100 text-orange-600 font-bold px-1.5 py-0.5 rounded-full leading-none">PROMO</span>}
                     {hasApp && <span className="text-[10px] bg-blue-100 text-blue-600 font-bold px-1.5 py-0.5 rounded-full leading-none">APP</span>}
                     <span className={`text-xs font-black ${i === 0 ? "text-green-600" : "text-gray-500"}`}>
-                      {fmt(store.total)} zł
+                      {allEstimated ? "~" : ""}{fmt(store.total)} zł
                     </span>
                     {i > 0 && diff > 0.01 && (
                       <span className="text-[10px] text-red-400 font-bold">+{fmt(diff)}</span>
@@ -345,6 +359,9 @@ export default function StoreComparison({ items }: Props) {
         const isOpen = expanded[store.name] ?? false;
         const promoCount = store.prices.filter(p => p.promo_price !== null).length;
         const reportCount = store.prices.filter(p => p.reported_price !== null).length;
+        const storePricedRows = store.prices.filter(p => effectivePrice(p) !== null);
+        const storeAllEstimated = storePricedRows.length > 0 && storePricedRows.every(isEstimated);
+        const estimatedCount = store.prices.filter(p => effectivePrice(p) !== null && isEstimated(p)).length;
 
         return (
           <div
@@ -365,17 +382,23 @@ export default function StoreComparison({ items }: Props) {
                     {isCheapest && results.length > 1 && (
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${style.tag}`}>Najtaniej</span>
                     )}
+                    {storeAllEstimated && (
+                      <span className="text-[10px] bg-gray-100 text-gray-500 font-bold px-1.5 py-0.5 rounded-full" title="Sklep blokuje scraping — ceny są szacowane">
+                        ~ ceny szacowane
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {store.found}/{items.length} produktów
                     {promoCount > 0 && ` · ${promoCount} w promocji`}
                     {reportCount > 0 && ` · ${reportCount} z półki`}
+                    {!storeAllEstimated && estimatedCount > 0 && ` · ${estimatedCount} szacowane`}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <p className="font-black text-xl text-gray-900 leading-tight">{fmt(store.total)} zł</p>
+                  <p className="font-black text-xl text-gray-900 leading-tight">{storeAllEstimated ? "~" : ""}{fmt(store.total)} zł</p>
                   {!isCheapest && results.length > 1 && diff > 0.01 && (
                     <p className="text-xs text-red-400 font-semibold leading-tight">+{fmt(diff)} zł ({diffPct}%)</p>
                   )}
@@ -395,6 +418,7 @@ export default function StoreComparison({ items }: Props) {
                     const hasReport = p.reported_price !== null;
                     const promoIsBetter = hasPromo && (!hasApp || p.promo_price! <= (p.app_price ?? Infinity)) && (!hasReport || p.promo_price! <= (p.reported_price ?? Infinity));
                     const reportIsBest = hasReport && ep === p.reported_price;
+                    const estimated = ep !== null && isEstimated(p);
 
                     return (
                       <div key={p.item} className="py-2.5 border-b border-gray-50 last:border-0">
@@ -421,6 +445,11 @@ export default function StoreComparison({ items }: Props) {
                                   z aplikacją
                                 </span>
                               )}
+                              {estimated && (
+                                <span className="text-[10px] bg-gray-100 text-gray-500 font-bold px-1.5 py-0.5 rounded-full leading-none" title="Cena szacowana — sklep blokuje scraping">
+                                  ~ szac.
+                                </span>
+                              )}
                             </div>
                           </div>
 
@@ -434,10 +463,11 @@ export default function StoreComparison({ items }: Props) {
                                   reportIsBest ? "text-green-600" :
                                   promoIsBetter ? "text-orange-600" :
                                   hasApp ? "text-blue-600" :
+                                  estimated ? "text-gray-400" :
                                   isCheapestItem ? "text-green-600" :
                                   "text-gray-700"
                                 }`}>
-                                  {fmt(ep)} zł
+                                  {estimated ? "~" : ""}{fmt(ep)} zł
                                 </span>
                               </div>
                             ) : (
@@ -484,10 +514,13 @@ export default function StoreComparison({ items }: Props) {
         </p>
       </div>
 
-      <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+      <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 space-y-1.5">
         <p className="text-xs text-amber-700 leading-relaxed">
-          <span className="font-bold">Ceny orientacyjne.</span> Aktualizowane co tydzień z gazetek i aplikacji.
-          Ceny z półki (zielone) są zgłaszane przez użytkowników.
+          <span className="font-bold">Skąd są ceny?</span> Carrefour, Aldi, Netto, Kaufland — codzienna synchronizacja z gazetek online.
+          Biedronka i Lidl blokują scraping — pokazujemy szacowane ceny rynkowe (oznaczone <span className="font-bold">~</span> i etykietą &quot;szac.&quot;).
+        </p>
+        <p className="text-xs text-amber-700 leading-relaxed">
+          Ceny z półki <span className="font-bold text-green-700">(zielone)</span> są zgłaszane przez użytkowników i mają najwyższy priorytet.
           Zawsze sprawdź aktualną cenę w sklepie przed zakupem.
         </p>
       </div>

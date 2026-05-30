@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const { data: prices, error: priceError } = await supabase
     .from("prices")
-    .select("store_id, product_id, price, app_price, stores(name, logo), products(name, unit)")
+    .select("store_id, product_id, price, app_price, source, scraped_at, stores(name, logo), products(name, unit)")
     .in("product_id", matchedIds.length > 0 ? matchedIds : [-1]);
 
   if (priceError) return NextResponse.json({ error: priceError.message }, { status: 500 });
@@ -106,6 +106,8 @@ export async function POST(req: NextRequest) {
       reported_price: report?.price ?? null,
       reported_at: report?.submitted_at ?? null,
       reported_city: report?.city ?? null,
+      source: row.source ?? "estimated",
+      scraped_at: row.scraped_at ?? null,
     });
   }
 
@@ -127,6 +129,8 @@ export async function POST(req: NextRequest) {
         reported_price: found?.reported_price ?? null,
         reported_at: found?.reported_at ?? null,
         reported_city: found?.reported_city ?? null,
+        source: found?.source ?? null,
+        scraped_at: found?.scraped_at ?? null,
       };
     });
     return { ...store, prices: filledPrices };
