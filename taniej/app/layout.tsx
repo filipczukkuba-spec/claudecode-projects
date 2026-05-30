@@ -6,17 +6,32 @@ import "./globals.css";
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "taniejkupuj — Najtańszy koszyk zakupów w Polsce",
-  description: "Porównaj ceny w 7 sklepach jednocześnie: Biedronka, Lidl, Kaufland, Aldi, Netto, Auchan, Carrefour. Znajdź najtańszy koszyk i oszczędzaj na zakupach.",
+  title: "taniejkupuj.pl — Porównywarka cen 7 sklepów spożywczych",
+  description: "Porównaj ceny w Biedronce, Lidlu, Kauflandzie, Aldi, Netto, Auchanie i Carrefourze. Wpisz listę zakupów, znajdź najtańszy koszyk. Bez logowania, gratis.",
   manifest: "/manifest.json",
-  keywords: ["porównywarka cen", "najtańsze zakupy", "biedronka lidl kaufland", "koszyk zakupów"],
+  keywords: [
+    "porównywarka cen",
+    "porównywarka cen spożywczych",
+    "najtańsze zakupy",
+    "promocje biedronka lidl kaufland",
+    "gazetka biedronki",
+    "gazetka lidla",
+    "koszyk zakupów online",
+    "tanie zakupy",
+    "porównaj ceny sklepów",
+  ],
   openGraph: {
-    title: "taniejkupuj — Najtańszy koszyk zakupów w Polsce",
-    description: "Porównaj ceny w 7 sklepach i znajdź najtańszy koszyk. Bezpłatnie.",
+    title: "taniejkupuj.pl — Porównywarka cen 7 sklepów spożywczych",
+    description: "Porównaj ceny w Biedronce, Lidlu, Kauflandzie, Aldi, Netto, Auchanie i Carrefourze. Wpisz listę zakupów, znajdź najtańszy koszyk. Bez logowania, gratis.",
     url: "https://taniejkupuj.pl",
     siteName: "taniejkupuj",
     locale: "pl_PL",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "taniejkupuj.pl — Porównywarka cen 7 sklepów spożywczych",
+    description: "Porównaj ceny w Biedronce, Lidlu, Kauflandzie, Aldi, Netto, Auchanie i Carrefourze. Wpisz listę zakupów, znajdź najtańszy koszyk. Bez logowania, gratis.",
   },
   appleWebApp: {
     capable: true,
