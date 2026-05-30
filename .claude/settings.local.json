@@ -107,7 +107,16 @@
       "Bash(npm install *)",
       "Bash(git commit *)",
       "Bash(npm run *)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "WebFetch(domain:www.gazetki.pl)",
+      "WebFetch(domain:www.promoceny.pl)",
+      "WebFetch(domain:www.lidl.pl)",
+      "WebFetch(domain:www.biedronka.pl)",
+      "WebFetch(domain:www.skarbiec.biz)",
+      "WebFetch(domain:www.okazje24.pl)",
+      "WebFetch(domain:promocje.dlaoszczednych.pl)",
+      "WebFetch(domain:www.pepper.pl)",
+      "WebFetch(domain:www.gazetka-online.pl)"
     ]
   }
 }
