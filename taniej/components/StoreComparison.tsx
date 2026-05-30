@@ -52,8 +52,11 @@ function fmt(n: number) {
   return n.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Main price used for totals & ranking. ONLY uses trusted sources
+// (scraped, estimated, promo, app). User-reported "shelf" prices are
+// shown separately as informational only — they can't skew totals.
 function effectivePrice(p: PriceRow): number | null {
-  const candidates = [p.reported_price, p.promo_price, p.app_price, p.price].filter((v): v is number => v !== null);
+  const candidates = [p.promo_price, p.app_price, p.price].filter((v): v is number => v !== null);
   return candidates.length > 0 ? Math.min(...candidates) : null;
 }
 
@@ -80,20 +83,29 @@ function ReportModal({ item, storeName, productId, storeId, currentPrice, onClos
   const [city, setCity] = useState("");
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit() {
     const parsed = parseFloat(price.replace(",", "."));
     if (!parsed || parsed <= 0) return;
     setSending(true);
+    setError(null);
     try {
-      await fetch("/api/report-price", {
+      const res = await fetch("/api/report-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ product_id: productId, store_id: storeId, price: parsed, city }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Nie udało się zapisać");
+        return;
+      }
       setDone(true);
       setTimeout(() => { onSubmitted(parsed); onClose(); }, 1200);
-    } catch {}
+    } catch {
+      setError("Błąd połączenia");
+    }
     finally { setSending(false); }
   }
 
@@ -142,6 +154,11 @@ function ReportModal({ item, storeName, productId, storeId, currentPrice, onClos
               onChange={(e) => setCity(e.target.value)}
             />
 
+            {error && (
+              <div className="mb-3 bg-red-50 border border-red-100 rounded-xl px-3 py-2 text-xs text-red-600 font-medium">
+                {error}
+              </div>
+            )}
             <button
               onClick={submit}
               disabled={sending || !price}
@@ -416,8 +433,7 @@ export default function StoreComparison({ items }: Props) {
                     const hasPromo = p.promo_price !== null;
                     const hasApp = p.app_price !== null;
                     const hasReport = p.reported_price !== null;
-                    const promoIsBetter = hasPromo && (!hasApp || p.promo_price! <= (p.app_price ?? Infinity)) && (!hasReport || p.promo_price! <= (p.reported_price ?? Infinity));
-                    const reportIsBest = hasReport && ep === p.reported_price;
+                    const promoIsBetter = hasPromo && (!hasApp || p.promo_price! <= (p.app_price ?? Infinity));
                     const estimated = ep !== null && isEstimated(p);
 
                     return (
@@ -460,7 +476,6 @@ export default function StoreComparison({ items }: Props) {
                                   <span className="text-xs text-gray-300 line-through leading-none">{fmt(p.price)} zł</span>
                                 )}
                                 <span className={`font-black text-base leading-none ${
-                                  reportIsBest ? "text-green-600" :
                                   promoIsBetter ? "text-orange-600" :
                                   hasApp ? "text-blue-600" :
                                   estimated ? "text-gray-400" :
@@ -468,6 +483,18 @@ export default function StoreComparison({ items }: Props) {
                                   "text-gray-700"
                                 }`}>
                                   {estimated ? "~" : ""}{fmt(ep)} zł
+                                </span>
+                                {hasReport && (
+                                  <span className="text-[10px] text-green-600 font-semibold leading-none" title={`Zgłoszono ${daysAgo(p.reported_at!)}${p.reported_city ? ` z ${p.reported_city}` : ""}`}>
+                                    półka: {fmt(p.reported_price!)} zł
+                                  </span>
+                                )}
+                              </div>
+                            ) : hasReport ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className="text-[10px] text-gray-400 leading-none">tylko z półki</span>
+                                <span className="font-bold text-sm text-green-600 leading-none" title={`Zgłoszono ${daysAgo(p.reported_at!)}${p.reported_city ? ` z ${p.reported_city}` : ""}`}>
+                                  ≈ {fmt(p.reported_price!)} zł
                                 </span>
                               </div>
                             ) : (
@@ -520,7 +547,7 @@ export default function StoreComparison({ items }: Props) {
           Biedronka i Lidl blokują scraping — pokazujemy szacowane ceny rynkowe (oznaczone <span className="font-bold">~</span> i etykietą &quot;szac.&quot;).
         </p>
         <p className="text-xs text-amber-700 leading-relaxed">
-          Ceny z półki <span className="font-bold text-green-700">(zielone)</span> są zgłaszane przez użytkowników i mają najwyższy priorytet.
+          Ceny z półki <span className="font-bold text-green-700">(zielone)</span> są zgłaszane przez użytkowników i pokazywane informacyjnie — <span className="font-bold">nie wpływają na koszt koszyka</span>, żeby nikt nie zepsuł porównania.
           Zawsze sprawdź aktualną cenę w sklepie przed zakupem.
         </p>
       </div>
