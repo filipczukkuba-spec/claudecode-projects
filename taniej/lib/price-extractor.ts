@@ -13,6 +13,38 @@ export interface ExtractedItem {
 
 // ── Fetch ──────────────────────────────────────────────────────────────────
 
+// Firecrawl: handles Cloudflare + JS rendering. Free tier = 500 pages/month.
+// Sign up at firecrawl.dev, add FIRECRAWL_API_KEY to Vercel env vars.
+export async function fetchViaFirecrawl(url: string): Promise<string> {
+  const key = process.env.FIRECRAWL_API_KEY;
+  if (!key) return "";
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 40000);
+    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        url,
+        formats: ["markdown"],
+        onlyMainContent: true,
+        waitFor: 3000,
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) return "";
+    const data = await res.json();
+    const text: string = data?.data?.markdown ?? "";
+    return text.length > 300 ? text.slice(0, 22000) : "";
+  } catch {
+    return "";
+  }
+}
+
 // Jina.ai reader: renders JS, returns clean text. Free tier, no key needed.
 // With JINA_API_KEY env var: higher rate limits (get free key at jina.ai).
 export async function fetchViaJina(url: string): Promise<string> {

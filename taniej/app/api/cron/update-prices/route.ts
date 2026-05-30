@@ -2,43 +2,78 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { matchScore } from "@/lib/matching";
 import { sendEmail } from "@/lib/email";
-import { fetchViaJina } from "@/lib/price-extractor";
+import { fetchViaJina, fetchViaFirecrawl } from "@/lib/price-extractor";
 
 export const maxDuration = 60;
 
 // ── Store pages ─────────────────────────────────────────────────────────────
-// Category pages return product listings with real prices.
-// Jina.ai renders JavaScript so SPA/React pages work too.
-// Limit: each store runs its URLs in parallel; all stores run in parallel.
+// fetcher: "jina" = free, no key needed. "firecrawl" = needs FIRECRAWL_API_KEY,
+// handles Cloudflare + JS-rendered product grids (500 pages/month free tier).
 
-const STORE_URLS: Record<string, string[]> = {
-  // Aldi: working well — keep as-is
-  Aldi: [
-    "https://www.aldi.pl/oferty/",
-    "https://www.aldi.pl/produkty/swieze-produkty/nabiał-i-jajka.html",
-    "https://www.aldi.pl/produkty/swieze-produkty/mieso-i-wedliny.html",
-    "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
-  ],
-  // Lidl: search queries used to return product pages — try again with simple terms
-  Lidl: [
-    "https://www.lidl.pl/s?q=mleko+ser+jajka",
-    "https://www.lidl.pl/s?q=kurczak+mieso+wedlina",
-    "https://www.lidl.pl/s?q=chleb+maslo+jogurt",
-    "https://www.lidl.pl/oferty",
-  ],
-  // Biedronka: prices in JS-rendered grid — use Jina's screenshot-like mode via longer wait
-  Biedronka: [
-    "https://www.biedronka.pl/pl/oferty/",
-    "https://www.biedronka.pl/pl/gazetka/",
-  ],
-  // Netto: gazetka page working — keep
-  Netto: [
-    "https://www.netto.pl/",
-    "https://www.netto.pl/gazetka-tygodniowa/",
-  ],
-  // Auchan: no reliable scraping possible — skip
-  // Kaufland: Cloudflare blocks all approaches — skip
-  // Carrefour: blocked — skip
+type StoreConfig = { urls: string[]; fetcher: "jina" | "firecrawl" };
+
+const STORES: Record<string, StoreConfig> = {
+  // Aldi: Jina works well — plain HTML offers page
+  Aldi: {
+    fetcher: "jina",
+    urls: [
+      "https://www.aldi.pl/oferty/",
+      "https://www.aldi.pl/produkty/swieze-produkty/nabiał-i-jajka.html",
+      "https://www.aldi.pl/produkty/swieze-produkty/mieso-i-wedliny.html",
+      "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
+    ],
+  },
+  // Lidl: Jina, search + offers
+  Lidl: {
+    fetcher: "jina",
+    urls: [
+      "https://www.lidl.pl/s?q=mleko+ser+jajka",
+      "https://www.lidl.pl/s?q=kurczak+mieso+wedlina",
+      "https://www.lidl.pl/s?q=chleb+maslo+jogurt",
+      "https://www.lidl.pl/oferty",
+    ],
+  },
+  // Netto: Jina, gazetka working
+  Netto: {
+    fetcher: "jina",
+    urls: [
+      "https://www.netto.pl/",
+      "https://www.netto.pl/gazetka-tygodniowa/",
+    ],
+  },
+  // Biedronka: Cloudflare + JS grid — Firecrawl
+  Biedronka: {
+    fetcher: "firecrawl",
+    urls: [
+      "https://www.biedronka.pl/pl/oferty/",
+      "https://zakupy.biedronka.pl/pl/nabial/",
+      "https://zakupy.biedronka.pl/pl/mieso/",
+    ],
+  },
+  // Kaufland: Cloudflare — Firecrawl
+  Kaufland: {
+    fetcher: "firecrawl",
+    urls: [
+      "https://www.kaufland.pl/angebote/aktuelle-woche/",
+      "https://www.kaufland.pl/produkte/kategorien/kuehlprodukte.html",
+    ],
+  },
+  // Carrefour: blocked — Firecrawl
+  Carrefour: {
+    fetcher: "firecrawl",
+    urls: [
+      "https://www.carrefour.pl/artykuly-spozywcze/",
+      "https://www.carrefour.pl/mieso-ryby-i-owoce-morza/",
+    ],
+  },
+  // Auchan: JS-rendered — Firecrawl
+  Auchan: {
+    fetcher: "firecrawl",
+    urls: [
+      "https://www.auchan.pl/artykuly-spozywcze/nabiał-i-jajka/",
+      "https://www.auchan.pl/artykuly-spozywcze/mieso-i-drob/",
+    ],
+  },
 };
 
 // ── Claude extraction ────────────────────────────────────────────────────────
@@ -135,12 +170,20 @@ export async function POST(req: NextRequest) {
   }> = {};
 
   await Promise.allSettled(
-    Object.entries(STORE_URLS).map(async ([storeName, urls]) => {
+    Object.entries(STORES).map(async ([storeName, { urls, fetcher }]) => {
       const storeId = storeIdMap[storeName];
       if (!storeId) return;
 
+      // Skip Firecrawl stores if no API key is configured
+      if (fetcher === "firecrawl" && !process.env.FIRECRAWL_API_KEY) {
+        report[storeName] = { pagesOk: 0, textChars: 0, textSample: "", extracted: 0, matched: 0, updated: 0, promos: 0, error: "no_firecrawl_key" };
+        return;
+      }
+
+      const fetch1 = fetcher === "firecrawl" ? fetchViaFirecrawl : fetchViaJina;
+
       try {
-        const htmlResults = await Promise.allSettled(urls.map((u) => fetchViaJina(u)));
+        const htmlResults = await Promise.allSettled(urls.map((u) => fetch1(u)));
         const texts = htmlResults
           .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled" && r.value.length > 300)
           .map((r) => r.value)
