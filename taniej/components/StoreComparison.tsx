@@ -20,12 +20,11 @@ interface PriceRow {
 }
 
 function isEstimated(p: PriceRow): boolean {
-  // A price is "real" if scraped, has a promo, has an app price, or has a user-reported price.
-  // Otherwise treat as estimate.
-  if (p.reported_price !== null) return false;
+  // A price is "real" if scraped, community-verified, has a promo, or has an app price.
+  // User reports don't count here (they're informational, not authoritative).
   if (p.promo_price !== null) return false;
   if (p.app_price !== null) return false;
-  return p.source !== "scraped";
+  return p.source !== "scraped" && p.source !== "community";
 }
 
 interface StoreResult {

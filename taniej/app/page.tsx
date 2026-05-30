@@ -5,6 +5,7 @@ import ShoppingList from "@/components/ShoppingList";
 import StoreComparison from "@/components/StoreComparison";
 import RecipeInput from "@/components/RecipeInput";
 import ProductLookup from "@/components/ProductLookup";
+import ReceiptScanner from "@/components/ReceiptScanner";
 import InstallBanner from "@/components/InstallBanner";
 import { Item } from "@/types";
 
@@ -147,6 +148,9 @@ export default function Home() {
 
         {/* ── Product lookup ── */}
         <ProductLookup />
+
+        {/* ── Receipt scanner ── */}
+        <ReceiptScanner />
 
         {/* ── Recipe input ── */}
         <RecipeInput items={items} setItems={setItems} />
