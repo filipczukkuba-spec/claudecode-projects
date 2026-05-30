@@ -23,14 +23,8 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
     ],
   },
-  // Lidl: Jina blocked, use Firecrawl
-  Lidl: {
-    fetcher: "firecrawl",
-    urls: [
-      "https://www.lidl.pl/oferty",
-      "https://www.lidl.pl/c/oferta-tygodnia/s10042553",
-    ],
-  },
+  // Lidl: fully blocked (Jina + Firecrawl both return empty) — skipped, DB uses estimates
+
   // Netto: Jina gazetka working
   Netto: {
     fetcher: "jina",
@@ -43,9 +37,9 @@ const STORES: Record<string, StoreConfig> = {
   Biedronka: {
     fetcher: "jina",
     urls: [
-      "https://www.biedronka.pl/pl/oferty-tygodnia",
-      "https://www.biedronka.pl/pl/gazetka",
+      "https://www.biedronka.pl/pl/oferty",
       "https://www.biedronka.pl/pl/",
+      "https://zakupy.biedronka.pl/pl/",
     ],
   },
   // Kaufland: main page intermittent — keep trying
@@ -180,7 +174,7 @@ export async function POST(req: NextRequest) {
           .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled" && r.value.length > 300)
           .map((r) => r.value)
           // Drop 404/block/overlay pages — they confuse Claude into extracting garbage
-          .filter(t => !/(niestety nie istnieje|co.? posz.o nie tak|nie istnieje|nie mo.emy znale.?.? strony|404 uuuups|wymagana weryfikacja|ray id:|cloudflare|mobile-app|logo-mobile-banner|pobierz aplikacj)/i.test(t.slice(0, 3000)));
+          .filter(t => !/(niestety nie istnieje|co.? posz.o nie tak|nie istnieje|nie mo.emy znale.?.? strony|nie znaleziono|404 uuuups|wymagana weryfikacja|ray id:|cloudflare|mobile-app|logo-mobile-banner|pobierz aplikacj)/i.test(t.slice(0, 3000)));
 
         const pagesOk = texts.length;
         const textChars = texts.reduce((s, t) => s + t.length, 0);
