@@ -7,47 +7,59 @@ import { fetchViaJina } from "@/lib/price-extractor";
 export const maxDuration = 60;
 
 // ── Store pages ─────────────────────────────────────────────────────────────
-// Use the pages most likely to have many products with prices visible.
-// Keep to 2 per store so all 14 requests finish within 60s.
+// Category pages return product listings with real prices.
+// Jina.ai renders JavaScript so SPA/React pages work too.
+// Limit: each store runs its URLs in parallel; all stores run in parallel.
 
 const STORE_URLS: Record<string, string[]> = {
-  // Aldi: main page has weekly deals with prices — confirmed working
   Aldi: [
-    "https://www.aldi.pl/",
     "https://www.aldi.pl/oferty/",
+    "https://www.aldi.pl/produkty/swieze-produkty/nabiał-i-jajka.html",
+    "https://www.aldi.pl/produkty/swieze-produkty/mieso-i-wedliny.html",
+    "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
   ],
-  // Lidl: search results include product names + prices
   Lidl: [
-    "https://www.lidl.pl/s?q=mleko+ser+maslo+jajka",
-    "https://www.lidl.pl/s?q=chleb+wedlina+mieso+kurczak",
-    "https://www.lidl.pl/s?q=jogurt+smietana+napoje+woda",
-    "https://www.lidl.pl/s?q=chipsy+czekolada+slodycze",
+    "https://www.lidl.pl/s?q=mleko+maslo+ser+jajka+jogurt+smietana",
+    "https://www.lidl.pl/s?q=chleb+bułki+pieczywo+bagietka",
+    "https://www.lidl.pl/s?q=kurczak+wieprzowina+wolowina+wedlina+kielbasa",
+    "https://www.lidl.pl/s?q=woda+sok+napoje+piwo+cola",
+    "https://www.lidl.pl/s?q=ryz+makaron+kasza+platki+musli",
+    "https://www.lidl.pl/s?q=chipsy+czekolada+ciastka+slodycze",
   ],
-  // Biedronka: all category URLs 404 — try root + their online shop
   Biedronka: [
-    "https://www.biedronka.pl/",
-    "https://www.biedronka.pl/pl",
-    "https://zakupy.biedronka.pl/pl/",
+    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/",
+    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/nabiał-i-jajka/",
+    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/mieso-i-wedliny/",
+    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/pieczywo-i-ciasta/",
+    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/napoje/",
+    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/owoce-i-warzywa/",
   ],
-  // Auchan: main page shows only nav; try offer/category pages
   Auchan: [
+    "https://www.auchan.pl/artykuly-spozywcze/nabiał-i-jajka/",
+    "https://www.auchan.pl/artykuly-spozywcze/mieso-i-drob/",
+    "https://www.auchan.pl/artykuly-spozywcze/pieczywo/",
+    "https://www.auchan.pl/artykuly-spozywcze/napoje/",
     "https://www.auchan.pl/oferty-tygodnia/",
-    "https://www.auchan.pl/artykuly-spozywcze/",
-    "https://www.auchan.pl/owoce-warzywa/",
   ],
-  // Netto: try different URL patterns
   Netto: [
-    "https://www.netto.pl/",
-    "https://www.netto.pl/oferty/",
-    "https://www.netto.pl/sklep/artykuly-spozywcze/",
+    "https://www.netto.pl/sklep/artykuly-spozywcze/mleczarskie/",
+    "https://www.netto.pl/sklep/artykuly-spozywcze/mieso-i-wedliny/",
+    "https://www.netto.pl/sklep/artykuly-spozywcze/pieczywo/",
+    "https://www.netto.pl/sklep/artykuly-spozywcze/napoje/",
+    "https://www.netto.pl/oferty/gazetka-tygodniowa/",
   ],
-  // Kaufland: Cloudflare blocks all requests — keep trying main page
   Kaufland: [
-    "https://www.kaufland.pl/",
+    "https://www.kaufland.pl/angebote/aktuelle-woche/",
+    "https://www.kaufland.pl/produkte/kategorien/kuehlprodukte.html",
+    "https://www.kaufland.pl/produkte/kategorien/fleisch--wurst--geflügel.html",
+    "https://www.kaufland.pl/produkte/kategorien/backwaren.html",
   ],
-  // Carrefour: completely blocked — keep for future
   Carrefour: [
-    "https://www.carrefour.pl/",
+    "https://www.carrefour.pl/artykuly-spozywcze/",
+    "https://www.carrefour.pl/mieso-ryby-i-owoce-morza/",
+    "https://www.carrefour.pl/nabiał-i-jajka/",
+    "https://www.carrefour.pl/pieczywo-i-ciasta/",
+    "https://www.carrefour.pl/napoje/",
   ],
 };
 
@@ -70,36 +82,37 @@ async function claudeExtract(
   const Anthropic = (await import("@anthropic-ai/sdk")).default;
   const ai = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  const combined = texts.join("\n\n---\n\n").slice(0, 24000);
+  // Use all pages, up to 40000 chars total
+  const combined = texts.join("\n\n---PAGE BREAK---\n\n").slice(0, 40000);
 
   try {
     const msg = await ai.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [
         {
           role: "user",
-          content: `Extract ALL grocery product prices from this ${storeName} page content.
+          content: `You are a price extraction engine. Extract every grocery product price from this ${storeName} page.
 
-Page content (rendered text from store website):
+Page content:
 ${combined}
 
-Return a JSON array of every product+price pair you can find. Use Polish product names as shown on the page.
+Output a JSON array. Every item must have:
+- "product": exact name from page (Polish, e.g. "Mleko UHT 3,2% 1L", "Pierś z kurczaka kg")
+- "price": current price as decimal number (PLN), e.g. 3.49
+- "is_promo": true if sale/promo price, false otherwise
+- "label": promo label string like "-20%", "2+1", "Cena tygodnia", or null
+- "original_price": regular price before discount as decimal, or null
 
-Each object:
-- product: product name as shown (Polish, e.g. "Mleko 3,2% 1L", "Pierś z kurczaka")
-- price: current price as number (e.g. 3.49) — use promo/sale price if available
-- is_promo: true if this is a promotional/sale price
-- label: promo label like "-20%", "2+1", "Okazja tygodnia", or null
-- original_price: regular price before discount as number, or null
+Critical rules:
+- Extract EVERY product with a visible price — aim for 50+ items per page
+- Price must be 0.20–999 PLN range
+- Use the PROMO price if both regular and promo are shown (set is_promo=true, original_price=regular)
+- Include weight/volume in product name when shown (e.g. "1L", "kg", "500g")
+- Skip: navigation links, store hours, delivery fees, membership fees, non-food items
+- Return [] only if the page is a 404 / cookie consent / pure navigation with zero prices
 
-Rules:
-- Extract EVERYTHING with a clear price — do not limit to specific products
-- Prices must be in PLN (złoty), typically 0.50–500 range
-- Skip items that are clearly not grocery products (store hours, addresses, etc.)
-- Return [] if the page has no product prices (e.g. cookie consent / error page)
-
-[{"product":"Mleko 3,2% 1L","price":3.49,"is_promo":false,"label":null,"original_price":null}]`,
+Start your response directly with [ (the JSON array):`,
         },
       ],
     });
@@ -133,7 +146,6 @@ export async function POST(req: NextRequest) {
   }
 
   const storeIdMap = Object.fromEntries(stores.map((s) => [s.name, s.id]));
-  const productNames = products.map((p) => p.name);
   const today = new Date().toISOString().split("T")[0];
   const validUntil = new Date(Date.now() + 7 * 86400_000).toISOString().split("T")[0];
   const now = new Date().toISOString();
@@ -144,14 +156,12 @@ export async function POST(req: NextRequest) {
     updated: number; promos: number; error?: string;
   }> = {};
 
-  // Fetch all stores in parallel (Jina renders JS automatically)
   await Promise.allSettled(
     Object.entries(STORE_URLS).map(async ([storeName, urls]) => {
       const storeId = storeIdMap[storeName];
       if (!storeId) return;
 
       try {
-        // Fetch all pages for this store in parallel
         const htmlResults = await Promise.allSettled(urls.map((u) => fetchViaJina(u)));
         const texts = htmlResults
           .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled" && r.value.length > 300)
@@ -159,7 +169,6 @@ export async function POST(req: NextRequest) {
 
         const pagesOk = texts.length;
         const textChars = texts.reduce((s, t) => s + t.length, 0);
-
         const textSample = texts[0]?.slice(0, 300) ?? "";
 
         if (pagesOk === 0) {
@@ -167,7 +176,6 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Claude extracts prices from the page text
         const items = await claudeExtract(texts, storeName);
 
         const priceUpdates: { product_id: number; store_id: number; price: number; source: string; scraped_at: string }[] = [];
@@ -175,11 +183,11 @@ export async function POST(req: NextRequest) {
         const historyRows: { product_id: number; store_id: number; price: number; source: string }[] = [];
 
         for (const item of items) {
-          if (!item.product || !item.price || item.price <= 0 || item.price > 2000) continue;
+          if (!item.product || !item.price || item.price <= 0.1 || item.price > 999) continue;
 
           const best = products
             .map((p) => ({ p, score: matchScore(item.product, p.name) }))
-            .filter(({ score }) => score >= 0.65)
+            .filter(({ score }) => score >= 0.60)
             .sort((a, b) => b.score - a.score)[0];
 
           if (!best) continue;
@@ -220,15 +228,7 @@ export async function POST(req: NextRequest) {
           await supabase.from("price_history" as any).insert(historyRows);
         }
 
-        report[storeName] = {
-          pagesOk,
-          textChars,
-          textSample,
-          extracted: items.length,
-          matched: priceUpdates.length + promoUpdates.length,
-          updated: priceUpdates.length,
-          promos: promoUpdates.length,
-        };
+        report[storeName] = { pagesOk, textChars, textSample, extracted: items.length, matched: priceUpdates.length + promoUpdates.length, updated: priceUpdates.length, promos: promoUpdates.length };
       } catch (e: any) {
         report[storeName] = { pagesOk: 0, textChars: 0, textSample: "", extracted: 0, matched: 0, updated: 0, promos: 0, error: e.message };
       }
@@ -243,7 +243,6 @@ export async function POST(req: NextRequest) {
     `taniejkupuj — sync ${totalUpdated} cen (${new Date().toLocaleDateString("pl-PL")})`,
     `<h2>Sync cen zakończony</h2>
     <p><b>Łącznie zaktualizowano:</b> ${totalUpdated} cen</p>
-    <p><b>Metoda:</b> Jina.ai reader + Claude Haiku</p>
     <p><b>Sklepy OK:</b> ${ok.join(", ") || "brak"}</p>
     ${failed.length > 0 ? `<p><b>Błędy:</b> ${failed.join(", ")}</p>` : ""}
     <pre style="background:#f5f5f5;padding:12px;border-radius:8px;font-size:11px">${JSON.stringify(report, null, 2)}</pre>
