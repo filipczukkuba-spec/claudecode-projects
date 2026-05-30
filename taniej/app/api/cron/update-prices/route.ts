@@ -32,23 +32,12 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.netto.pl/gazetka-tygodniowa/",
     ],
   },
-  // Biedronka: zakupy SPA too heavy for Firecrawl timeout — try main site promo pages
-  Biedronka: {
-    fetcher: "firecrawl",
-    urls: [
-      "https://www.biedronka.pl/pl/gazetka/",
-      "https://www.biedronka.pl/pl/produkty/category/nabiał-i-jajka/",
-      "https://www.biedronka.pl/pl/produkty/category/mieso-i-wedliny/",
-    ],
-  },
-  // Kaufland: main page works — target food categories specifically
+  // Biedronka: every page shows mobile app overlay — skip
+  // Kaufland: category pages all fail, main page intermittent — keep trying
   Kaufland: {
     fetcher: "firecrawl",
     urls: [
       "https://www.kaufland.pl/",
-      "https://www.kaufland.pl/produkte/kategorien/milch-eier-kaese-butter.html",
-      "https://www.kaufland.pl/produkte/kategorien/fleisch-wurst-geflugel.html",
-      "https://www.kaufland.pl/produkte/kategorien/brot-backwaren.html",
     ],
   },
   // Carrefour: 2 pages confirmed working — keep only those 2, drop failing category pages
@@ -173,8 +162,8 @@ export async function POST(req: NextRequest) {
         const texts = htmlResults
           .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled" && r.value.length > 300)
           .map((r) => r.value)
-          // Drop 404/block pages — they confuse Claude into extracting garbage
-          .filter(t => !/(niestety nie istnieje|coś poszło nie tak|już nie istnieje|strona nie istnieje|nie możemy znaleźć strony|404 uuuups|wymagana weryfikacja|ray id:|cloudflare)/i.test(t.slice(0, 800)));
+          // Drop 404/block/overlay pages — they confuse Claude into extracting garbage
+          .filter(t => !/(niestety nie istnieje|coś poszło nie tak|już nie istnieje|strona nie istnieje|nie możemy znaleźć strony|404 uuuups|wymagana weryfikacja|ray id:|cloudflare|pobierz aplikację i oszczędzaj)/i.test(t.slice(0, 800)));
 
         const pagesOk = texts.length;
         const textChars = texts.reduce((s, t) => s + t.length, 0);
