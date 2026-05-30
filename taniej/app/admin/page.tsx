@@ -28,6 +28,26 @@ export default function AdminPage() {
 
   const token = useRef("");
 
+  async function loadData() {
+    setLoading(true);
+    const res = await fetch("/api/admin/products", {
+      headers: { Authorization: `Bearer ${token.current}` },
+    });
+    if (!res.ok) { setLoading(false); return; }
+    const data = await res.json();
+    setProducts(data.products ?? []);
+    setStores(data.stores ?? []);
+    const pMap = new Map<string, number>();
+    const aMap = new Map<string, number>();
+    for (const p of data.prices ?? []) {
+      if (p.price != null) pMap.set(`${p.product_id}-${p.store_id}`, p.price);
+      if (p.app_price != null) aMap.set(`${p.product_id}-${p.store_id}`, p.app_price);
+    }
+    setPriceMap(pMap);
+    setAppPriceMap(aMap);
+    setLoading(false);
+  }
+
   async function login(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -41,20 +61,8 @@ export default function AdminPage() {
       return;
     }
     token.current = password;
-    const data = await res.json();
-    setProducts(data.products ?? []);
-    setStores(data.stores ?? []);
-
-    const pMap = new Map<string, number>();
-    const aMap = new Map<string, number>();
-    for (const p of data.prices ?? []) {
-      if (p.price != null) pMap.set(`${p.product_id}-${p.store_id}`, p.price);
-      if (p.app_price != null) aMap.set(`${p.product_id}-${p.store_id}`, p.app_price);
-    }
-    setPriceMap(pMap);
-    setAppPriceMap(aMap);
+    await loadData();
     setAuthed(true);
-    setLoading(false);
   }
 
   function currentMap(): Map<string, number> {
@@ -200,6 +208,13 @@ export default function AdminPage() {
                 {syncResult}
               </span>
             )}
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="bg-gray-500 hover:bg-gray-600 disabled:opacity-40 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-all"
+            >
+              {loading ? "Ładowanie..." : "Odśwież"}
+            </button>
             <button
               onClick={triggerSync}
               disabled={syncing}
