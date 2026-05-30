@@ -118,7 +118,9 @@
       "WebFetch(domain:www.pepper.pl)",
       "WebFetch(domain:www.gazetka-online.pl)",
       "Skill(update-config)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(grep -hoE \"'[A-ZŁŚĆŻŹŃĄĘÓ][^']{2,40}'\" supabase_seed_v2.sql supabase_seed_v3.sql supabase_seed_v4.sql supabase_seed_v5.sql supabase_seed_v6.sql supabase_seed_v7_brands.sql)",
+      "Bash(grep -hoE \"'[A-ZŁŚĆŻŹŃĄĘÓ][^']{2,40}'\" supabase_seed_v8_more_brands.sql supabase_seed_v9_loose_produce.sql)"
     ]
   }
 }
