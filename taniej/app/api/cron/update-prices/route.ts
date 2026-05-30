@@ -133,9 +133,10 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient();
 
-  const [{ data: products }, { data: stores }] = await Promise.all([
+  const [{ data: products }, { data: stores }, { data: existingPrices }] = await Promise.all([
     supabase.from("products").select("id, name"),
     supabase.from("stores").select("id, name"),
+    supabase.from("prices").select("product_id, price"),
   ]);
 
   if (!products || !stores) {
@@ -143,6 +144,26 @@ export async function POST(req: NextRequest) {
   }
 
   const storeIdMap = Object.fromEntries(stores.map((s) => [s.name, s.id]));
+
+  // Per-product reference (median of currently stored prices). Used to reject
+  // outliers — Claude Haiku occasionally misreads a label and writes e.g.
+  // 85.99 zł for a 100ml Actimel. Anything >= 5x median is dropped.
+  const medianByProduct = new Map<number, number>();
+  if (existingPrices) {
+    const groups = new Map<number, number[]>();
+    for (const r of existingPrices as { product_id: number; price: number | null }[]) {
+      if (r.price == null) continue;
+      const arr = groups.get(r.product_id) ?? [];
+      arr.push(r.price);
+      groups.set(r.product_id, arr);
+    }
+    for (const [pid, arr] of groups) {
+      arr.sort((a, b) => a - b);
+      medianByProduct.set(pid, arr[Math.floor(arr.length / 2)]);
+    }
+  }
+  const ABSOLUTE_PRICE_CAP = 500;
+  const OUTLIER_MULTIPLIER = 5;
   const today = new Date().toISOString().split("T")[0];
   const validUntil = new Date(Date.now() + 7 * 86400_000).toISOString().split("T")[0];
   const now = new Date().toISOString();
@@ -150,7 +171,7 @@ export async function POST(req: NextRequest) {
   const report: Record<string, {
     pagesOk: number; textChars: number; textSample: string;
     extracted: number; matched: number;
-    updated: number; promos: number; error?: string;
+    updated: number; promos: number; rejected?: number; error?: string;
   }> = {};
 
   await Promise.allSettled(
@@ -190,9 +211,10 @@ export async function POST(req: NextRequest) {
         const priceUpdates: { product_id: number; store_id: number; price: number; source: string; scraped_at: string }[] = [];
         const promoUpdates: any[] = [];
         const historyRows: { product_id: number; store_id: number; price: number; source: string }[] = [];
+        let rejectedOutliers = 0;
 
         for (const item of items) {
-          if (!item.product || !item.price || item.price <= 0.1 || item.price > 999) continue;
+          if (!item.product || !item.price || item.price <= 0.1 || item.price > ABSOLUTE_PRICE_CAP) continue;
 
           const best = products
             .map((p) => ({ p, score: matchScore(item.product, p.name) }))
@@ -200,6 +222,18 @@ export async function POST(req: NextRequest) {
             .sort((a, b) => b.score - a.score)[0];
 
           if (!best) continue;
+
+          // Outlier guard: drop prices >= 5x the cross-store median.
+          // Stops Claude Haiku misreads (e.g. 85.99 zł for a 100ml Actimel).
+          const median = medianByProduct.get(best.p.id);
+          if (median && item.price >= median * OUTLIER_MULTIPLIER) {
+            rejectedOutliers++;
+            continue;
+          }
+          if (item.original_price && median && item.original_price >= median * OUTLIER_MULTIPLIER) {
+            rejectedOutliers++;
+            continue;
+          }
 
           if (item.is_promo && item.original_price && item.original_price > item.price) {
             promoUpdates.push({
@@ -237,7 +271,7 @@ export async function POST(req: NextRequest) {
           await supabase.from("price_history" as any).insert(historyRows);
         }
 
-        report[storeName] = { pagesOk, textChars, textSample, extracted: items.length, matched: priceUpdates.length + promoUpdates.length, updated: priceUpdates.length, promos: promoUpdates.length };
+        report[storeName] = { pagesOk, textChars, textSample, extracted: items.length, matched: priceUpdates.length + promoUpdates.length, updated: priceUpdates.length, promos: promoUpdates.length, rejected: rejectedOutliers };
       } catch (e: any) {
         report[storeName] = { pagesOk: 0, textChars: 0, textSample: "", extracted: 0, matched: 0, updated: 0, promos: 0, error: e.message };
       }
