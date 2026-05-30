@@ -15,12 +15,12 @@ export interface ExtractedItem {
 
 // Firecrawl: handles Cloudflare + JS rendering. Free tier = 500 pages/month.
 // Sign up at firecrawl.dev, add FIRECRAWL_API_KEY to Vercel env vars.
-export async function fetchViaFirecrawl(url: string): Promise<string> {
+export async function fetchViaFirecrawl(url: string, actions?: object[]): Promise<string> {
   const key = process.env.FIRECRAWL_API_KEY;
   if (!key) return "";
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 40000);
+    const t = setTimeout(() => ctrl.abort(), 50000);
     const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
       headers: {
@@ -32,6 +32,7 @@ export async function fetchViaFirecrawl(url: string): Promise<string> {
         formats: ["markdown"],
         onlyMainContent: true,
         waitFor: 5000,
+        ...(actions ? { actions } : {}),
       }),
       signal: ctrl.signal,
     });

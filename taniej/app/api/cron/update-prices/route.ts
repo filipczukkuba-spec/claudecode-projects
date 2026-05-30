@@ -10,7 +10,7 @@ export const maxDuration = 60;
 // fetcher: "jina" = free, no key needed. "firecrawl" = needs FIRECRAWL_API_KEY,
 // handles Cloudflare + JS-rendered product grids (500 pages/month free tier).
 
-type StoreConfig = { urls: string[]; fetcher: "jina" | "firecrawl" };
+type StoreConfig = { urls: string[]; fetcher: "jina" | "firecrawl"; actions?: object[] };
 
 const STORES: Record<string, StoreConfig> = {
   // Aldi: Jina works well — plain HTML offers page
@@ -32,7 +32,20 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.netto.pl/gazetka-tygodniowa/",
     ],
   },
-  // Biedronka: every page shows mobile app overlay — skip
+  // Biedronka: mobile overlay on every page — use Firecrawl actions to click close first
+  Biedronka: {
+    fetcher: "firecrawl",
+    actions: [
+      { type: "click", selector: "a[href$='#'], button.close, .modal-close" },
+      { type: "wait", milliseconds: 2000 },
+    ],
+    urls: [
+      "https://www.biedronka.pl/pl/",
+      "https://www.biedronka.pl/pl/oferty/",
+      "https://zakupy.biedronka.pl/pl/",
+    ],
+  },
+  // Kaufland: category pages all fail, main page intermittent — keep trying
   // Kaufland: category pages all fail, main page intermittent — keep trying
   Kaufland: {
     fetcher: "firecrawl",
@@ -155,7 +168,9 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      const fetch1 = fetcher === "firecrawl" ? fetchViaFirecrawl : fetchViaJina;
+      const fetch1 = fetcher === "firecrawl"
+        ? (u: string) => fetchViaFirecrawl(u, actions)
+        : fetchViaJina;
 
       try {
         const htmlResults = await Promise.allSettled(urls.map((u) => fetch1(u)));
