@@ -334,6 +334,16 @@ export default function StoreComparison({ items }: Props) {
                 <p className="text-white/80 text-sm font-medium">złotych</p>
               </div>
             </div>
+            <a
+              href={`/go/${encodeURIComponent(cheapest.name)}${items.length === 1 ? `?q=${encodeURIComponent(items[0].name)}` : ""}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => track("store_click", { store: cheapest.name, items: items.length, source: "winner" })}
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-white/95 hover:bg-white active:scale-[0.98] transition-all text-gray-900 font-black text-sm rounded-xl py-3"
+            >
+              <span>Kup w {cheapest.name}</span>
+              <span>→</span>
+            </a>
           </div>
         </div>
       )}
@@ -540,6 +550,19 @@ export default function StoreComparison({ items }: Props) {
                   <div className="mt-3 bg-amber-50 rounded-xl px-3 py-2 text-xs text-amber-600 font-medium">
                     Brak danych dla {items.length - store.found} produktów
                   </div>
+                )}
+
+                {!noData && (
+                  <a
+                    href={`/go/${encodeURIComponent(store.name)}${items.length === 1 ? `?q=${encodeURIComponent(items[0].name)}` : ""}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => track("store_click", { store: store.name, items: items.length })}
+                    className={`mt-3 w-full flex items-center justify-center gap-2 ${style.bg} hover:opacity-90 active:scale-[0.98] transition-all text-white font-bold text-sm rounded-xl py-3 shadow-sm`}
+                  >
+                    <span>Kup w {store.name}</span>
+                    <span>→</span>
+                  </a>
                 )}
               </div>
             )}

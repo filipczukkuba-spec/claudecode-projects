@@ -13,6 +13,7 @@ const KNOWN_EVENTS = new Set([
   "install_clicked",
   "install_accepted",
   "price_reported",
+  "store_click",
 ]);
 
 // Tiny endpoint — keep it cheap. Fire-and-forget from the client.
