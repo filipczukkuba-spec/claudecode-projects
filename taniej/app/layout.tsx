@@ -25,11 +25,6 @@ export const metadata: Metadata = {
   },
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
   robots: { index: true, follow: true },
-  verification: {
-    other: {
-      "convertiser-verification": "43c8e80f84c9e5a8ab2a30e786d89e07c1cc722b",
-    },
-  },
 };
 
 export const viewport: Viewport = {
@@ -44,6 +39,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pl" className={`${geist.variable} h-full antialiased`}>
+      <head>
+        <meta name="convertiser-verification" content="43c8e80f84c9e5a8ab2a30e786d89e07c1cc722b" />
+      </head>
       <body className="min-h-full flex flex-col bg-[#f0f0eb]">
         {children}
         <Analytics />
