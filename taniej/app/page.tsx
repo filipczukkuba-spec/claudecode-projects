@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { track } from "@vercel/analytics";
+import { track } from "@/lib/analytics";
 import ShoppingList from "@/components/ShoppingList";
 import StoreComparison from "@/components/StoreComparison";
 import RecipeInput from "@/components/RecipeInput";
@@ -30,6 +30,7 @@ export default function Home() {
 
   // Load from URL first (shared link), then localStorage (returning user)
   useEffect(() => {
+    track("pageview");
     const params = new URLSearchParams(window.location.search);
     const encoded = params.get("l");
     if (encoded) {

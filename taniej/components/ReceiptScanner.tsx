@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { track } from "@vercel/analytics";
+import { track } from "@/lib/analytics";
 
 interface AcceptedItem { product: string; price: number; unit_type: string | null; is_promo: boolean }
 interface RejectedItem { raw: string; reason: string }

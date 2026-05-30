@@ -243,7 +243,10 @@ export default function AdminPage() {
           <div>
             <h1 className="text-2xl font-black text-gray-900">Panel cen</h1>
             <p className="text-gray-400 text-sm">
-              {products.length} produktów · {stores.length} sklepów
+              {products.length} produktów · {stores.length} sklepów ·{" "}
+              <a href="/admin/events" className="text-green-600 hover:underline font-semibold">
+                Analityka →
+              </a>
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
