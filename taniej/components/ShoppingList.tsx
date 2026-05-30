@@ -219,6 +219,129 @@ const COMMON_PRODUCTS: Product[] = [
   { name: "Hellmann's majonez", unit: "400ml" },
   { name: "Knorr zupa", unit: "68g" },
   { name: "Maggi zupa", unit: "68g" },
+  // ── Polish dairy brands ──
+  { name: "Mlekovita ser", unit: "250g" },
+  { name: "Mlekovita masło", unit: "200g" },
+  { name: "Piątnica twaróg", unit: "250g" },
+  { name: "Piątnica śmietana", unit: "400g" },
+  { name: "Hochland ser topiony", unit: "200g" },
+  { name: "Hochland Almette", unit: "150g" },
+  { name: "Bakoma jogurt", unit: "150g" },
+  { name: "Bakoma Mus", unit: "100g" },
+  { name: "Zott Jogobella", unit: "150g" },
+  { name: "Zott Monte", unit: "100g" },
+  { name: "Müller jogurt", unit: "150g" },
+  { name: "Skyr Pilos", unit: "150g" },
+  { name: "Mleko UHT Łaciate 3,2%", unit: "1L" },
+  { name: "Mleko UHT Łaciate 2%", unit: "1L" },
+  { name: "Mleko Wypasione", unit: "1L" },
+  // ── Polish meat / cold cuts ──
+  { name: "Sokołów szynka", unit: "300g" },
+  { name: "Sokołów kiełbasa", unit: "1kg" },
+  { name: "Tarczyński kabanosy", unit: "120g" },
+  { name: "Kabanos Drobimex", unit: "120g" },
+  { name: "Indykpol indyk", unit: "1kg" },
+  { name: "Krakus szynka", unit: "300g" },
+  // ── Polish chips / snacks ──
+  { name: "Crunchips Paprika", unit: "140g" },
+  { name: "Crunchips Solone", unit: "140g" },
+  { name: "Star Chipsy", unit: "150g" },
+  { name: "Cheetos", unit: "85g" },
+  { name: "Doritos", unit: "180g" },
+  { name: "Paluszki Lajkonik", unit: "300g" },
+  { name: "Tartinki Wasa", unit: "200g" },
+  // ── Polish sweets ──
+  { name: "Wedel Ptasie Mleczko", unit: "380g" },
+  { name: "Wedel Pawełek", unit: "100g" },
+  { name: "Wawel Tiki Taki", unit: "280g" },
+  { name: "Wawel Michałki", unit: "280g" },
+  { name: "Goplana Grześki", unit: "36g" },
+  { name: "Goplana Czekolada Mleczna", unit: "100g" },
+  { name: "Delicje Szampańskie", unit: "147g" },
+  { name: "Krówki", unit: "300g" },
+  { name: "Toffifee", unit: "125g" },
+  { name: "Merci czekoladki", unit: "250g" },
+  { name: "Lindt Lindor", unit: "200g" },
+  { name: "Lindt Excellence", unit: "100g" },
+  { name: "Ritter Sport", unit: "100g" },
+  { name: "Tic Tac", unit: "16g" },
+  { name: "Mentos", unit: "38g" },
+  { name: "Skittles", unit: "38g" },
+  { name: "Haribo Goldbären", unit: "100g" },
+  // ── Polish drinks ──
+  { name: "Frugo", unit: "330ml" },
+  { name: "Kubuś Waterrr", unit: "330ml" },
+  { name: "Kubuś sok", unit: "1L" },
+  { name: "Cappy sok", unit: "330ml" },
+  { name: "Hoop Cola", unit: "1.5L" },
+  { name: "Tymbark Mleczny szejk", unit: "250ml" },
+  { name: "Pepsi Wild Cherry", unit: "0.5L" },
+  { name: "Lipton Ice Tea", unit: "1.5L" },
+  { name: "Nestea", unit: "1.5L" },
+  { name: "Sprite", unit: "0.5L" },
+  { name: "Schweppes", unit: "1L" },
+  { name: "Muszynianka", unit: "1.5L" },
+  { name: "Nałęczowianka", unit: "1.5L" },
+  { name: "Kropla Beskidu", unit: "1.5L" },
+  { name: "Pepsi Twist", unit: "1.5L" },
+  // ── Polish beer ──
+  { name: "Tyskie", unit: "0.5L" },
+  { name: "Żywiec piwo", unit: "0.5L" },
+  { name: "Lech", unit: "0.5L" },
+  { name: "Warka", unit: "0.5L" },
+  { name: "Książęce", unit: "0.5L" },
+  { name: "Okocim", unit: "0.5L" },
+  { name: "Heineken", unit: "0.5L" },
+  { name: "Carlsberg", unit: "0.5L" },
+  { name: "Desperados", unit: "0.4L" },
+  { name: "Somersby", unit: "0.4L" },
+  // ── Polish bread / staples ──
+  { name: "Łowicki ketchup", unit: "450g" },
+  { name: "Pudliszki ketchup", unit: "480g" },
+  { name: "Pudliszki passata", unit: "500g" },
+  { name: "Develey musztarda", unit: "270g" },
+  { name: "Lubella makaron", unit: "500g" },
+  { name: "Malma makaron", unit: "500g" },
+  { name: "Britta makaron", unit: "500g" },
+  { name: "Łowicz dżem", unit: "280g" },
+  { name: "Łowicz konfitura", unit: "300g" },
+  // ── Frozen ──
+  { name: "Hortex frytki", unit: "1kg" },
+  { name: "Hortex truskawki mrożone", unit: "450g" },
+  { name: "Iglotex pierogi", unit: "450g" },
+  { name: "Bonduelle kukurydza", unit: "340g" },
+  { name: "Pierogi Madej Wróbel", unit: "500g" },
+  { name: "Mrożone warzywa Hortex", unit: "450g" },
+  // ── Personal care ──
+  { name: "Nivea krem", unit: "75ml" },
+  { name: "Nivea żel pod prysznic", unit: "250ml" },
+  { name: "Garnier szampon", unit: "400ml" },
+  { name: "Schwarzkopf szampon", unit: "400ml" },
+  { name: "Head & Shoulders", unit: "400ml" },
+  { name: "Dove żel pod prysznic", unit: "250ml" },
+  { name: "Old Spice dezodorant", unit: "150ml" },
+  { name: "Rexona dezodorant", unit: "150ml" },
+  { name: "Colgate pasta", unit: "100ml" },
+  { name: "Signal pasta", unit: "75ml" },
+  { name: "Sensodyne pasta", unit: "75ml" },
+  { name: "Listerine", unit: "500ml" },
+  { name: "Gillette żyletki", unit: "4 szt." },
+  { name: "Bella podpaski", unit: "10 szt." },
+  { name: "Always podpaski", unit: "12 szt." },
+  // ── Household cleaning ──
+  { name: "Persil proszek", unit: "3kg" },
+  { name: "Ariel proszek", unit: "3kg" },
+  { name: "Vizir kapsułki", unit: "30 szt." },
+  { name: "Lenor płyn", unit: "1.5L" },
+  { name: "Domestos", unit: "1.25L" },
+  { name: "Cif krem", unit: "750ml" },
+  { name: "Cillit Bang", unit: "750ml" },
+  { name: "Ludwik płyn do naczyń", unit: "1L" },
+  { name: "Fairy płyn do naczyń", unit: "900ml" },
+  { name: "Pronto do mebli", unit: "250ml" },
+  { name: "Velvet papier toaletowy", unit: "8 rolek" },
+  { name: "Regina papier toaletowy", unit: "8 rolek" },
+  { name: "Foliopak worki", unit: "30 szt." },
 ];
 
 interface Props {
@@ -230,10 +353,11 @@ export default function ShoppingList({ items, setItems }: Props) {
   const [input, setInput] = useState("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [focused, setFocused] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (input.trim().length === 0) { setSuggestions([]); return; }
+    if (input.trim().length === 0) { setSuggestions([]); setHighlight(-1); return; }
     const q = norm(input);
     const matches = COMMON_PRODUCTS.filter(
       (p) =>
@@ -248,6 +372,7 @@ export default function ShoppingList({ items, setItems }: Props) {
       })
       .slice(0, 6);
     setSuggestions(matches);
+    setHighlight(matches.length > 0 ? 0 : -1);
   }, [input, items]);
 
   function addItem(product?: Product) {
@@ -259,6 +384,7 @@ export default function ShoppingList({ items, setItems }: Props) {
     setItems([...items, { id: crypto.randomUUID(), name, unit }]);
     setInput("");
     setSuggestions([]);
+    setHighlight(-1);
     inputRef.current?.focus();
   }
 
@@ -267,8 +393,29 @@ export default function ShoppingList({ items, setItems }: Props) {
   }
 
   function handleKey(e: React.KeyboardEvent) {
-    if (e.key === "Enter") addItem();
-    if (e.key === "Escape") setSuggestions([]);
+    if (e.key === "ArrowDown" && suggestions.length > 0) {
+      e.preventDefault();
+      setHighlight((h) => (h + 1) % suggestions.length);
+      return;
+    }
+    if (e.key === "ArrowUp" && suggestions.length > 0) {
+      e.preventDefault();
+      setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1));
+      return;
+    }
+    if (e.key === "Enter") {
+      if (highlight >= 0 && suggestions[highlight]) {
+        e.preventDefault();
+        addItem(suggestions[highlight]);
+      } else {
+        addItem();
+      }
+      return;
+    }
+    if (e.key === "Escape") {
+      setSuggestions([]);
+      setHighlight(-1);
+    }
   }
 
   return (
@@ -314,11 +461,14 @@ export default function ShoppingList({ items, setItems }: Props) {
 
           {focused && suggestions.length > 0 && (
             <ul className="absolute left-0 right-10 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl z-20 overflow-hidden">
-              {suggestions.map((s) => (
+              {suggestions.map((s, idx) => (
                 <li
                   key={s.name}
                   onMouseDown={() => addItem(s)}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-green-50 active:bg-green-100 cursor-pointer border-b border-gray-50 last:border-0 transition-colors"
+                  onMouseEnter={() => setHighlight(idx)}
+                  className={`flex items-center justify-between px-4 py-3 cursor-pointer border-b border-gray-50 last:border-0 transition-colors ${
+                    idx === highlight ? "bg-green-50" : "hover:bg-green-50"
+                  }`}
                 >
                   <span className="text-gray-800 text-sm font-medium">{s.name}</span>
                   <span className="text-gray-400 text-xs">{s.unit}</span>

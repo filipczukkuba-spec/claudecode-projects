@@ -18,31 +18,71 @@ const STORES = [
   { name: "Carrefour", color: "bg-sky-500" },
 ];
 
+const STORAGE_KEY = "taniejkupuj:list";
+
 export default function Home() {
   const [items, setItems] = useState<Item[]>([]);
   const [searched, setSearched] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [restored, setRestored] = useState(false);
 
+  // Load from URL first (shared link), then localStorage (returning user)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const encoded = params.get("l");
-    if (!encoded) return;
+    if (encoded) {
+      try {
+        const decoded = JSON.parse(atob(encoded));
+        if (Array.isArray(decoded) && decoded.length > 0) {
+          setItems(decoded);
+          setSearched(true);
+          setRestored(true);
+          return;
+        }
+      } catch {}
+    }
     try {
-      const decoded = JSON.parse(atob(encoded));
-      if (Array.isArray(decoded) && decoded.length > 0) {
-        setItems(decoded);
-        setSearched(true);
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setItems(parsed);
+        }
       }
     } catch {}
+    setRestored(true);
   }, []);
 
-  function shareList() {
+  // Save items to localStorage on every change (after initial restore)
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      if (items.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      else localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+  }, [items, restored]);
+
+  async function shareList() {
     const encoded = btoa(JSON.stringify(items));
     const url = `${window.location.origin}/?l=${encoded}`;
-    navigator.clipboard.writeText(url).then(() => {
+    // Native share sheet on mobile, clipboard fallback elsewhere
+    if (typeof navigator !== "undefined" && "share" in navigator) {
+      try {
+        await navigator.share({
+          title: "Moja lista zakupów — taniejkupuj.pl",
+          text: `Porównaj ceny ${items.length} produktów w 7 sklepach`,
+          url,
+        });
+        return;
+      } catch {
+        // user cancelled — fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    });
+    } catch {}
   }
 
   function handleSearch() {
@@ -73,7 +113,7 @@ export default function Home() {
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {[
                   { v: "7", l: "sklepów" },
-                  { v: "400+", l: "produktów" },
+                  { v: "500+", l: "produktów" },
                   { v: "gratis", l: "za darmo" },
                 ].map((s) => (
                   <div key={s.l} className="bg-white/20 rounded-full px-2.5 py-1 flex items-center gap-1">

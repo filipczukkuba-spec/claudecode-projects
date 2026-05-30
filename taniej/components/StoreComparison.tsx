@@ -300,7 +300,7 @@ export default function StoreComparison({ items }: Props) {
       )}
 
       {/* Winner banner */}
-      {results.length > 1 && (
+      {withData.length > 0 && (
         <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-md ${cheapestStyle.bg}`}>
           <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10 pointer-events-none" />
           <div className="absolute -bottom-6 -left-2 w-16 h-16 rounded-full bg-white/10 pointer-events-none" />
