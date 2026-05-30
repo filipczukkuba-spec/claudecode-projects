@@ -10,7 +10,7 @@ export async function sendEmail(subject: string, html: string) {
     },
     body: JSON.stringify({
       from: "taniejkupuj <onboarding@resend.dev>",
-      to: ["filipczuk.kuba@gmail.com"],
+      to: ["kubafilipczuktaniejkupuj@gmail.com"],
       subject,
       html,
     }),
