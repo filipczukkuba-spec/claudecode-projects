@@ -12,61 +12,43 @@ export const maxDuration = 60;
 // Limit: each store runs its URLs in parallel; all stores run in parallel.
 
 const STORE_URLS: Record<string, string[]> = {
+  // Aldi: direct website working well
   Aldi: [
     "https://www.aldi.pl/oferty/",
     "https://www.aldi.pl/produkty/swieze-produkty/nabiał-i-jajka.html",
     "https://www.aldi.pl/produkty/swieze-produkty/mieso-i-wedliny.html",
-    "https://www.aldi.pl/produkty/swieze-produkty/pieczywo.html",
-    // aggregator fallback — gazetki.pl shows real Aldi flyer prices
     "https://www.gazetki.pl/gazetki/aldi/",
-    "https://promocjusz.pl/sklepy/aldi/",
   ],
+  // Lidl: search queries return 404 — use main + offers page + gazeta aggregator
   Lidl: [
-    "https://www.lidl.pl/s?q=mleko+maslo+ser+jajka+jogurt+smietana",
-    "https://www.lidl.pl/s?q=chleb+bułki+pieczywo+bagietka",
-    "https://www.lidl.pl/s?q=kurczak+wieprzowina+wolowina+wedlina+kielbasa",
-    "https://www.lidl.pl/s?q=woda+sok+napoje+piwo+cola",
-    "https://www.lidl.pl/s?q=ryz+makaron+kasza+platki+musli",
-    "https://www.lidl.pl/s?q=chipsy+czekolada+ciastka+slodycze",
+    "https://www.lidl.pl/",
+    "https://www.lidl.pl/oferty",
     "https://www.gazetki.pl/gazetki/lidl/",
   ],
-  // Biedronka main site blocks scrapers — use their online store + aggregators
+  // Biedronka: zakupy category pages 404 — use root + gazetki.pl (active gazeta confirmed)
   Biedronka: [
-    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/nabiał-i-jajka/",
-    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/mieso-i-wedliny/",
-    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/pieczywo-i-ciasta/",
-    "https://zakupy.biedronka.pl/pl/artykuly-spozywcze/napoje/",
+    "https://zakupy.biedronka.pl/pl/",
     "https://www.gazetki.pl/gazetki/biedronka/",
-    "https://promocjusz.pl/sklepy/biedronka/",
   ],
+  // Auchan: no active gazeta on gazetki.pl — scrape direct website
   Auchan: [
-    "https://www.auchan.pl/artykuly-spozywcze/nabiał-i-jajka/",
-    "https://www.auchan.pl/artykuly-spozywcze/mieso-i-drob/",
-    "https://www.auchan.pl/artykuly-spozywcze/pieczywo/",
-    "https://www.gazetki.pl/gazetki/auchan/",
-    "https://promocjusz.pl/sklepy/auchan/",
+    "https://www.auchan.pl/",
+    "https://www.auchan.pl/oferty-tygodnia/",
+    "https://www.auchan.pl/artykuly-spozywcze/",
   ],
+  // Netto: /sklep/ URLs all 404 — use root + offers + gazetki.pl
   Netto: [
-    "https://www.netto.pl/sklep/artykuly-spozywcze/mleczarskie/",
-    "https://www.netto.pl/sklep/artykuly-spozywcze/mieso-i-wedliny/",
-    "https://www.netto.pl/sklep/artykuly-spozywcze/pieczywo/",
-    "https://www.netto.pl/sklep/artykuly-spozywcze/napoje/",
-    "https://www.netto.pl/oferty/gazetka-tygodniowa/",
+    "https://www.netto.pl/",
+    "https://www.netto.pl/oferty/",
     "https://www.gazetki.pl/gazetki/netto/",
   ],
-  // Kaufland: Cloudflare on main site — aggregators have their real flyer prices
+  // Kaufland: Cloudflare blocks direct — gazetki.pl has active Kaufland gazeta (confirmed)
   Kaufland: [
-    "https://www.kaufland.pl/angebote/aktuelle-woche/",
     "https://www.gazetki.pl/gazetki/kaufland/",
-    "https://promocjusz.pl/sklepy/kaufland/",
-    "https://www.superoferty.pl/kaufland/",
   ],
-  // Carrefour: completely blocked — aggregators only
+  // Carrefour: direct blocked, promocjusz.pl dead — gazetki.pl only
   Carrefour: [
-    "https://www.carrefour.pl/artykuly-spozywcze/",
     "https://www.gazetki.pl/gazetki/carrefour/",
-    "https://promocjusz.pl/sklepy/carrefour/",
-    "https://www.superoferty.pl/carrefour/",
   ],
 };
 
