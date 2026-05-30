@@ -79,6 +79,29 @@ export async function POST(req: NextRequest) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const base64 = Buffer.from(bytes).toString("base64");
 
+  // Image-byte hash — same photo always produces same fingerprint regardless
+  // of any OCR variance. Catches re-scans of the exact same image.
+  const imageFingerprint = createHash("sha256").update(bytes).digest("hex").slice(0, 32);
+
+  const dupSince = new Date(Date.now() - DUP_WINDOW_DAYS * 86400_000).toISOString();
+  const { count: imgDupCount } = await admin
+    .from("receipt_scans")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "ok")
+    .eq("fingerprint", imageFingerprint)
+    .gte("scanned_at", dupSince);
+
+  if ((imgDupCount ?? 0) > 0) {
+    await admin.from("receipt_scans").insert({
+      status: "rejected", reject_reason: "duplicate_image",
+      ip_hash: ipHash, city,
+    });
+    return NextResponse.json(
+      { error: "Ten paragon już został zeskanowany. Dziękujemy!" },
+      { status: 409 }
+    );
+  }
+
   const productList = products
     .map((p) => `${p.id}: ${p.name}${p.unit ? ` (${p.unit})` : ""}`)
     .join("\n");
@@ -230,35 +253,6 @@ Respond with ONLY a JSON object (no markdown):
     return NextResponse.json({ error: "Nie znaleziono produktów na paragonie" }, { status: 422 });
   }
 
-  // Duplicate detection — fingerprint = store + date + total + sorted line totals
-  const fingerprintInput =
-    `${storeRow.id}|${vision.receipt_date}|${(vision.total ?? 0).toFixed(2)}|` +
-    items
-      .map((i) => (Number.isFinite(i.line_total) ? i.line_total : 0).toFixed(2))
-      .sort()
-      .join(",");
-  const fingerprint = createHash("sha256").update(fingerprintInput).digest("hex").slice(0, 32);
-
-  const dupSince = new Date(Date.now() - DUP_WINDOW_DAYS * 86400_000).toISOString();
-  const { count: dupCount } = await admin
-    .from("receipt_scans")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "ok")
-    .eq("fingerprint", fingerprint)
-    .gte("scanned_at", dupSince);
-
-  if ((dupCount ?? 0) > 0) {
-    await admin.from("receipt_scans").insert({
-      status: "rejected", reject_reason: "duplicate",
-      store_id: storeRow.id, receipt_date: vision.receipt_date,
-      ip_hash: ipHash, city,
-    });
-    return NextResponse.json(
-      { error: "Ten paragon już został zeskanowany. Dziękujemy!" },
-      { status: 409 }
-    );
-  }
-
   // Total reconciliation using line_total values
   if (vision.total != null && Number.isFinite(vision.total)) {
     const sum = items.reduce((s, i) => s + (Number.isFinite(i.line_total) ? i.line_total : 0), 0);
@@ -298,7 +292,7 @@ Respond with ONLY a JSON object (no markdown):
     .from("receipt_scans")
     .insert({
       status: "ok",
-      fingerprint,
+      fingerprint: imageFingerprint,
       store_id: storeRow.id,
       receipt_date: vision.receipt_date,
       receipt_total: vision.total ?? null,
@@ -371,6 +365,105 @@ Respond with ONLY a JSON object (no markdown):
 
   if (reportRows.length > 0) {
     await admin.from("price_reports").insert(reportRows);
+
+    // Also write the receipt-verified prices straight into the main prices
+    // table as source='community'. Non-promo lines only — promo prices go
+    // through the promotions flow elsewhere. We never overwrite a fresh
+    // 'scraped' price (scrapers stay authoritative).
+    const { data: existing } = await admin
+      .from("prices")
+      .select("product_id, store_id, source")
+      .in("product_id", reportRows.map((r) => r.product_id))
+      .eq("store_id", storeRow.id);
+
+    const existingMap = new Map<number, string | null>();
+    for (const e of (existing ?? []) as any[]) {
+      existingMap.set(e.product_id, e.source ?? null);
+    }
+
+    const mainUpdates = reportRows
+      .filter((r) => !r.is_promo)
+      .filter((r) => existingMap.get(r.product_id) !== "scraped")
+      .map((r) => ({
+        product_id: r.product_id,
+        store_id: r.store_id,
+        price: r.price,
+        source: "community",
+        scraped_at: new Date().toISOString(),
+      }));
+
+    if (mainUpdates.length > 0) {
+      await admin.from("prices").upsert(mainUpdates, { onConflict: "product_id,store_id" });
+    }
+  }
+
+  // ── Cross-store calibration ─────────────────────────────────────────
+  // When a receipt verifies a real price for one store, it tells us this
+  // product's price level — the *estimated* prices in OTHER stores that
+  // were way off (e.g. cukinia 3,50 zł vs verified 8,99 zł) should be
+  // brought in line using historical store multipliers.
+  //
+  // Rules:
+  //  - Only touch rows where source = 'estimated' (never overwrite
+  //    scraped or community-verified prices in other stores).
+  //  - Skip if the existing estimate is already within 50% of the
+  //    receipt-implied baseline (already plausible).
+  //  - Don't apply for promo lines (those are one-off discounts).
+  let recalibrated = 0;
+  if (reportRows.length > 0) {
+    const STORE_MULTIPLIER: Record<string, number> = {
+      Biedronka: 1.00, Lidl: 0.97, Aldi: 0.98, Kaufland: 1.05,
+      Netto: 0.99, Auchan: 1.06, Carrefour: 1.08,
+    };
+    const sourceFactor = STORE_MULTIPLIER[storeRow.name] ?? 1.0;
+
+    // Pull current prices for all (product, store) we want to consider
+    const productIds = [...new Set(reportRows.filter((r) => !r.is_promo).map((r) => r.product_id))];
+    if (productIds.length > 0) {
+      const { data: peerPrices } = await admin
+        .from("prices")
+        .select("product_id, store_id, price, source");
+
+      const peerMap = new Map<string, { price: number | null; source: string | null }>();
+      for (const p of (peerPrices ?? []) as any[]) {
+        peerMap.set(`${p.product_id}-${p.store_id}`, { price: p.price, source: p.source });
+      }
+
+      const calibrationUpdates: { product_id: number; store_id: number; price: number; source: string }[] = [];
+
+      for (const row of reportRows) {
+        if (row.is_promo) continue;
+        const baseline = row.price / sourceFactor;       // Biedronka-reference baseline
+
+        for (const peer of stores) {
+          if (peer.id === storeRow.id) continue;          // skip the source store itself
+          const factor = STORE_MULTIPLIER[peer.name];
+          if (!factor) continue;
+          const target = parseFloat((baseline * factor).toFixed(2));
+
+          const current = peerMap.get(`${row.product_id}-${peer.id}`);
+          if (!current) continue;
+          if (current.source && current.source !== "estimated") continue;  // hands off real data
+          if (current.price != null) {
+            // Already close enough? skip
+            const ratio = current.price / target;
+            if (ratio >= 0.5 && ratio <= 1.5) continue;
+          }
+
+          calibrationUpdates.push({
+            product_id: row.product_id,
+            store_id: peer.id,
+            price: target,
+            source: "estimated",
+          });
+        }
+      }
+
+      if (calibrationUpdates.length > 0) {
+        await admin.from("prices").upsert(calibrationUpdates, { onConflict: "product_id,store_id" });
+        recalibrated = calibrationUpdates.length;
+      }
+    }
   }
 
   return NextResponse.json({
@@ -381,5 +474,6 @@ Respond with ONLY a JSON object (no markdown):
     accepted,
     rejected,
     saved: reportRows.length,
+    recalibrated,
   });
 }
