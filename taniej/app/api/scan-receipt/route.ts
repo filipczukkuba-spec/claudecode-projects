@@ -1,7 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { matchScore } from "@/lib/matching";
+import { norm } from "@/lib/matching";
 import { createHash } from "crypto";
+
+const STOPWORDS = new Set([
+  "z", "ze", "do", "od", "na", "po", "i", "w", "we", "bez", "luz",
+  "luzem", "szt", "kg", "ml", "ltr", "l", "g",
+]);
+
+// At least one meaningful word in `raw` shares a 4-char prefix with a
+// meaningful word in `target`. Guards against Claude hallucinating a
+// completely unrelated match.
+function sharesRoot(raw: string, target: string): boolean {
+  const tokenize = (s: string) =>
+    norm(s).split(" ").filter((t) => t.length >= 4 && !STOPWORDS.has(t));
+  const rawWords = tokenize(raw);
+  const tgtWords = tokenize(target);
+  if (rawWords.length === 0 || tgtWords.length === 0) return false;
+  for (const r of rawWords) {
+    const rRoot = r.slice(0, 4);
+    for (const t of tgtWords) {
+      if (t.startsWith(rRoot) || r.startsWith(t.slice(0, 4))) return true;
+    }
+  }
+  return false;
+}
 
 export const maxDuration = 60;
 
@@ -11,7 +34,6 @@ const HARD_MAX_PRICE = 500;
 const OUTLIER_MULTIPLIER = 5;
 const MAX_SCANS_PER_HOUR = 10;
 const DUP_WINDOW_DAYS = 30;
-const STRICT_MATCH_THRESHOLD = 0.75; // higher = less guessing
 
 interface ExtractedItem {
   raw_name: string;
@@ -151,10 +173,27 @@ CRITICAL RULES — read carefully:
 
 6. FOR EACH ITEM LINE:
    - raw_name: the exact abbreviated Polish text on the receipt
-   - matched_name: the EXACT name from the catalogue above ONLY IF you are confident.
-     DO NOT GUESS. If the receipt says "PATYCZKI SZAS" and there is no Patyczki product
-     in the catalogue, return matched_name = null. NEVER pick a different product just
-     because it has similar letters. "FILET DORSZ" must NOT be matched to "Filet z indyka".
+   - matched_name: the EXACT name from the catalogue above ONLY if the FIRST MEANINGFUL
+     WORD on the receipt line matches the first meaningful word in a catalogue entry.
+     RULE: receipt's first noun must share its root with the catalogue product's first noun.
+     If you are not 100% sure, return matched_name = null. NULL IS THE CORRECT ANSWER
+     when in doubt — we never want a wrong match.
+
+     EXAMPLES OF WHAT NOT TO DO (these are FORBIDDEN matches):
+       receipt "PATYCZKI SZAS"   → matched_name MUST be "Patyczki do szaszłyków" OR null
+                                    NEVER "Filet z dorsza", NEVER "Paluszki Lajkonik"
+       receipt "FILET DORSZ"     → matched_name MUST be "Filet z dorsza" OR null
+                                    NEVER "Filet z kurczaka", NEVER "Filet z indyka"
+       receipt "PAPRYKA CZERW"   → matched_name MUST be "Papryka" OR null
+                                    NEVER "Papryka mielona"
+       receipt "MLEKO LACIATE 2" → matched_name MUST be "Mleko UHT Łaciate 2%" OR null
+                                    NEVER plain "Mleko"
+       receipt "COCA-COLA ZERO"  → matched_name MUST be "Coca-Cola Zero" OR null
+                                    NEVER "Coca-Cola"
+
+     If the receipt item does not appear in the catalogue at all, matched_name = null.
+     The system will skip that line gracefully. This is GOOD.
+
    - quantity: how many units were bought. For piece-sold items = the count (1, 2, ...).
      For weight-sold items the receipt shows "0.63 x 14.99 = 9.44" — here quantity = 0.63 (kg).
    - unit_type: "szt" (piece), "kg" (kilogram), or "l" (litre). null if unclear.
@@ -368,20 +407,22 @@ Respond with ONLY a JSON object (no markdown):
       continue;
     }
 
-    // Strict match: prefer Claude's matched_name; only fall back to fuzzy if very high score
-    let best = item.matched_name
+    // STRICT match only: Claude must return matched_name, and it must exist
+    // in our catalogue. No fuzzy fallback — if Claude wasn't sure (matched_name
+    // = null) we'd rather skip the line than guess wrong.
+    const best = item.matched_name
       ? products.find((p) => p.name.toLowerCase() === item.matched_name!.toLowerCase())
       : undefined;
 
     if (!best) {
-      const candidates = products
-        .map((p) => ({ p, score: matchScore(item.raw_name, p.name) }))
-        .filter(({ score }) => score >= STRICT_MATCH_THRESHOLD)
-        .sort((a, b) => b.score - a.score);
-      best = candidates[0]?.p;
+      rejected.push({ raw: item.raw_name, reason: "no_match" });
+      continue;
     }
 
-    if (!best) {
+    // Safety net: even if Claude returned a name, sanity-check that it shares
+    // at least one meaningful word root with the receipt line. This catches
+    // hallucinations like "PATYCZKI SZAS" → "Filet z dorsza".
+    if (!sharesRoot(item.raw_name, best.name)) {
       rejected.push({ raw: item.raw_name, reason: "no_match" });
       continue;
     }
