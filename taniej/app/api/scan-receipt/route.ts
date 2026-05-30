@@ -25,6 +25,8 @@ interface ExtractedItem {
 
 interface VisionResult {
   store: string | null;
+  store_nip: string | null;        // 10-digit tax ID
+  receipt_number: string | null;   // NR PARAGONU printed near the date
   receipt_date: string | null;
   total: number | null;
   items: ExtractedItem[];
@@ -136,11 +138,18 @@ CRITICAL RULES — read carefully:
 
 1. STORE: identify from the header, logo, or address. Use exact spelling from the list above.
 
-2. DATE: find the receipt date (near "DATA" or YYYY-MM-DD format).
+2. STORE_NIP: the 10-digit tax ID printed in the header (look for "NIP" followed by 10 digits).
+   Return as a plain digit string with no formatting, e.g. "7811897358". null if not visible.
 
-3. TOTAL: find the final total at "SUMA PLN" or "DO ZAPŁATY".
+3. RECEIPT_NUMBER: the unique receipt number — usually labeled "NR" or "PARAGON FISKALNY nr",
+   often near the date. Return the full identifier as printed (digits, slashes, dashes ok),
+   e.g. "747556" or "Z2/123/45". null if not visible.
 
-4. FOR EACH ITEM LINE:
+4. DATE: find the receipt date (near "DATA" or YYYY-MM-DD format).
+
+5. TOTAL: find the final total at "SUMA PLN" or "DO ZAPŁATY".
+
+6. FOR EACH ITEM LINE:
    - raw_name: the exact abbreviated Polish text on the receipt
    - matched_name: the EXACT name from the catalogue above ONLY IF you are confident.
      DO NOT GUESS. If the receipt says "PATYCZKI SZAS" and there is no Patyczki product
@@ -158,13 +167,15 @@ CRITICAL RULES — read carefully:
    - is_promo: true if the line shows "*", "RABAT", "PROMO", "1+1", "-X%", or has a
      discount row right after it.
 
-5. SKIP: deposit fees ("OPŁATA SKARBOWA"), bag charges, NIP, copy markers, blank rows.
+7. SKIP from items: deposit fees ("OPŁATA SKARBOWA"), bag charges, copy markers, blank rows.
 
-6. If receipt is blurry, cut off, or not a Polish receipt: return unreadable=true.
+8. If receipt is blurry, cut off, or not a Polish receipt: return unreadable=true.
 
 Respond with ONLY a JSON object (no markdown):
 {
   "store": "Lidl" | "Biedronka" | ... | null,
+  "store_nip": "7811897358" | null,
+  "receipt_number": "747556" | null,
   "receipt_date": "2026-05-30" | null,
   "total": 51.86 | null,
   "items": [
@@ -253,6 +264,39 @@ Respond with ONLY a JSON object (no markdown):
     return NextResponse.json({ error: "Nie znaleziono produktów na paragonie" }, { status: 422 });
   }
 
+  // Primary dedup: NIP + receipt number + date. Polish fiscal receipts are
+  // uniquely identified by this combo — even a re-photograph of the same
+  // paragon will share it. Image-hash check above already caught identical
+  // bytes; this catches the same receipt photographed twice.
+  const nipClean = vision.store_nip ? String(vision.store_nip).replace(/\D/g, "") : null;
+  const nrClean = vision.receipt_number ? String(vision.receipt_number).trim().slice(0, 80) : null;
+  const haveBoth = nipClean && nipClean.length >= 8 && nrClean && nrClean.length >= 3;
+
+  if (haveBoth) {
+    const dupSince = new Date(Date.now() - DUP_WINDOW_DAYS * 86400_000).toISOString();
+    const { count: nipDupCount } = await admin
+      .from("receipt_scans")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "ok")
+      .eq("store_nip", nipClean)
+      .eq("receipt_number", nrClean)
+      .eq("receipt_date", vision.receipt_date!)
+      .gte("scanned_at", dupSince);
+
+    if ((nipDupCount ?? 0) > 0) {
+      await admin.from("receipt_scans").insert({
+        status: "rejected", reject_reason: "duplicate_nip",
+        store_id: storeRow.id, receipt_date: vision.receipt_date,
+        store_nip: nipClean, receipt_number: nrClean,
+        ip_hash: ipHash, city,
+      });
+      return NextResponse.json(
+        { error: "Ten paragon już został zeskanowany (sprawdzamy po numerze paragonu). Dziękujemy!" },
+        { status: 409 }
+      );
+    }
+  }
+
   // Total reconciliation using line_total values
   if (vision.total != null && Number.isFinite(vision.total)) {
     const sum = items.reduce((s, i) => s + (Number.isFinite(i.line_total) ? i.line_total : 0), 0);
@@ -293,6 +337,8 @@ Respond with ONLY a JSON object (no markdown):
     .insert({
       status: "ok",
       fingerprint: imageFingerprint,
+      store_nip: nipClean,
+      receipt_number: nrClean,
       store_id: storeRow.id,
       receipt_date: vision.receipt_date,
       receipt_total: vision.total ?? null,
