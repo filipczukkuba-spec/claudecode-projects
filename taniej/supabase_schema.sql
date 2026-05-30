@@ -12,6 +12,11 @@ create table products (
   unit text
 );
 
+-- Prevent duplicate product names (case-insensitive).
+-- Seed files use ON CONFLICT (id) DO NOTHING, so this catches name-collisions
+-- where two seeds picked different ids for the same product.
+create unique index if not exists uniq_products_name_lower on products(lower(name));
+
 -- Prices (one row per store+product combo)
 create table prices (
   id serial primary key,

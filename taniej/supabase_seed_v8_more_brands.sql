@@ -13,13 +13,13 @@ INSERT INTO products (id, name, unit) VALUES
   (431, 'Mlekovita ser',            '250g'),
   (432, 'Mlekovita masło',          '200g'),
   (433, 'Piątnica twaróg',          '250g'),
-  (434, 'Piątnica śmietana',        '400g'),
+  -- 434 'Piątnica śmietana' removed (duplicate of earlier seed)
   (435, 'Hochland ser topiony',     '200g'),
   (436, 'Hochland Almette',         '150g'),
   (437, 'Bakoma jogurt',            '150g'),
   (438, 'Bakoma Mus',               '100g'),
   (439, 'Zott Jogobella',           '150g'),
-  (440, 'Zott Monte',               '100g'),
+  -- 440 'Zott Monte' removed (duplicate of earlier seed)
   (441, 'Müller jogurt',            '150g'),
   (442, 'Skyr Pilos',               '150g'),
   (443, 'Mleko UHT Łaciate 3,2%',   '1L'),
@@ -131,15 +131,15 @@ INSERT INTO products (id, name, unit) VALUES
   (540, 'Velvet papier toaletowy',  '8 rolek'),
   (541, 'Regina papier toaletowy',  '8 rolek'),
   (542, 'Foliopak worki',           '30 szt.')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- 2. Base prices (Biedronka reference, PLN).
 WITH base_prices(product_id, base) AS (
   VALUES
     -- dairy
-    (431, 12.99::numeric), (432, 9.49), (433, 4.99), (434, 5.49),
+    (431, 12.99::numeric), (432, 9.49), (433, 4.99),
     (435, 6.99), (436, 5.99), (437, 2.49), (438, 2.79),
-    (439, 2.69), (440, 3.49), (441, 3.99), (442, 3.49),
+    (439, 2.69),            (441, 3.99), (442, 3.49),
     (443, 4.49), (444, 4.29), (445, 4.99),
     -- meat
     (446, 9.99), (447, 24.99), (448, 5.99), (449, 4.99),
