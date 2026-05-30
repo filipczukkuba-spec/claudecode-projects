@@ -116,7 +116,8 @@
       "WebFetch(domain:www.okazje24.pl)",
       "WebFetch(domain:promocje.dlaoszczednych.pl)",
       "WebFetch(domain:www.pepper.pl)",
-      "WebFetch(domain:www.gazetka-online.pl)"
+      "WebFetch(domain:www.gazetka-online.pl)",
+      "Skill(update-config)"
     ]
   }
 }
