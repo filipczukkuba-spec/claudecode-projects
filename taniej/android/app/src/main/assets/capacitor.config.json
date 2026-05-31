@@ -1,0 +1,20 @@
+{
+	"appId": "pl.taniejkupuj.app",
+	"appName": "taniejkupuj",
+	"webDir": "mobile-shell",
+	"server": {
+		"url": "https://taniejkupuj.pl",
+		"cleartext": false
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 1200,
+			"backgroundColor": "#16a34a",
+			"showSpinner": false
+		},
+		"StatusBar": {
+			"style": "LIGHT",
+			"backgroundColor": "#16a34a"
+		}
+	}
+}
