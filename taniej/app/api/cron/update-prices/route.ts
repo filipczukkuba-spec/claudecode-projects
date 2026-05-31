@@ -10,7 +10,9 @@ export const maxDuration = 60;
 // fetcher: "jina" = free, no key needed. "firecrawl" = needs FIRECRAWL_API_KEY,
 // handles Cloudflare + JS-rendered product grids (500 pages/month free tier).
 
-type StoreConfig = { urls: string[]; fetcher: "jina" | "firecrawl"; actions?: object[] };
+// render: ask Jina for its browser engine (executes JS before extraction).
+// Only meaningful for fetcher:"jina"; needed for client-rendered offer pages.
+type StoreConfig = { urls: string[]; fetcher: "jina" | "firecrawl"; actions?: object[]; render?: boolean };
 
 const STORES: Record<string, StoreConfig> = {
   // Aldi: Jina works well — plain HTML offers page
@@ -26,14 +28,18 @@ const STORES: Record<string, StoreConfig> = {
   // Lidl: fully blocked (Jina + Firecrawl both return empty) — skipped, DB uses estimates
 
   // Netto: weekly promo list lives at /oferta/ (homepage + /gazetka-tygodniowa
-  // went dead). Prices render as "6.\n99" with no "zł" suffix — Claude handles it.
+  // went dead). Static fetch returns ~20 price tokens; the browser engine
+  // renders the full list (~47). Prices show as "6.\n99" with no "zł" suffix
+  // — Claude handles it.
   Netto: {
     fetcher: "jina",
     urls: [
       "https://www.netto.pl/oferta/",
     ],
+    render: true,
   },
-  // Biedronka: Jina bypasses the JS mobile overlay that blocks Firecrawl
+  // Biedronka: offers are client-rendered; the default fetch returns the JS
+  // mobile overlay with no prices, so use the browser engine.
   Biedronka: {
     fetcher: "jina",
     urls: [
@@ -41,6 +47,7 @@ const STORES: Record<string, StoreConfig> = {
       "https://www.biedronka.pl/pl/",
       "https://zakupy.biedronka.pl/pl/",
     ],
+    render: true,
   },
   // Kaufland: main page intermittent — keep trying
   Kaufland: {
@@ -175,7 +182,7 @@ export async function POST(req: NextRequest) {
   }> = {};
 
   await Promise.allSettled(
-    Object.entries(STORES).map(async ([storeName, { urls, fetcher, actions }]) => {
+    Object.entries(STORES).map(async ([storeName, { urls, fetcher, actions, render }]) => {
       const storeId = storeIdMap[storeName];
       if (!storeId) return;
 
@@ -187,7 +194,7 @@ export async function POST(req: NextRequest) {
 
       const fetch1 = fetcher === "firecrawl"
         ? (u: string) => fetchViaFirecrawl(u, actions)
-        : fetchViaJina;
+        : (u: string) => fetchViaJina(u, render);
 
       try {
         const htmlResults = await Promise.allSettled(urls.map((u) => fetch1(u)));

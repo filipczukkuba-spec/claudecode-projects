@@ -48,16 +48,25 @@ export async function fetchViaFirecrawl(url: string, actions?: object[]): Promis
 
 // Jina.ai reader: renders JS, returns clean text. Free tier, no key needed.
 // With JINA_API_KEY env var: higher rate limits (get free key at jina.ai).
-export async function fetchViaJina(url: string): Promise<string> {
+//
+// `render` switches Jina to its headless-browser engine (X-Engine: browser),
+// which executes the page's JS before extracting. Needed for stores whose
+// offers are client-rendered: probing Netto's /oferta/ returned ~20 price
+// tokens with the default fetch vs ~47 with the browser engine, and the
+// default fetch returns near-empty for Biedronka/Auchan. It's slower and uses
+// more Jina quota, so it stays opt-in per store. Markdown format is used in
+// render mode because it preserves the price/label structure Claude reads.
+export async function fetchViaJina(url: string, render = false): Promise<string> {
   const jinaKey = process.env.JINA_API_KEY;
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 35000);
+    const t = setTimeout(() => ctrl.abort(), render ? 55000 : 35000);
     const res = await fetch(`https://r.jina.ai/${url}`, {
       headers: {
         ...(jinaKey ? { Authorization: `Bearer ${jinaKey}` } : {}),
-        "X-Return-Format": "text",
-        "X-Timeout": "25",
+        "X-Return-Format": render ? "markdown" : "text",
+        "X-Timeout": render ? "45" : "25",
+        ...(render ? { "X-Engine": "browser" } : {}),
         "Accept": "text/plain",
       },
       signal: ctrl.signal,
