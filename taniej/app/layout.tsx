@@ -27,12 +27,22 @@ export const metadata: Metadata = {
     siteName: "taniejkupuj",
     locale: "pl_PL",
     type: "website",
+    images: [
+      {
+        url: "https://taniejkupuj.pl/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "taniejkupuj — porównywarka cen w polskich sklepach spożywczych",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "taniejkupuj.pl — Porównywarka cen 7 sklepów spożywczych",
     description: "Porównaj ceny w Biedronce, Lidlu, Kauflandzie, Aldi, Netto, Auchanie i Carrefourze. Wpisz listę zakupów, znajdź najtańszy koszyk. Bez logowania, gratis.",
+    images: ["https://taniejkupuj.pl/opengraph-image"],
   },
+  metadataBase: new URL("https://taniejkupuj.pl"),
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
