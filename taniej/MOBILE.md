@@ -33,38 +33,55 @@ cart/arrow art in the safe zone (`icon-foreground.png`).
 npx cap sync        # copies web assets + config into the native projects
 ```
 
-## Building Android (tooling NOT installed on the current machine)
+## Building Android
 
-This machine has no JDK and no Android SDK (`java` not on PATH, `ANDROID_HOME`
-unset), so the APK/AAB can't be built here. Install once:
+The toolchain is installed and both builds are verified working.
 
-- **JDK 17** (Temurin/Adoptium) → set `JAVA_HOME`
-- **Android Studio** + Android SDK → set `ANDROID_HOME` (e.g.
-  `%LOCALAPPDATA%\Android\Sdk`)
+- **JDK 21** — `C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot`
+  (`JAVA_HOME` set at user scope). ⚠️ Capacitor 8 requires **JDK 21** — JDK 17
+  fails with `invalid source release: 21`.
+- **Android SDK** — `C:\Users\filip\Android\Sdk` (`ANDROID_HOME` /
+  `ANDROID_SDK_ROOT` set), with `platform-tools`, **`platforms;android-36`**
+  (compileSdk 36), `build-tools;35.0.0`.
 
-Then:
+Debug APK (verified → ~4.4 MB `app-debug.apk`):
 
 ```bash
 npx cap sync android
-npx cap open android                         # open in Android Studio, or:
 cd android && ./gradlew assembleDebug        # -> app/build/outputs/apk/debug/app-debug.apk
+```
+
+If a fresh shell doesn't see `java`, set it for the session (PowerShell):
+
+```powershell
+$env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot"
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+$env:ANDROID_HOME="C:\Users\filip\Android\Sdk"
 ```
 
 ### Play Store release (signed AAB)
 
-1. Create an upload keystore once (back it up — losing it blocks future updates):
-   ```bash
-   keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 \
-     -validity 9125 -alias upload
-   ```
-2. Reference it from `android/app/build.gradle` via a `key.properties` file.
-   **Never commit the keystore or passwords** (add both to `.gitignore`).
-3. Bump `versionCode` (and usually `versionName`) for every upload.
-4. Build the bundle:
-   ```bash
-   cd android && ./gradlew bundleRelease      # -> app/build/outputs/bundle/release/app-release.aab
-   ```
-5. Upload the `.aab` at https://play.google.com/console (one-time $25 dev
+The upload keystore + signing are already set up. `build.gradle` reads a
+gitignored `android/app/key.properties` (opt-in: no file → unsigned release,
+so clones/CI don't break):
+
+- Keystore: `android/app/upload-keystore.jks`, alias `upload`
+- `android/app/key.properties` holds the passwords
+- **Both are gitignored — never commit them.** ⚠️ Back up the keystore +
+  password off-machine; losing them means you can never ship an update to the
+  same Play listing. (Password is recorded in project memory.)
+
+Build the signed bundle (verified → ~3.2 MB signed `app-release.aab`,
+`META-INF/UPLOAD.RSA`):
+
+```bash
+cd android && ./gradlew bundleRelease        # -> app/build/outputs/bundle/release/app-release.aab
+```
+
+Then:
+1. Bump `versionCode` (and usually `versionName`) in `android/app/build.gradle`
+   for every new upload.
+2. Upload the `.aab` at https://play.google.com/console (one-time $25 dev
    account). Prepare: PL store listing, screenshots, privacy-policy URL,
    data-safety form, content rating.
 
@@ -81,7 +98,7 @@ npx cap open ios     # Xcode -> set Team/signing -> Product > Archive -> upload 
 - [x] Capacitor Android + iOS projects scaffolded (`cap add`)
 - [x] WebView points at live `taniejkupuj.pl`; offline fallback shell
 - [x] Branded launcher icons + adaptive icon + splash (green / cart+arrow)
-- [ ] Build APK/AAB — blocked: JDK 17 + Android SDK not installed here
-- [ ] Upload keystore + signing config
-- [ ] Play Store listing + first upload
-- [ ] iOS archive (needs macOS)
+- [x] JDK 21 + Android SDK (android-36) installed; **debug APK + signed AAB build**
+- [x] Upload keystore + opt-in signing config (gitignored)
+- [ ] Play Store listing + first upload (needs $25 dev account + listing assets)
+- [ ] iOS archive (needs macOS + Xcode)
