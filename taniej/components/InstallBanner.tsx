@@ -49,9 +49,8 @@ export default function InstallBanner() {
   return (
     <div className="fixed top-4 inset-x-4 z-50 max-w-md mx-auto animate-slide-up">
       <div className="bg-gray-900 text-white rounded-2xl p-4 shadow-2xl flex items-center gap-3">
-        <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center text-white font-black text-lg shrink-0">
-          t
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon-192.png" alt="taniejkupuj" className="w-10 h-10 rounded-xl shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-tight">Dodaj do ekranu głównego</p>
           <p className="text-xs text-gray-400 mt-0.5">Szybszy dostęp, działa jak aplikacja</p>

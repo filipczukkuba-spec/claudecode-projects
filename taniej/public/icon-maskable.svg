@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#16a34a"/>
+    </linearGradient>
+  </defs>
+  <!-- full-bleed background; OS applies its own mask -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- content scaled into the ~70% maskable safe zone -->
+  <g transform="translate(256 256) scale(0.7) translate(-256 -256)">
+    <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M104 150 h44 l40 188 h150"/>
+      <path d="M188 198 h232 l-34 122 h-198"/>
+    </g>
+    <circle cx="214" cy="384" r="22" fill="#ffffff"/>
+    <circle cx="372" cy="384" r="22" fill="#ffffff"/>
+    <circle cx="372" cy="232" r="66" fill="#facc15"/>
+    <path d="M372 196 v58 M372 254 l-26 -26 M372 254 l26 -26" fill="none" stroke="#166534" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
