@@ -122,7 +122,9 @@
       "Bash(grep -hoE \"'[A-ZŁŚĆŻŹŃĄĘÓ][^']{2,40}'\" supabase_seed_v2.sql supabase_seed_v3.sql supabase_seed_v4.sql supabase_seed_v5.sql supabase_seed_v6.sql supabase_seed_v7_brands.sql)",
       "Bash(grep -hoE \"'[A-ZŁŚĆŻŹŃĄĘÓ][^']{2,40}'\" supabase_seed_v8_more_brands.sql supabase_seed_v9_loose_produce.sql)",
       "Bash(npx next *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(npx cap *)"
     ]
   }
 }

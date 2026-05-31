@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">taniejkupuj</string>
+    <string name="title_activity_main">taniejkupuj</string>
+    <string name="package_name">pl.taniejkupuj.app</string>
+    <string name="custom_url_scheme">pl.taniejkupuj.app</string>
+</resources>

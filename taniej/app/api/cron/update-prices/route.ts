@@ -25,12 +25,12 @@ const STORES: Record<string, StoreConfig> = {
   },
   // Lidl: fully blocked (Jina + Firecrawl both return empty) — skipped, DB uses estimates
 
-  // Netto: Jina gazetka working
+  // Netto: weekly promo list lives at /oferta/ (homepage + /gazetka-tygodniowa
+  // went dead). Prices render as "6.\n99" with no "zł" suffix — Claude handles it.
   Netto: {
     fetcher: "jina",
     urls: [
-      "https://www.netto.pl/",
-      "https://www.netto.pl/gazetka-tygodniowa/",
+      "https://www.netto.pl/oferta/",
     ],
   },
   // Biedronka: Jina bypasses the JS mobile overlay that blocks Firecrawl
